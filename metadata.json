@@ -1,0 +1,7 @@
+{
+  "name": "TangerConnect AI Assistant",
+  "description": "An AI-powered chatbot for Tangier city services. Get medical advice, book appointments with various professionals, and get help with utilities. Features a QR code system for appointment verification. Supports Arabic, French, and English.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

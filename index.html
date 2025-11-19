@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TangerConnect AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      // These will be replaced by your actual Supabase credentials
+      window.process = {
+        env: {
+          SUPABASE_URL: 'https://lrprlzijjykvpxpyxrcn.supabase.co',
+          SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxycHJsemlqanlrdnB4cHl4cmNuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMxMjIwNDEsImV4cCI6MjA3ODY5ODA0MX0.6S8eSgprS686iobE7zrmurxIvzvC8Qmpu71rKT8FvZc'
+        }
+      };
+
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              primary: '#0077B6',
+              secondary: '#00B4D8',
+              accent: '#90E0EF',
+              light: '#CAF0F8',
+              dark: '#03045E',
+            },
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+              arabic: ['Tajawal', 'sans-serif']
+            }
+          }
+        }
+      }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.29.1",
+    "jsqr": "https://aistudiocdn.com/jsqr@^1.4.0",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.553.0",
+    "qrcode": "https://aistudiocdn.com/qrcode@^1.5.4",
+    "react-qr-reader": "https://aistudiocdn.com/react-qr-reader@^3.0.0-beta-1",
+    "@supabase/supabase-js": "https://aistudiocdn.com/@supabase/supabase-js@^2.45.0"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
