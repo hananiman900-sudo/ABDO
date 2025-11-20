@@ -1,15 +1,10 @@
 
-
 import { GoogleGenAI } from "@google/genai";
 import { Language } from "../types";
 import { supabase } from "./supabaseClient";
 
-const API_KEY = process.env.API_KEY;
-if (!API_KEY) {
-  throw new Error("API_KEY environment variable is not set");
-}
-
-const ai = new GoogleGenAI({ apiKey: API_KEY });
+// Do not initialize globally to prevent crash on load if key is missing
+// const API_KEY = process.env.API_KEY;
 
 const getSystemInstruction = (language: Language, providersList: string, upcomingAppointments: string) => {
   const commonInstructions = `
@@ -150,6 +145,14 @@ export const getChatResponse = async (
   userId?: number,
 ): Promise<string> => {
   try {
+    // Initialize AI Client lazily here to prevent crash on load if API_KEY is missing
+    const API_KEY = process.env.API_KEY;
+    if (!API_KEY) {
+        console.error("API_KEY environment variable is not set");
+        return "Configuration Error: The API_KEY is missing in Vercel Environment Variables. Please add it to make the AI work.";
+    }
+    const ai = new GoogleGenAI({ apiKey: API_KEY });
+
     const { data: providers, error: providersError } = await supabase
       .from('providers')
       .select('name, service_type, location');
@@ -209,6 +212,6 @@ export const getChatResponse = async (
     return response.text;
   } catch (error) {
     console.error("Error in generateContent:", error);
-    throw new Error("Failed to get response from AI model.");
+    return "Sorry, I encountered an error connecting to the AI service. Please check the configuration.";
   }
 };
