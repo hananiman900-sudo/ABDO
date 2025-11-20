@@ -345,7 +345,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
                         />
                         <button onClick={saveApiKey} className="bg-red-600 text-white px-3 py-2 rounded-lg hover:bg-red-700 shadow-md">Save</button>
                    </div>
-                   <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-xs text-red-500 hover:underline mt-2 block text-right flex items-center justify-end gap-1">
+                   <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-xs text-red-500 hover:underline mt-2 flex items-center justify-end gap-1">
                       Get Key <ArrowRight size={12} />
                    </a>
              </div>
@@ -383,7 +383,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
                 onKeyPress={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }}}
                 placeholder={t('inputPlaceholder')}
                 rows={1}
-                className="w-full bg-transparent border-none focus:ring-0 text-gray-900 dark:text-gray-100 placeholder-gray-400 resize-none py-3 max-h-24"
+                className="w-full bg-transparent border-none focus:ring-0 text-gray-900 dark:text-white placeholder-gray-400 resize-none py-3 max-h-24 outline-none"
                 disabled={isLoading}
                 style={{ minHeight: '44px' }}
               />
