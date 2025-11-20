@@ -1,3 +1,4 @@
+
 import { GoogleGenAI } from "@google/genai";
 import { Language } from "../types";
 import { supabase } from "./supabaseClient";
@@ -144,14 +145,22 @@ export const getChatResponse = async (
   userId?: number,
 ): Promise<string> => {
   try {
-    // Check Environment Variable first, then LocalStorage
-    let API_KEY = process.env.API_KEY;
+    // Check Environment Variable first (from index.html window.process)
+    let API_KEY = '';
     
-    if (!API_KEY) {
-        // Fallback: Check local storage in the browser
-        if (typeof window !== 'undefined') {
-            API_KEY = localStorage.getItem('gemini_api_key') || undefined;
-        }
+    // 1. Try the injected window.process (from index.html)
+    if (typeof window !== 'undefined' && (window as any).process?.env?.API_KEY) {
+      API_KEY = (window as any).process.env.API_KEY;
+    }
+    
+    // 2. Try standard process.env (if build tool replaces it)
+    if (!API_KEY && typeof process !== 'undefined' && process.env?.API_KEY) {
+      API_KEY = process.env.API_KEY;
+    }
+
+    // 3. Try LocalStorage (user entered key)
+    if (!API_KEY && typeof window !== 'undefined') {
+        API_KEY = localStorage.getItem('gemini_api_key') || '';
     }
 
     if (!API_KEY) {
