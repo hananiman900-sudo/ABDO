@@ -5,7 +5,7 @@ import { getChatResponse } from '../services/geminiService';
 import { useLocalization } from '../hooks/useLocalization';
 import { supabase } from '../services/supabaseClient';
 import QRCodeDisplay from './QRCodeDisplay';
-import { Send, Bot, User as UserIcon, Loader2, Paperclip, X, Bell, Key, Save, ImageIcon } from 'lucide-react';
+import { Send, Bot, User as UserIcon, Loader2, Paperclip, X, Bell, Key, Save, ImageIcon, ArrowRight } from 'lucide-react';
 
 const BookingConfirmation: React.FC<{ details: BookingDetails }> = ({ details }) => {
   const { t } = useLocalization();
@@ -345,7 +345,9 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
                         />
                         <button onClick={saveApiKey} className="bg-red-600 text-white px-3 py-2 rounded-lg hover:bg-red-700 shadow-md">Save</button>
                    </div>
-                   <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-xs text-red-500 hover:underline mt-2 block text-right">Get Key -></a>
+                   <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-xs text-red-500 hover:underline mt-2 block text-right flex items-center justify-end gap-1">
+                      Get Key <ArrowRight size={12} />
+                   </a>
              </div>
           )}
           <div ref={messagesEndRef} />
