@@ -5,25 +5,25 @@ import Chatbot from './components/Chatbot';
 import ProviderPortal from './components/QRScanner';
 import AppointmentsDrawer from './components/AppointmentsDrawer';
 import DatabaseSetup from './components/DatabaseSetup';
-import { LocalizationProvider, useLocalization } from './hooks/useLocalization';
-import { Globe, User as UserIcon, CheckSquare, Sun, Moon, LogIn, LogOut, X, CalendarDays, Database, AlertTriangle, CreditCard, CheckCircle2 } from 'lucide-react';
+import { LocalizationProvider, useLocalization, translations } from './hooks/useLocalization';
+import { Globe, User as UserIcon, CheckSquare, Sun, Moon, LogIn, LogOut, X, CalendarDays, Database, AlertTriangle, CreditCard, CheckCircle2, Menu, MoreVertical } from 'lucide-react';
 import { supabase } from './services/supabaseClient';
 
 const RegistrationSuccessModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     const { t } = useLocalization();
     return (
-        <div className="fixed inset-0 bg-black/70 z-[60] flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md p-8 text-center animate-in fade-in zoom-in duration-300">
-                <div className="w-20 h-20 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <CheckCircle2 size={48} className="text-green-600 dark:text-green-400" />
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4 animate-fade-in">
+            <div className="bg-surface dark:bg-surfaceDark rounded-3xl shadow-2xl w-full max-w-sm p-8 text-center border border-gray-100 dark:border-gray-700 transform transition-all scale-100">
+                <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+                    <CheckCircle2 size={32} className="text-green-600 dark:text-green-400" />
                 </div>
-                <h2 className="text-2xl font-bold text-dark dark:text-light mb-4">{t('registrationSuccessTitle')}</h2>
-                <p className="text-gray-600 dark:text-gray-300 mb-6 text-lg">
+                <h2 className="text-2xl font-bold text-dark dark:text-light mb-3 font-arabic">{t('registrationSuccessTitle')}</h2>
+                <p className="text-gray-600 dark:text-gray-300 mb-8 text-base leading-relaxed">
                     {t('providerRegistrationSuccessMessage')}
                 </p>
                 <button 
                     onClick={onClose} 
-                    className="w-full px-6 py-3 bg-primary text-white rounded-xl hover:bg-dark transition-colors font-bold text-lg shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 duration-200"
+                    className="w-full px-6 py-3.5 bg-primary hover:bg-primaryDark text-white rounded-xl transition-all font-bold text-base shadow-lg shadow-primary/30 active:scale-95"
                 >
                     {t('backToApp')}
                 </button>
@@ -59,42 +59,9 @@ const AuthDrawer: React.FC<{
   const [providerPhone, setProviderPhone] = useState('');
   
   const drawerRef = useRef<HTMLDivElement>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [startY, setStartY] = useState(0);
-  const [currentY, setCurrentY] = useState(0);
 
-  const handleDragStart = (e: React.TouchEvent | React.MouseEvent) => {
-    setIsDragging(true);
-    const y = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    setStartY(y);
-  };
-  
-  const handleDragMove = (e: React.TouchEvent | React.MouseEvent) => {
-    if (!isDragging || !drawerRef.current) return;
-    const y = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    const deltaY = y - startY;
-    if (deltaY > 0) { // Only allow dragging down
-      setCurrentY(deltaY);
-      drawerRef.current.style.transform = `translateY(${deltaY}px)`;
-    }
-  };
-
-  const handleDragEnd = () => {
-    if (!isDragging) return;
-    setIsDragging(false);
-    if (currentY > 100) { // If dragged more than 100px, close
-      onClose();
-    }
-    // Reset position
-    if (drawerRef.current) {
-      drawerRef.current.style.transform = 'translateY(0)';
-    }
-    setCurrentY(0);
-    setStartY(0);
-  };
-  
   const handleSpecificError = (err: any) => {
-      console.error("Auth Error:", err); // Log the full error for debugging
+      console.error("Auth Error:", err); 
       const message = (err.message || '').toLowerCase();
       const code = err.code || '';
       const isSchemaError = message.includes('relation') || message.includes('column') || message.includes('schema cache');
@@ -157,7 +124,6 @@ const AuthDrawer: React.FC<{
         onAuthSuccess({ id: data.id, name: data.full_name, accountType: AccountType.CLIENT, phone: data.phone });
       } else {
         if (!username || !password) { setError(t('allFieldsRequired')); setIsLoading(false); return; }
-        // Select is_active AND subscription_end_date
         const { data, error } = await supabase
           .from('providers')
           .select('id, name, username, is_active, subscription_end_date')
@@ -167,8 +133,6 @@ const AuthDrawer: React.FC<{
           
         if (error || !data) throw error || new Error('Invalid credentials');
 
-        // Allow login even if inactive, but flag it
-        // The ProviderPortal component will handle the locking logic
         localStorage.setItem('tangerconnect_user_id', data.id.toString());
         localStorage.setItem('tangerconnect_user_type', AccountType.PROVIDER);
         onAuthSuccess({ 
@@ -204,7 +168,6 @@ const AuthDrawer: React.FC<{
       } else {
         if(!businessName || !serviceType || !location || !username || !password || !providerPhone) { setError(t('allFieldsRequired')); setIsLoading(false); return; }
         
-        // Insert with is_active = false by default (enforced by DB default, but explicit here for clarity if needed, or rely on DB)
         const { data, error } = await supabase
           .from('providers')
           .insert({ 
@@ -220,8 +183,6 @@ const AuthDrawer: React.FC<{
           .single();
           
         if (error || !data) throw error;
-        
-        // Show Success Modal
         setShowSuccessModal(true);
       }
     } catch (e: any) {
@@ -237,18 +198,24 @@ const AuthDrawer: React.FC<{
     else handleLogin();
   };
   
+  const InputField = ({ label, value, onChange, type = "text", placeholder = "" }: any) => (
+    <div className="mb-4">
+        <label className="block mb-2 text-sm font-semibold text-gray-700 dark:text-gray-300">{label}</label>
+        <input 
+            type={type} 
+            value={value} 
+            onChange={(e) => onChange(e.target.value)} 
+            placeholder={placeholder}
+            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 text-gray-900 rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary dark:bg-gray-700/50 dark:border-gray-600 dark:text-white transition-all outline-none" 
+            required 
+        />
+    </div>
+  );
+
   const renderClientFields = () => (
     <>
-      {isRegister && (
-        <div>
-          <label className="block mb-2 text-sm font-medium text-gray-900 dark:text-white">{t('fullName')}</label>
-          <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} className="w-full p-2.5 bg-gray-50 border border-gray-300 text-gray-900 rounded-lg focus:ring-primary focus:border-primary dark:bg-gray-700 dark:border-gray-600 dark:text-white" required />
-        </div>
-      )}
-      <div>
-        <label className="block mb-2 text-sm font-medium text-gray-900 dark:text-white">{t('phone')}</label>
-        <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full p-2.5 bg-gray-50 border border-gray-300 text-gray-900 rounded-lg focus:ring-primary focus:border-primary dark:bg-gray-700 dark:border-gray-600 dark:text-white" required />
-      </div>
+      {isRegister && <InputField label={t('fullName')} value={fullName} onChange={setFullName} />}
+      <InputField label={t('phone')} value={phone} onChange={setPhone} type="tel" placeholder="06..." />
     </>
   );
 
@@ -256,128 +223,84 @@ const AuthDrawer: React.FC<{
     <>
        {isRegister && (
          <>
-            <div className="bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-400 p-4 mb-4">
-                <div className="flex">
-                    <div className="flex-shrink-0">
-                        <AlertTriangle className="h-5 w-5 text-yellow-400" aria-hidden="true" />
-                    </div>
-                    <div className="ltr:ml-3 rtl:mr-3">
-                        <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-300">{t('subscriptionNoticeTitle')}</h3>
-                        <div className="mt-2 text-sm text-yellow-700 dark:text-yellow-200">
-                            <p>{t('subscriptionNoticeDesc')}</p>
-                        </div>
-                         <div className="mt-2 font-bold text-sm text-yellow-800 dark:text-yellow-300">
+            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-4 mb-5 rounded-xl">
+                <div className="flex gap-3">
+                    <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0" />
+                    <div>
+                        <h3 className="text-sm font-bold text-amber-800 dark:text-amber-400">{t('subscriptionNoticeTitle')}</h3>
+                        <p className="mt-1 text-xs text-amber-700 dark:text-amber-300 leading-relaxed">{t('subscriptionNoticeDesc')}</p>
+                        <div className="mt-2 font-bold text-sm text-amber-900 dark:text-amber-200 bg-amber-100 dark:bg-amber-900/40 inline-block px-2 py-1 rounded-md">
                             {t('subscriptionFee')}
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div>
-                <label className="block mb-2 text-sm font-medium text-gray-900 dark:text-white">{t('businessName')}</label>
-                <input type="text" value={businessName} onChange={(e) => setBusinessName(e.target.value)} className="w-full p-2.5 bg-gray-50 border border-gray-300 text-gray-900 rounded-lg focus:ring-primary focus:border-primary dark:bg-gray-700 dark:border-gray-600 dark:text-white" required />
-            </div>
-             <div>
-                <label className="block mb-2 text-sm font-medium text-gray-900 dark:text-white">{t('serviceType')}</label>
-                <input type="text" value={serviceType} onChange={(e) => setServiceType(e.target.value)} className="w-full p-2.5 bg-gray-50 border border-gray-300 text-gray-900 rounded-lg focus:ring-primary focus:border-primary dark:bg-gray-700 dark:border-gray-600 dark:text-white" required />
-            </div>
-             <div>
-                <label className="block mb-2 text-sm font-medium text-gray-900 dark:text-white">{t('location')}</label>
-                <input type="text" value={location} onChange={(e) => setLocation(e.target.value)} className="w-full p-2.5 bg-gray-50 border border-gray-300 text-gray-900 rounded-lg focus:ring-primary focus:border-primary dark:bg-gray-700 dark:border-gray-600 dark:text-white" required />
-            </div>
-             <div>
-                <label className="block mb-2 text-sm font-medium text-gray-900 dark:text-white">{t('phone')}</label>
-                <input type="tel" value={providerPhone} onChange={(e) => setProviderPhone(e.target.value)} placeholder="06..." className="w-full p-2.5 bg-gray-50 border border-gray-300 text-gray-900 rounded-lg focus:ring-primary focus:border-primary dark:bg-gray-700 dark:border-gray-600 dark:text-white" required />
-            </div>
+            <InputField label={t('businessName')} value={businessName} onChange={setBusinessName} />
+            <InputField label={t('serviceType')} value={serviceType} onChange={setServiceType} />
+            <InputField label={t('location')} value={location} onChange={setLocation} />
+            <InputField label={t('phone')} value={providerPhone} onChange={setProviderPhone} type="tel" />
          </>
        )}
-        <div>
-            <label className="block mb-2 text-sm font-medium text-gray-900 dark:text-white">{t('username')}</label>
-            <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full p-2.5 bg-gray-50 border border-gray-300 text-gray-900 rounded-lg focus:ring-primary focus:border-primary dark:bg-gray-700 dark:border-gray-600 dark:text-white" required />
-        </div>
+       <InputField label={t('username')} value={username} onChange={setUsername} />
     </>
   );
 
-
   useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'auto';
-    }
+    if (isOpen) document.body.style.overflow = 'hidden';
+    else document.body.style.overflow = 'auto';
     return () => { document.body.style.overflow = 'auto'; };
   }, [isOpen]);
-
-  useEffect(() => {
-    if (isDragging) {
-      window.addEventListener('touchmove', handleDragMove);
-      window.addEventListener('touchend', handleDragEnd);
-      window.addEventListener('mousemove', handleDragMove);
-      window.addEventListener('mouseup', handleDragEnd);
-    }
-    return () => {
-      window.removeEventListener('touchmove', handleDragMove);
-      window.removeEventListener('touchend', handleDragEnd);
-      window.removeEventListener('mousemove', handleDragMove);
-      window.removeEventListener('mouseup', handleDragEnd);
-    };
-  }, [isDragging, handleDragMove, handleDragEnd]);
-
 
   if (!isOpen) return null;
 
   return (
     <>
-    <div className="fixed inset-0 bg-black/60 z-50 flex justify-center items-end" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-center items-end sm:items-center" onClick={onClose}>
       <div 
         ref={drawerRef}
-        className="bg-white dark:bg-gray-800 rounded-t-2xl shadow-xl w-full max-w-md relative transition-transform duration-300 max-h-[90vh] overflow-y-auto" 
+        className="bg-surface dark:bg-surfaceDark rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-lg relative max-h-[90vh] overflow-y-auto animate-slide-up sm:animate-fade-in" 
         onClick={(e) => e.stopPropagation()}
-        style={{ transform: `translateY(0)`, willChange: 'transform' }}
       >
-        <div 
-          className="w-full py-4 flex justify-center cursor-grab sticky top-0 bg-white dark:bg-gray-800 z-10"
-          onTouchStart={handleDragStart}
-          onMouseDown={handleDragStart}
-        >
-          <div className="w-12 h-1.5 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
-        </div>
         
-        <div className="p-8 pt-0">
-          <button onClick={onClose} className="absolute top-4 right-4 rtl:left-4 rtl:right-auto text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 z-20">
-            <X size={24} />
-          </button>
-          <h2 className="text-2xl font-bold text-center text-dark dark:text-light mb-4">
-            {isRegister ? t('registerTitle') : t('loginTitle')}
-          </h2>
-            <div className="mb-4">
-                <label className="block mb-2 text-sm font-medium text-gray-900 dark:text-white">{t('accountType')}</label>
-                <div className="flex rounded-md shadow-sm">
-                    <button onClick={() => setAccountType(AccountType.CLIENT)} className={`px-4 py-2 block w-full text-sm font-medium rounded-l-lg border ${accountType === AccountType.CLIENT ? 'bg-primary text-white border-primary' : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'}`}>
-                        {t('client')}
-                    </button>
-                    <button onClick={() => setAccountType(AccountType.PROVIDER)} className={`px-4 py-2 block w-full text-sm font-medium rounded-r-lg border-t border-b border-r ${accountType === AccountType.PROVIDER ? 'bg-primary text-white border-primary' : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'}`}>
-                        {t('provider')}
-                    </button>
-                </div>
+        <div className="p-6 sm:p-8">
+            <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-dark dark:text-light">
+                    {isRegister ? t('registerTitle') : t('loginTitle')}
+                </h2>
+                <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                    <X size={24} className="text-gray-500" />
+                </button>
             </div>
+
+            <div className="mb-6 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl flex">
+                <button onClick={() => setAccountType(AccountType.CLIENT)} className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${accountType === AccountType.CLIENT ? 'bg-white dark:bg-gray-700 text-primary shadow-sm' : 'text-gray-500 dark:text-gray-400'}`}>
+                    {t('client')}
+                </button>
+                <button onClick={() => setAccountType(AccountType.PROVIDER)} className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${accountType === AccountType.PROVIDER ? 'bg-white dark:bg-gray-700 text-primary shadow-sm' : 'text-gray-500 dark:text-gray-400'}`}>
+                    {t('provider')}
+                </button>
+            </div>
+
             <form onSubmit={handleSubmit} className="space-y-4">
               {accountType === AccountType.CLIENT ? renderClientFields() : renderProviderFields()}
-               <div>
-                <label className="block mb-2 text-sm font-medium text-gray-900 dark:text-white">{t('password')}</label>
-                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-2.5 bg-gray-50 border border-gray-300 text-gray-900 rounded-lg focus:ring-primary focus:border-primary dark:bg-gray-700 dark:border-gray-600 dark:text-white" required />
-              </div>
-              {error && <div className="text-sm text-center">{error}</div>}
-              <button type="submit" disabled={isLoading} className="w-full text-white bg-primary hover:bg-dark focus:ring-4 focus:ring-secondary font-medium rounded-lg text-sm px-5 py-2.5 text-center disabled:bg-gray-400">
+              <InputField label={t('password')} value={password} onChange={setPassword} type="password" />
+              
+              {error && <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 text-red-600 dark:text-red-300 text-sm rounded-lg text-center">{error}</div>}
+              
+              <button type="submit" disabled={isLoading} className="w-full text-white bg-primary hover:bg-primaryDark font-bold rounded-xl text-base px-5 py-3.5 text-center shadow-lg shadow-primary/25 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
                 {isLoading ? t('loading') : (isRegister ? t('registerButton') : t('loginButton'))}
               </button>
             </form>
-            <p className="text-sm text-center text-gray-500 dark:text-gray-400 mt-4">
-              {isRegister ? t('haveAccount') : t('noAccount')}{' '}
-              <button onClick={() => setIsRegister(!isRegister)} className="font-medium text-secondary hover:underline">
-                {isRegister ? t('loginButton') : t('registerButton')}
-              </button>
-            </p>
+
+            <div className="mt-6 text-center pt-4 border-t border-gray-100 dark:border-gray-700">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                {isRegister ? t('haveAccount') : t('noAccount')}{' '}
+                <button onClick={() => setIsRegister(!isRegister)} className="font-bold text-secondary hover:text-primary transition-colors">
+                  {isRegister ? t('loginButton') : t('registerButton')}
+                </button>
+              </p>
+            </div>
         </div>
       </div>
     </div>
@@ -385,36 +308,11 @@ const AuthDrawer: React.FC<{
         <RegistrationSuccessModal 
             onClose={() => {
                 setShowSuccessModal(false);
-                onClose(); // Close the auth drawer as well
+                onClose();
             }} 
         />
     )}
     </>
-  );
-};
-
-
-const Footer: React.FC = () => {
-  const { t } = useLocalization();
-  return (
-    <footer className="w-full p-4 text-center text-gray-600 dark:text-gray-400 text-sm">
-      <p>&copy; 2025 {t('appName')}</p>
-    </footer>
-  );
-};
-
-const PendingAccountView: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
-  const { t } = useLocalization();
-  return (
-    <div className="flex flex-col items-center justify-center h-full text-center p-6 bg-yellow-50 dark:bg-yellow-900/20 rounded-xl max-w-md border border-yellow-200">
-        <AlertTriangle className="text-yellow-500 w-12 h-12 mb-4" />
-        <h2 className="text-xl font-bold text-dark dark:text-light mb-2">{t('accountPending')}</h2>
-        <p className="text-gray-600 dark:text-gray-300 mb-4">{t('accountPendingDesc')}</p>
-        <button onClick={onLogout} className="flex items-center gap-2 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-dark dark:text-light rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
-            <LogOut size={18} />
-            {t('logout')}
-        </button>
-    </div>
   );
 };
 
@@ -426,12 +324,17 @@ const App: React.FC = () => {
   const [showAuthDrawer, setShowAuthDrawer] = useState(false);
   const [showAppointmentsDrawer, setShowAppointmentsDrawer] = useState(false);
   const [showDbSetup, setShowDbSetup] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const [theme, setTheme] = useState(() => {
     if (typeof window !== 'undefined' && localStorage.theme) return localStorage.theme;
     if (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches) return 'dark';
     return 'light';
   });
+
+  const t = (key: keyof typeof translations) => {
+    return translations[key]?.[language] || translations[key]?.[Language.EN] || key;
+  };
 
   useEffect(() => {
     const checkUser = async () => {
@@ -445,7 +348,6 @@ const App: React.FC = () => {
             if (data) setCurrentUser({ id: data.id, name: data.full_name, accountType: AccountType.CLIENT, phone: data.phone });
           } else if (userType === AccountType.PROVIDER) {
             const { data, error } = await supabase.from('providers').select('id, name, username, is_active, subscription_end_date').eq('id', parseInt(userId, 10)).single();
-            if (error) throw error;
             if (data) {
                 setCurrentUser({ 
                     id: data.id, 
@@ -458,7 +360,6 @@ const App: React.FC = () => {
             }
           }
         } catch (error) {
-          console.error("Error fetching user:", error);
           localStorage.removeItem('tangerconnect_user_id');
           localStorage.removeItem('tangerconnect_user_type');
         }
@@ -484,100 +385,179 @@ const App: React.FC = () => {
     }
   }, [theme]);
 
-  const toggleTheme = () => {
-    setTheme(prevTheme => (prevTheme === 'light' ? 'dark' : 'light'));
-  };
+  const toggleTheme = () => setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
   
   const handleLogout = () => {
     localStorage.removeItem('tangerconnect_user_id');
     localStorage.removeItem('tangerconnect_user_type');
     setCurrentUser(null);
     setView(UserView.CLIENT);
+    setMobileMenuOpen(false);
   };
   
   const handleAuthSuccess = (user: AuthenticatedUser) => {
     setCurrentUser(user);
     setShowAuthDrawer(false);
-    if (user.accountType === AccountType.PROVIDER) {
-        setView(UserView.PROVIDER);
-    } else {
-        setView(UserView.CLIENT);
-    }
+    if (user.accountType === AccountType.PROVIDER) setView(UserView.PROVIDER);
+    else setView(UserView.CLIENT);
   };
 
   const Header = () => {
     const { t } = useLocalization();
     
-    // Determine status for provider badge
     let statusBadge = null;
     if (currentUser?.accountType === AccountType.PROVIDER) {
-        const isActive = currentUser.isActive;
-        const isExpired = currentUser.subscriptionEndDate && new Date(currentUser.subscriptionEndDate) < new Date();
-        const isValid = isActive && !isExpired;
-        
+        const isValid = currentUser.isActive && currentUser.subscriptionEndDate && new Date(currentUser.subscriptionEndDate) > new Date();
         statusBadge = (
-             <span className={`ml-2 text-xs font-bold px-2 py-0.5 rounded-full ${
+             <span className={`ml-2 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wide ${
                  isValid 
-                 ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' 
-                 : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
+                 ? 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300' 
+                 : 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300'
              }`}>
-                 {isValid ? t('statusActive') : (isActive ? t('statusExpired') : t('statusPending'))}
+                 {isValid ? t('statusActive') : t('statusPending')}
              </span>
         );
     }
 
-
-    const accountTypeDisplay = currentUser ? `(${t(currentUser.accountType.toLowerCase() as any)})` : '';
     return (
-      <header className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm shadow-md w-full p-4 flex justify-between items-center z-20 sticky top-0">
-        <div className="flex items-center gap-2">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-          <h1 className="text-xl md:text-2xl font-bold text-dark dark:text-light">{t('appName')}</h1>
-        </div>
-        <div className="flex items-center gap-2 md:gap-4">
-           {currentUser ? (
-             <div className="flex items-center gap-2">
-                <div className="hidden md:flex flex-col items-end bg-light dark:bg-dark px-3 py-1 rounded-lg">
-                    <div className="flex items-center gap-1">
-                        <span className="text-dark dark:text-light font-medium text-sm truncate max-w-32">{currentUser.name}</span>
+      <header className="fixed top-0 left-0 right-0 bg-surface/80 dark:bg-dark/80 backdrop-blur-md border-b border-gray-200/50 dark:border-gray-800/50 z-40 transition-all duration-300">
+        <div className="max-w-6xl mx-auto px-4 h-16 flex justify-between items-center">
+            {/* Logo & Title */}
+            <div className="flex items-center gap-2.5">
+                <div className="bg-gradient-to-br from-primary to-secondary p-1.5 rounded-lg shadow-lg shadow-primary/20">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                </div>
+                <h1 className="text-lg md:text-xl font-bold text-dark dark:text-light tracking-tight">
+                    Tanger<span className="text-primary">Connect</span>
+                </h1>
+            </div>
+
+            {/* Desktop Actions */}
+            <div className="hidden md:flex items-center gap-3">
+                {currentUser ? (
+                    <div className="flex items-center gap-3 bg-gray-50 dark:bg-gray-800/50 pl-1 pr-4 py-1 rounded-full border border-gray-200 dark:border-gray-700">
+                        <div className="w-8 h-8 bg-primary/10 text-primary rounded-full flex items-center justify-center font-bold text-sm">
+                            {currentUser.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="text-sm font-bold text-dark dark:text-light leading-none">{currentUser.name}</span>
+                            <span className="text-[10px] text-gray-500 uppercase">{currentUser.accountType}</span>
+                        </div>
                         {statusBadge}
                     </div>
-                    <span className="text-xs text-secondary">{accountTypeDisplay}</span>
-                </div>
-                 {currentUser.accountType === AccountType.CLIENT && (
-                    <button onClick={() => setShowAppointmentsDrawer(true)} className="p-2.5 bg-gray-100 dark:bg-gray-800 rounded-lg text-gray-900 dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors" aria-label={t('myAppointments')}>
+                ) : (
+                    <button onClick={() => setShowAuthDrawer(true)} className="flex items-center gap-2 px-5 py-2 bg-primary text-white rounded-full hover:bg-primaryDark transition-all shadow-md shadow-primary/20 font-medium text-sm">
+                        <LogIn size={16} /> {t('loginRegister')}
+                    </button>
+                )}
+
+                <div className="h-6 w-px bg-gray-200 dark:bg-gray-700 mx-1"></div>
+
+                {currentUser?.accountType === AccountType.CLIENT && (
+                    <button onClick={() => setShowAppointmentsDrawer(true)} className="p-2 text-gray-600 hover:text-primary hover:bg-gray-100 rounded-full transition-colors" title={t('myAppointments')}>
                         <CalendarDays size={20} />
                     </button>
-                 )}
-                <button onClick={handleLogout} className="p-2.5 bg-gray-100 dark:bg-gray-800 rounded-lg text-gray-900 dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors" aria-label={t('logout')}>
-                    <LogOut size={20} />
+                )}
+                
+                <button onClick={() => setShowDbSetup(true)} className="p-2 text-gray-600 hover:text-primary hover:bg-gray-100 rounded-full transition-colors">
+                    <Database size={20} />
                 </button>
-             </div>
-           ) : (
-             <button onClick={() => setShowAuthDrawer(true)} className="flex items-center gap-2 px-3 py-2 bg-primary text-white rounded-lg hover:bg-dark transition-colors text-sm">
-                <LogIn size={18} />
-                <span className="hidden md:inline">{t('loginRegister')}</span>
-             </button>
-           )}
-           <button onClick={toggleTheme} aria-label="Toggle theme" className="p-2.5 bg-gray-100 dark:bg-gray-800 rounded-lg text-gray-900 dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
-            {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
-          </button>
-          <button onClick={() => setShowDbSetup(true)} aria-label="Database Setup" className="p-2.5 bg-gray-100 dark:bg-gray-800 rounded-lg text-gray-900 dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
-            <Database size={20} />
-          </button>
-          <div className="relative">
-            <Globe className="absolute top-1/2 -translate-y-1/2 left-3 rtl:right-3 rtl:left-auto text-gray-500" size={20} />
-            <select value={language} onChange={(e) => setLanguage(e.target.value as Language)} className="bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-200 text-sm rounded-lg focus:ring-primary focus:border-primary block w-full pl-10 rtl:pr-10 rtl:pl-4 p-2.5 appearance-none">
-              <option value={Language.AR}>العربية</option>
-              <option value={Language.EN}>English</option>
-              <option value={Language.FR}>Français</option>
-            </select>
-          </div>
-          <button onClick={() => setView(view === UserView.CLIENT ? UserView.PROVIDER : UserView.CLIENT)} className="flex items-center gap-2 px-4 py-2 bg-secondary text-white rounded-lg hover:bg-primary transition-colors">
-            {view === UserView.CLIENT ? <CheckSquare size={20} /> : <UserIcon size={20} />}
-            <span className="hidden md:inline">{view === UserView.CLIENT ? t('providerView') : t('clientView')}</span>
-          </button>
+
+                <button onClick={toggleTheme} className="p-2 text-gray-600 hover:text-primary hover:bg-gray-100 rounded-full transition-colors">
+                    {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
+                </button>
+
+                <div className="relative group">
+                    <button className="flex items-center gap-1 p-2 text-gray-600 hover:text-primary hover:bg-gray-100 rounded-full transition-colors">
+                        <Globe size={20} />
+                    </button>
+                    <div className="absolute right-0 top-full mt-2 w-32 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden hidden group-hover:block animate-fade-in">
+                        {[Language.AR, Language.EN, Language.FR].map(lang => (
+                            <button key={lang} onClick={() => setLanguage(lang)} className={`w-full text-left rtl:text-right px-4 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 ${language === lang ? 'text-primary font-bold' : 'text-gray-600 dark:text-gray-300'}`}>
+                                {lang === Language.AR ? 'العربية' : lang === Language.EN ? 'English' : 'Français'}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                <button onClick={() => setView(view === UserView.CLIENT ? UserView.PROVIDER : UserView.CLIENT)} className="ml-2 flex items-center gap-2 px-4 py-2 bg-secondary/10 text-secondary hover:bg-secondary hover:text-white rounded-full transition-all font-medium text-sm">
+                    {view === UserView.CLIENT ? <CheckSquare size={16} /> : <UserIcon size={16} />}
+                    <span>{view === UserView.CLIENT ? t('providerView') : t('clientView')}</span>
+                </button>
+
+                {currentUser && (
+                     <button onClick={handleLogout} className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors">
+                        <LogOut size={20} />
+                    </button>
+                )}
+            </div>
+
+            {/* Mobile Menu Button */}
+            <div className="flex md:hidden items-center gap-2">
+                {currentUser?.accountType === AccountType.CLIENT && (
+                     <button onClick={() => setShowAppointmentsDrawer(true)} className="p-2 bg-gray-100 dark:bg-gray-800 rounded-full text-primary">
+                        <CalendarDays size={20} />
+                     </button>
+                )}
+                <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="p-2 text-dark dark:text-light hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
+                    {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+                </button>
+            </div>
         </div>
+
+        {/* Mobile Dropdown Menu */}
+        {mobileMenuOpen && (
+            <div className="md:hidden absolute top-16 left-0 w-full bg-surface dark:bg-surfaceDark border-b border-gray-200 dark:border-gray-800 shadow-2xl animate-slide-up">
+                <div className="p-4 space-y-4">
+                    {currentUser ? (
+                        <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                             <div className="w-10 h-10 bg-primary text-white rounded-full flex items-center justify-center font-bold text-lg">
+                                {currentUser.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                                <div className="font-bold text-dark dark:text-light">{currentUser.name}</div>
+                                <div className="text-xs text-gray-500">{currentUser.accountType}</div>
+                            </div>
+                            {statusBadge}
+                        </div>
+                    ) : (
+                         <button onClick={() => {setShowAuthDrawer(true); setMobileMenuOpen(false);}} className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-primary text-white rounded-xl font-bold shadow-lg shadow-primary/20">
+                            <LogIn size={18} /> {t('loginRegister')}
+                        </button>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-3">
+                         <button onClick={() => {setView(view === UserView.CLIENT ? UserView.PROVIDER : UserView.CLIENT); setMobileMenuOpen(false);}} className="flex items-center justify-center gap-2 p-3 bg-gray-100 dark:bg-gray-800 rounded-xl font-medium text-sm text-dark dark:text-light">
+                            {view === UserView.CLIENT ? <CheckSquare size={18} className="text-secondary" /> : <UserIcon size={18} className="text-secondary" />}
+                            <span>{view === UserView.CLIENT ? t('providerView') : t('clientView')}</span>
+                        </button>
+                        <button onClick={toggleTheme} className="flex items-center justify-center gap-2 p-3 bg-gray-100 dark:bg-gray-800 rounded-xl font-medium text-sm text-dark dark:text-light">
+                            {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+                            <span>{theme === 'light' ? 'Dark Mode' : 'Light Mode'}</span>
+                        </button>
+                    </div>
+
+                    <div className="flex items-center justify-between p-3 border border-gray-100 dark:border-gray-700 rounded-xl">
+                        <span className="text-sm font-medium text-gray-600 dark:text-gray-300 flex items-center gap-2"><Globe size={18} /> Language</span>
+                        <select value={language} onChange={(e) => setLanguage(e.target.value as Language)} className="bg-transparent font-bold text-primary outline-none">
+                            <option value={Language.AR}>العربية</option>
+                            <option value={Language.EN}>English</option>
+                            <option value={Language.FR}>Français</option>
+                        </select>
+                    </div>
+
+                    <button onClick={() => {setShowDbSetup(true); setMobileMenuOpen(false);}} className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-xl text-sm text-gray-600 dark:text-gray-300 transition-colors">
+                        <Database size={18} /> {t('databaseSetupTitle')}
+                    </button>
+
+                    {currentUser && (
+                        <button onClick={handleLogout} className="w-full flex items-center gap-3 p-3 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-xl font-bold text-sm">
+                            <LogOut size={18} /> {t('logout')}
+                        </button>
+                    )}
+                </div>
+            </div>
+        )}
       </header>
     );
   };
@@ -585,11 +565,14 @@ const App: React.FC = () => {
   const ProviderLoginPrompt = () => {
     const { t } = useLocalization();
     return (
-      <div className="flex flex-col items-center justify-center h-full text-center">
-        <h2 className="text-2xl font-bold text-dark dark:text-light mb-4">{t('providerLoginTitle')}</h2>
-        <p className="text-gray-600 dark:text-gray-400 mb-6">{t('pleaseLoginAsProvider')}</p>
-        <button onClick={() => setShowAuthDrawer(true)} className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-dark transition-colors">
-            <LogIn size={18} />
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-6">
+        <div className="w-20 h-20 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-6">
+            <UserIcon size={40} className="text-gray-400" />
+        </div>
+        <h2 className="text-2xl font-bold text-dark dark:text-light mb-3">{t('providerLoginTitle')}</h2>
+        <p className="text-gray-500 dark:text-gray-400 mb-8 max-w-xs mx-auto">{t('pleaseLoginAsProvider')}</p>
+        <button onClick={() => setShowAuthDrawer(true)} className="flex items-center gap-2 px-8 py-3 bg-primary text-white rounded-xl hover:bg-primaryDark transition-all shadow-lg shadow-primary/20 font-bold">
+            <LogIn size={20} />
             {t('loginRegister')}
         </button>
       </div>
@@ -615,9 +598,15 @@ const App: React.FC = () => {
             user={currentUser} 
         />
       )}
-      <div className="bg-light dark:bg-dark min-h-screen flex flex-col items-center">
+      <div className="bg-light dark:bg-dark min-h-screen flex flex-col relative overflow-hidden">
+        {/* Decorative Background Elements */}
+        <div className="absolute top-0 left-0 w-full h-96 bg-gradient-to-b from-primary/5 to-transparent pointer-events-none z-0"></div>
+        <div className="absolute -top-20 -right-20 w-64 h-64 bg-secondary/10 rounded-full blur-3xl pointer-events-none z-0"></div>
+        <div className="absolute top-40 -left-20 w-72 h-72 bg-primary/10 rounded-full blur-3xl pointer-events-none z-0"></div>
+
         <Header />
-        <main className="w-full flex-1 flex flex-col items-center p-4 overflow-hidden">
+        
+        <main className="flex-1 w-full max-w-6xl mx-auto px-4 pt-20 pb-6 z-10 flex flex-col">
           {view === UserView.CLIENT ? (
             <Chatbot 
               currentUser={currentUser} 
@@ -630,7 +619,10 @@ const App: React.FC = () => {
             <ProviderLoginPrompt />
           )}
         </main>
-        <Footer />
+        
+        <footer className="w-full py-6 text-center text-gray-400 dark:text-gray-600 text-xs z-10">
+          <p>&copy; 2025 {t('appName')} - Built for Tangier</p>
+        </footer>
       </div>
     </LocalizationProvider>
   );

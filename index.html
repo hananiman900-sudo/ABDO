@@ -4,7 +4,7 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>TangerConnect AI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -12,7 +12,8 @@
       window.process = {
         env: {
           SUPABASE_URL: 'https://lrprlzijjykvpxpyxrcn.supabase.co',
-          SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxycHJsemlqanlrdnB4cHl4cmNuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMxMjIwNDEsImV4cCI6MjA3ODY5ODA0MX0.6S8eSgprS686iobE7zrmurxIvzvC8Qmpu71rKT8FvZc'
+          SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxycHJsemlqanlrdnB4cHl4cmNuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMxMjIwNDEsImV4cCI6MjA3ODY5ODA0MX0.6S8eSgprS686iobE7zrmurxIvzvC8Qmpu71rKT8FvZc',
+          API_KEY: 'AIzaSyDa4OxIrKhl6q3-AmcmjmQvw5wdkyrQYnA'
         }
       };
 
@@ -22,14 +23,35 @@
           extend: {
             colors: {
               primary: '#0077B6',
+              primaryDark: '#023E8A',
               secondary: '#00B4D8',
               accent: '#90E0EF',
-              light: '#CAF0F8',
-              dark: '#03045E',
+              light: '#F0F9FF',
+              dark: '#0B1120',
+              surface: '#FFFFFF',
+              surfaceDark: '#1F2937'
             },
             fontFamily: {
-              sans: ['Inter', 'sans-serif'],
-              arabic: ['Tajawal', 'sans-serif']
+              sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+              arabic: ['Tajawal', 'ui-sans-serif', 'system-ui', 'sans-serif']
+            },
+            boxShadow: {
+              'soft': '0 4px 20px -2px rgba(0, 0, 0, 0.1)',
+              'glow': '0 0 15px rgba(0, 180, 216, 0.3)',
+            },
+            animation: {
+              'slide-up': 'slideUp 0.3s ease-out',
+              'fade-in': 'fadeIn 0.2s ease-out',
+            },
+            keyframes: {
+              slideUp: {
+                '0%': { transform: 'translateY(100%)', opacity: '0' },
+                '100%': { transform: 'translateY(0)', opacity: '1' },
+              },
+              fadeIn: {
+                '0%': { opacity: '0' },
+                '100%': { opacity: '1' },
+              }
             }
           }
         }
@@ -37,7 +59,7 @@
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Tajawal:wght@300;400;500;700&display=swap" rel="stylesheet">
   <script type="importmap">
 {
   "imports": {
@@ -52,8 +74,21 @@
   }
 }
 </script>
+<style>
+  /* Hide Scrollbar but allow scrolling */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  body {
+    -webkit-tap-highlight-color: transparent;
+  }
+</style>
 </head>
-  <body>
+  <body class="bg-light dark:bg-dark text-gray-900 dark:text-white antialiased selection:bg-primary selection:text-white">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>

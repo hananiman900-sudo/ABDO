@@ -1,4 +1,3 @@
-
 import { GoogleGenAI } from "@google/genai";
 import { Language } from "../types";
 import { supabase } from "./supabaseClient";
@@ -52,7 +51,7 @@ You are 'TangerConnect', a helpful AI assistant for the city of Tangier. Your re
     - Summarize the options conversationally.
 6.  **Booking Flow:**
     - Offer to book appointments with a 19% discount.
-    - To book, you already have the user's name and phone. Just confirm the provider they want.
+    - To book, you already have the user's name and phone. Just confirm the booking.
     - Confirm the booking by responding ONLY with the following JSON structure.
 \`\`\`json
 {
@@ -145,12 +144,21 @@ export const getChatResponse = async (
   userId?: number,
 ): Promise<string> => {
   try {
-    // Initialize AI Client lazily here to prevent crash on load if API_KEY is missing
-    const API_KEY = process.env.API_KEY;
+    // Check Environment Variable first, then LocalStorage
+    let API_KEY = process.env.API_KEY;
+    
+    if (!API_KEY) {
+        // Fallback: Check local storage in the browser
+        if (typeof window !== 'undefined') {
+            API_KEY = localStorage.getItem('gemini_api_key') || undefined;
+        }
+    }
+
     if (!API_KEY) {
         console.error("API_KEY environment variable is not set");
-        return "Configuration Error: The API_KEY is missing in Vercel Environment Variables. Please add it to make the AI work.";
+        return "MISSING_API_KEY_ERROR";
     }
+    
     const ai = new GoogleGenAI({ apiKey: API_KEY });
 
     const { data: providers, error: providersError } = await supabase
@@ -212,6 +220,6 @@ export const getChatResponse = async (
     return response.text;
   } catch (error) {
     console.error("Error in generateContent:", error);
-    return "Sorry, I encountered an error connecting to the AI service. Please check the configuration.";
+    return "سمح لينا، وقع شي مشكل فالاتصال بالذكاء الاصطناعي. عافاك تأكد من API Key.\n\nError connecting to AI service.";
   }
 };
