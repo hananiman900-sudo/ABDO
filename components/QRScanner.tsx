@@ -1,10 +1,9 @@
 
-import React, { useState, useRef, useEffect } from 'react';
-import { QrReader } from 'react-qr-reader';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useLocalization } from '../hooks/useLocalization';
 import { BookingDetails, FollowUp, AuthenticatedUser } from '../types';
 import { supabase } from '../services/supabaseClient';
-import { CheckCircle, XCircle, Camera, Loader2, Upload, Send, LogOut, User, Calendar, FileText, Lock, Phone } from 'lucide-react';
+import { CheckCircle, XCircle, Camera, Loader2, Upload, Send, LogOut, User, Calendar, FileText, Lock, Phone, X } from 'lucide-react';
 import jsQR from 'jsqr';
 
 interface ScannedAppointment extends BookingDetails {}
@@ -16,6 +15,76 @@ const QRScannerComponent: React.FC = () => {
     const [showScanner, setShowScanner] = useState(false);
     const [isVerifying, setIsVerifying] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const requestRef = useRef<number>();
+
+    // Clean up camera on unmount or when scanner closes
+    useEffect(() => {
+        return () => {
+            stopCamera();
+        };
+    }, []);
+
+    // Start/Stop camera based on showScanner state
+    useEffect(() => {
+        if (showScanner) {
+            startCamera();
+        } else {
+            stopCamera();
+        }
+    }, [showScanner]);
+
+    const startCamera = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+            if (videoRef.current) {
+                videoRef.current.srcObject = stream;
+                // Wait for video to be ready before starting scan loop
+                videoRef.current.onloadedmetadata = () => {
+                    videoRef.current?.play().catch(e => console.error("Play error:", e));
+                    requestRef.current = requestAnimationFrame(scanVideoFrame);
+                };
+            }
+        } catch (err) {
+            console.error("Error accessing camera:", err);
+            setError(t('qrScannerInstruction')); // Fallback error message or "Use upload instead"
+            setShowScanner(false);
+        }
+    };
+
+    const stopCamera = () => {
+        if (requestRef.current) {
+            cancelAnimationFrame(requestRef.current);
+        }
+        if (videoRef.current && videoRef.current.srcObject) {
+            const stream = videoRef.current.srcObject as MediaStream;
+            stream.getTracks().forEach(track => track.stop());
+            videoRef.current.srcObject = null;
+        }
+    };
+
+    const scanVideoFrame = () => {
+        if (videoRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
+            const canvas = document.createElement('canvas');
+            canvas.width = videoRef.current.videoWidth;
+            canvas.height = videoRef.current.videoHeight;
+            const ctx = canvas.getContext('2d');
+            
+            if (ctx) {
+                ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                    inversionAttempts: "dontInvert",
+                });
+
+                if (code) {
+                    handleScanResult({ text: code.data });
+                    return; // Stop scanning loop
+                }
+            }
+        }
+        requestRef.current = requestAnimationFrame(scanVideoFrame);
+    };
 
     const processQrCodeText = async (qrCodeText: string | undefined) => {
         if (!qrCodeText) {
@@ -51,13 +120,14 @@ const QRScannerComponent: React.FC = () => {
         } catch (e: any) { setError(e.message || t('invalidQR')); }
     }
 
-    const handleScanResult = async (result: any, error: any) => {
-        if (!!result) {
-            setShowScanner(false);
+    const handleScanResult = async (result: { text: string }) => {
+        if (result && result.text) {
+            setShowScanner(false); // UI update to hide scanner
+            stopCamera(); // Stop the stream
             setIsVerifying(true);
             setError(null);
             setScannedData(null);
-            await processQrCodeText(result?.text);
+            await processQrCodeText(result.text);
             setIsVerifying(false);
         }
     };
@@ -112,8 +182,15 @@ const QRScannerComponent: React.FC = () => {
                 </>
             )}
             {showScanner && (
-                <div className="w-full h-64 md:h-80 bg-gray-900 rounded-lg overflow-hidden border-4 border-gray-300 dark:border-gray-600 mb-4">
-                     <QrReader onResult={handleScanResult} constraints={{ facingMode: 'environment' }} containerStyle={{ width: '100%', height: '100%' }} videoContainerStyle={{ width: '100%', height: '100%', paddingTop: 0 }} videoStyle={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <div className="relative w-full h-64 md:h-80 bg-black rounded-lg overflow-hidden border-4 border-gray-300 dark:border-gray-600 mb-4">
+                     <video ref={videoRef} className="w-full h-full object-cover" playsInline muted />
+                     <div className="absolute inset-0 border-2 border-primary/50 pointer-events-none animate-pulse m-8 rounded-lg"></div>
+                     <button 
+                        onClick={() => setShowScanner(false)}
+                        className="absolute top-2 right-2 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 transition-colors"
+                     >
+                        <X size={20} />
+                     </button>
                 </div>
             )}
             {isVerifying && (<div className="flex flex-col items-center justify-center gap-4 p-4"><Loader2 className="animate-spin text-primary" size={48} /><p className="text-lg text-gray-700 dark:text-gray-300">{t('verifying')}</p></div>)}
