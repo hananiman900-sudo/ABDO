@@ -3,9 +3,6 @@ import { GoogleGenAI } from "@google/genai";
 import { Language } from "../types";
 import { supabase } from "./supabaseClient";
 
-// Do not initialize globally to prevent crash on load if key is missing
-// const API_KEY = process.env.API_KEY;
-
 const getSystemInstruction = (language: Language, providersList: string, upcomingAppointments: string, announcements: string) => {
   const commonInstructions = `
 You are 'TangerConnect', a helpful AI assistant for the city of Tangier. Your responses should be concise, natural, and directly answer the user's question.
@@ -46,7 +43,9 @@ You are 'TangerConnect', a helpful AI assistant for the city of Tangier. Your re
     - Then, respond with the 'REGISTER_PROVIDER' JSON action as described above.
 
 3.  **Appointment Reminders:** At the start of a conversation with a registered user, check the list of their upcoming appointments. If any appointment is within the next 24 hours, remind them in your first message. Example: "Welcome back, [Name]! Just a friendly reminder you have an appointment with [Provider] tomorrow."
-4.  **Analyze User Input:** If the user uploads an image, analyze it for context (e.g., a dental problem suggests needing a dentist).
+4.  **Analyze User Input:** 
+    - If the user uploads an image, analyze it for context (e.g., a dental problem suggests needing a dentist).
+    - **If the user sends AUDIO:** Listen carefully to the request. The user might be speaking in Darija, Arabic, French, or English. Transcribe the intent internally and respond accordingly.
 5.  **Recommend Services & Announcements:**
     - When a user asks for a service, check the list of available providers.
     - **Check the Announcements section.** If a provider has an active announcement (discount, news), MENTION IT to the user as a "Special Offer" or "Update".
@@ -156,34 +155,12 @@ export const getChatResponse = async (
   newMessage: string,
   language: Language,
   image?: { base64: string; mimeType: string; },
+  audio?: { base64: string; mimeType: string; },
   userId?: number,
   announcementsText: string = ""
 ): Promise<string> => {
   try {
-    // Check Environment Variable first (from index.html window.process)
-    let API_KEY = '';
-    
-    // 1. Try the injected window.process (from index.html)
-    if (typeof window !== 'undefined' && (window as any).process?.env?.API_KEY) {
-      API_KEY = (window as any).process.env.API_KEY;
-    }
-    
-    // 2. Try standard process.env (if build tool replaces it)
-    if (!API_KEY && typeof process !== 'undefined' && process.env?.API_KEY) {
-      API_KEY = process.env.API_KEY;
-    }
-
-    // 3. Try LocalStorage (user entered key)
-    if (!API_KEY && typeof window !== 'undefined') {
-        API_KEY = localStorage.getItem('gemini_api_key') || '';
-    }
-
-    if (!API_KEY) {
-        console.error("API_KEY environment variable is not set");
-        return "MISSING_API_KEY_ERROR";
-    }
-    
-    const ai = new GoogleGenAI({ apiKey: API_KEY });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
     const { data: providers, error: providersError } = await supabase
       .from('providers')
@@ -212,11 +189,11 @@ export const getChatResponse = async (
         }
     }
 
-
     const systemInstruction = getSystemInstruction(language, providersListString, upcomingAppointmentsString, announcementsText);
     
     const userParts: any[] = [];
     if (newMessage) userParts.push({ text: newMessage });
+    
     if (image) {
       userParts.push({
         inlineData: {
@@ -226,12 +203,20 @@ export const getChatResponse = async (
       });
     }
 
+    if (audio) {
+        userParts.push({
+            inlineData: {
+                data: audio.base64,
+                mimeType: audio.mimeType
+            }
+        });
+    }
+
     const contents = [...history, { role: 'user', parts: userParts }];
     // Add user ID to system instruction context if available
     const finalSystemInstruction = userId 
         ? `${systemInstruction}\n\nUSER_CONTEXT: The current user's ID is ${userId}. They are a registered client.`
         : `${systemInstruction}\n\nUSER_CONTEXT: The user is not registered yet. You must guide them through the registration flow if they wish to book or create a profile.`;
-
 
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
@@ -244,6 +229,6 @@ export const getChatResponse = async (
     return response.text;
   } catch (error) {
     console.error("Error in generateContent:", error);
-    return "سمح لينا، وقع شي مشكل فالاتصال بالذكاء الاصطناعي. عافاك تأكد من API Key.\n\nError connecting to AI service.";
+    return "سمح لينا، وقع شي مشكل فالاتصال بالذكاء الاصطناعي. \n\nError connecting to AI service.";
   }
 };

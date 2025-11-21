@@ -42,16 +42,17 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [showApiKeyInput, setShowApiKeyInput] = useState(false);
-  const [userApiKey, setUserApiKey] = useState('');
-  const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   
+  // Audio Recording State
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
-  const recognitionRef = useRef<any>(null);
 
   // --- Chat History Persistence ---
   useEffect(() => {
@@ -109,68 +110,66 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  useEffect(scrollToBottom, [messages, showApiKeyInput]);
+  useEffect(scrollToBottom, [messages, isRecording]);
 
-  const saveApiKey = () => {
-    if (userApiKey.trim().startsWith('AIza')) {
-      localStorage.setItem('gemini_api_key', userApiKey.trim());
-      setShowApiKeyInput(false);
-      setMessages(prev => [...prev, { role: Role.BOT, text: "تم حفظ مفتاح API بنجاح! دابا تقدر تهضر معايا.\n\nAPI Key saved successfully!" }]);
-    } else {
-      alert("Invalid API Key.");
-    }
-  };
-
-  // --- Audio Logic ---
-  const startListening = () => {
-      if (isListening) {
-          recognitionRef.current?.stop();
-          setIsListening(false);
-          return;
-      }
-
-      if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-          alert("Browser does not support speech recognition. Try Google Chrome.");
-          return;
-      }
-
-      // @ts-ignore
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.lang = language === 'ar' ? 'ar-MA' : language === 'fr' ? 'fr-FR' : 'en-US';
-      recognitionRef.current.continuous = false;
-      recognitionRef.current.interimResults = false;
-
-      recognitionRef.current.onstart = () => {
-          setIsListening(true);
-          if (navigator.vibrate) navigator.vibrate(100); // Feedback
-      };
-      
-      recognitionRef.current.onend = () => setIsListening(false);
-      
-      recognitionRef.current.onresult = (event: any) => {
-          const transcript = event.results[0][0].transcript;
-          setInput(prev => prev + (prev ? ' ' : '') + transcript);
-      };
-
-      recognitionRef.current.onerror = (event: any) => {
-          console.error("Speech recognition error", event.error);
-          setIsListening(false);
-          if (event.error === 'not-allowed') {
-              alert("Microphone access denied. Please allow microphone permissions in your browser settings (click the lock icon in the address bar).");
-          } else if (event.error === 'no-speech') {
-              // Ignore no-speech errors, just stop listening
-          } else {
-              alert("Speech recognition error: " + event.error);
-          }
-      };
-
+  // --- Audio Recording Logic (MediaRecorder) ---
+  const startRecording = async () => {
+      if (navigator.vibrate) navigator.vibrate(50);
       try {
-        recognitionRef.current.start();
-      } catch (e) {
-        console.error("Recognition start failed", e);
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          const mediaRecorder = new MediaRecorder(stream);
+          mediaRecorderRef.current = mediaRecorder;
+          audioChunksRef.current = [];
+
+          mediaRecorder.ondataavailable = (event) => {
+              if (event.data.size > 0) {
+                  audioChunksRef.current.push(event.data);
+              }
+          };
+
+          mediaRecorder.onstop = async () => {
+              // Create audio blob
+              const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+              // Send immediately
+              await handleSendAudio(audioBlob);
+              
+              // Stop all tracks to release mic
+              stream.getTracks().forEach(track => track.stop());
+          };
+
+          mediaRecorder.start();
+          setIsRecording(true);
+      } catch (err) {
+          console.error("Error accessing microphone:", err);
+          alert(t('errorMessage') + " (Microphone access denied)");
       }
   };
+
+  const stopRecording = () => {
+      if (mediaRecorderRef.current && isRecording) {
+          if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
+          mediaRecorderRef.current.stop();
+          setIsRecording(false);
+      }
+  };
+
+  const handleSendAudio = async (audioBlob: Blob) => {
+       const reader = new FileReader();
+       reader.readAsDataURL(audioBlob);
+       reader.onloadend = async () => {
+           const base64Audio = (reader.result as string).split(',')[1];
+           // Mime type might need adjustment depending on browser output, but 'audio/webm' or 'audio/mp4' usually accepted
+           const mimeType = audioBlob.type || 'audio/webm';
+           
+           const userMessage: Message = { role: Role.USER, text: "🎤 Audio Message" };
+           setMessages(prev => [...prev, userMessage]);
+           setIsLoading(true);
+
+           await processGeminiRequest(userMessage, undefined, { base64: base64Audio, mimeType });
+       };
+  };
+
+  // -------------------
 
   const speakText = (text: string) => {
       if (!('speechSynthesis' in window)) return;
@@ -201,7 +200,6 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
   }
   // -------------------
 
-
   const handleSend = async () => {
     if ((input.trim() === '' && !imageFile) || isLoading) return;
     
@@ -220,7 +218,14 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
     setInput('');
     removeImage();
     setIsLoading(true);
+    await processGeminiRequest(userMessage, imagePayload, undefined);
+  };
 
+  const processGeminiRequest = async (
+      userMessage: Message, 
+      imagePayload?: { base64: string; mimeType: string; },
+      audioPayload?: { base64: string; mimeType: string; }
+  ) => {
     try {
       const history = messages
         .filter(msg => !msg.isComponent)
@@ -234,17 +239,15 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
         ? announcements.map(a => `${a.providers.name}: ${a.message}`).join('\n') 
         : "";
 
-      const botResponseText = await getChatResponse(history, userMessage.text, language, imagePayload, currentUser?.id, announcementText);
-
-      if (botResponseText === "MISSING_API_KEY_ERROR") {
-        setShowApiKeyInput(true);
-        setMessages(prev => [...prev, { 
-            role: Role.BOT, 
-            text: "عافاك دخل API Key ديال Google Gemini باش نقدر نجاوبك. (aistudio.google.com)" 
-        }]);
-        setIsLoading(false);
-        return;
-      }
+      const botResponseText = await getChatResponse(
+          history, 
+          userMessage.text, 
+          language, 
+          imagePayload, 
+          audioPayload, 
+          currentUser?.id, 
+          announcementText
+      );
 
       let parsedJson = null;
       const jsonMatch = botResponseText.match(/```json\n([\s\S]*?)\n```/);
@@ -263,6 +266,8 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
         }
       } else {
         setMessages(prev => [...prev, { role: Role.BOT, text: botResponseText }]);
+        // Auto-speak if audio was sent? Optional.
+        if (audioPayload) speakText(botResponseText);
       }
     } catch (error) {
       setMessages(prev => [...prev, { role: Role.BOT, text: t('errorMessage') }]);
@@ -366,7 +371,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
    const hasContent = input.trim().length > 0 || imageFile !== null;
 
   return (
-    <div className="flex flex-col w-full h-[calc(100vh-140px)] bg-surface dark:bg-surfaceDark rounded-3xl shadow-2xl border border-white/20 overflow-hidden relative">
+    <div className="flex flex-col w-full h-[calc(100vh-110px)] bg-surface dark:bg-surfaceDark rounded-3xl shadow-2xl border border-white/20 overflow-hidden relative mb-0">
         {/* Marquee Styles */}
         <style>{`
             @keyframes marquee-ltr { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
@@ -460,24 +465,6 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
             </div>
           )}
           
-          {showApiKeyInput && (
-             <div className="mx-4 my-2 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl animate-fade-in">
-                   <h4 className="font-bold text-red-700 dark:text-red-400 mb-2 flex items-center gap-2"><Key size={16}/> API Key Required</h4>
-                   <div className="flex gap-2">
-                        <input 
-                            type="text" 
-                            value={userApiKey}
-                            onChange={(e) => setUserApiKey(e.target.value)}
-                            placeholder="AIza..."
-                            className="flex-1 p-2 text-sm border border-red-300 rounded-lg dark:bg-gray-800 dark:border-red-700 outline-none focus:ring-2 focus:ring-red-500"
-                        />
-                        <button onClick={saveApiKey} className="bg-red-600 text-white px-3 py-2 rounded-lg hover:bg-red-700 shadow-md">Save</button>
-                   </div>
-                   <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-xs text-red-500 hover:underline mt-2 flex items-center justify-end gap-1">
-                      Get Key <ArrowRight size={12} />
-                   </a>
-             </div>
-          )}
           <div ref={messagesEndRef} />
         </div>
       </div>
@@ -487,7 +474,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
       <div dir="ltr" className="p-2 bg-surface dark:bg-surfaceDark border-t border-gray-100 dark:border-gray-700 flex items-end gap-2 w-full max-w-full">
         
         {/* Main Pill Container (Input + Attachments) */}
-        <div className="flex-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-[24px] flex items-end shadow-sm relative px-2 overflow-hidden">
+        <div className={`flex-1 bg-white dark:bg-gray-800 border ${isRecording ? 'border-red-500 ring-1 ring-red-500' : 'border-gray-200 dark:border-gray-600'} rounded-[24px] flex items-end shadow-sm relative px-2 overflow-hidden transition-all duration-200`}>
             
              {imagePreviewUrl && (
                 <div className="absolute bottom-full left-0 mb-2 ml-2 bg-white dark:bg-gray-800 p-2 rounded-xl border border-gray-200 dark:border-gray-600 shadow-lg animate-slide-up z-20">
@@ -501,61 +488,79 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
             )}
 
             {/* Text Area - Respects app language for text alignment */}
-            <textarea
-                dir={language === 'ar' ? 'rtl' : 'ltr'}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyPress={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }}}
-                placeholder={isListening ? t('listening') || "Listening..." : t('inputPlaceholder')}
-                rows={1}
-                className="flex-1 bg-transparent border-none focus:ring-0 text-gray-900 dark:text-white placeholder-gray-400 resize-none py-3 px-4 max-h-32 outline-none text-base"
-                disabled={isLoading}
-                style={{ minHeight: '48px' }} 
-            />
+            {isRecording ? (
+                <div className="flex-1 py-3 px-4 text-red-600 font-bold animate-pulse flex items-center gap-2 h-[48px]">
+                    <div className="w-3 h-3 bg-red-600 rounded-full animate-ping"></div>
+                    Recording Audio...
+                </div>
+            ) : (
+                <textarea
+                    dir={language === 'ar' ? 'rtl' : 'ltr'}
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyPress={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }}}
+                    placeholder={t('inputPlaceholder')}
+                    rows={1}
+                    className="flex-1 bg-transparent border-none focus:ring-0 text-gray-900 dark:text-white placeholder-gray-400 resize-none py-3 px-4 max-h-32 outline-none text-base"
+                    disabled={isLoading}
+                    style={{ minHeight: '48px' }} 
+                />
+            )}
 
             {/* Attachments Inside Pill (Always on the Right side of the pill due to LTR container) */}
-            <div className="flex items-center pb-2 pr-1 gap-1 flex-none">
-                {/* Paperclip triggers file selection */}
-                <input type="file" ref={fileInputRef} onChange={handleImageChange} accept="image/*" className="hidden" />
-                
-                {/* Camera triggers Environment Camera */}
-                <input type="file" ref={cameraInputRef} onChange={handleImageChange} accept="image/*" capture="environment" className="hidden" />
-                
-                <button
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isLoading}
-                    className="p-2 text-gray-400 hover:text-primary transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
-                    title="Attach Image"
-                >
-                    <Paperclip size={20} className="rotate-45" />
-                </button>
-                <button
-                    onClick={() => cameraInputRef.current?.click()}
-                    disabled={isLoading}
-                    className="p-2 text-gray-400 hover:text-primary transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
-                    title="Open Camera"
-                >
-                    <Camera size={20} />
-                </button>
-            </div>
+            {!isRecording && (
+                <div className="flex items-center pb-2 pr-1 gap-1 flex-none">
+                    {/* Paperclip triggers file selection */}
+                    <input type="file" ref={fileInputRef} onChange={handleImageChange} accept="image/*" className="hidden" />
+                    
+                    {/* Camera triggers Environment Camera. Crucial: capture="environment" */}
+                    <input 
+                        type="file" 
+                        ref={cameraInputRef} 
+                        onChange={handleImageChange} 
+                        accept="image/*" 
+                        capture="environment" 
+                        className="hidden" 
+                    />
+                    
+                    <button
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isLoading}
+                        className="p-2 text-gray-400 hover:text-primary transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+                        title="Attach Image"
+                    >
+                        <Paperclip size={20} className="rotate-45" />
+                    </button>
+                    <button
+                        onClick={() => cameraInputRef.current?.click()}
+                        disabled={isLoading}
+                        className="p-2 text-gray-400 hover:text-primary transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+                        title="Open Camera"
+                    >
+                        <Camera size={20} />
+                    </button>
+                </div>
+            )}
         </div>
 
         {/* Round Action Button (Mic or Send) - Always on Right */}
         <button
-            onClick={hasContent ? handleSend : startListening}
+            onClick={hasContent ? handleSend : (isRecording ? stopRecording : startRecording)}
             disabled={isLoading}
             className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-all duration-200 transform hover:scale-105 active:scale-95 flex-none
-                ${isListening 
-                    ? 'bg-red-500 animate-pulse text-white' 
-                    : 'bg-green-500 hover:bg-green-600 text-white'
+                ${isRecording 
+                    ? 'bg-red-600 hover:bg-red-700 text-white scale-110' 
+                    : hasContent 
+                        ? 'bg-green-500 hover:bg-green-600 text-white'
+                        : 'bg-green-500 hover:bg-green-600 text-white'
                 }`}
         >
             {isLoading ? (
                 <Loader2 className="animate-spin" size={20} />
             ) : hasContent ? (
                 <Send size={20} className={language === 'ar' ? 'rotate-180' : ''} />
-            ) : isListening ? (
-                <StopCircle size={24} />
+            ) : isRecording ? (
+                <Send size={20} className={language === 'ar' ? 'rotate-180' : ''} />
             ) : (
                 <Mic size={20} />
             )}
