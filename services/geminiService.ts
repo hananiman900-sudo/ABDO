@@ -160,32 +160,47 @@ export const getChatResponse = async (
   announcementsText: string = ""
 ): Promise<string> => {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    // FIX: Properly access API Key from window object if process is undefined in browser
+    const apiKey = (window as any).process?.env?.API_KEY;
+    if (!apiKey) throw new Error("API Key missing. Check index.html configuration.");
 
-    const { data: providers, error: providersError } = await supabase
-      .from('providers')
-      .select('name, service_type, location');
-    
-    if (providersError) throw new Error("Failed to fetch provider data.");
-    
-    const providersListString = providers && providers.length > 0
-        ? providers.map(p => 
-            `- Provider: ${p.name}, Service: ${p.service_type}, Location: ${p.location}`
-          ).join('\n')
-        : "There are currently no service providers registered in the system. Inform the user about this and tell them to check back later.";
+    const ai = new GoogleGenAI({ apiKey });
+
+    // FIX: Graceful degradation for Supabase errors
+    // If tables don't exist yet, we shouldn't crash the whole AI request.
+    let providersListString = "Information unavailable.";
+    try {
+        const { data: providers, error: providersError } = await supabase
+        .from('providers')
+        .select('name, service_type, location');
+        
+        if (!providersError && providers) {
+             providersListString = providers.length > 0
+                ? providers.map(p => `- Provider: ${p.name}, Service: ${p.service_type}, Location: ${p.location}`).join('\n')
+                : "No registered providers yet.";
+        } else {
+            console.warn("Provider fetch skipped or failed (ignoring for chat):", providersError?.message);
+        }
+    } catch (e) {
+        console.warn("Supabase access failed", e);
+    }
 
     let upcomingAppointmentsString = "None";
     if (userId) {
-        const { data: appointments, error: appointmentsError } = await supabase
-            .from('follow_ups')
-            .select('next_appointment_date, providers(name)')
-            .eq('client_id', userId)
-            .gt('next_appointment_date', new Date().toISOString());
+        try {
+            const { data: appointments } = await supabase
+                .from('follow_ups')
+                .select('next_appointment_date, providers(name)')
+                .eq('client_id', userId)
+                .gt('next_appointment_date', new Date().toISOString());
 
-        if (appointments && appointments.length > 0) {
-            upcomingAppointmentsString = appointments.map(a => 
-                `- Appointment with ${a.providers.name} on ${new Date(a.next_appointment_date).toLocaleString()}`
-            ).join('\n');
+            if (appointments && appointments.length > 0) {
+                upcomingAppointmentsString = appointments.map(a => 
+                    `- Appointment with ${a.providers.name} on ${new Date(a.next_appointment_date).toLocaleString()}`
+                ).join('\n');
+            }
+        } catch (e) {
+             console.warn("Appointments fetch skipped", e);
         }
     }
 
@@ -213,10 +228,9 @@ export const getChatResponse = async (
     }
 
     const contents = [...history, { role: 'user', parts: userParts }];
-    // Add user ID to system instruction context if available
     const finalSystemInstruction = userId 
         ? `${systemInstruction}\n\nUSER_CONTEXT: The current user's ID is ${userId}. They are a registered client.`
-        : `${systemInstruction}\n\nUSER_CONTEXT: The user is not registered yet. You must guide them through the registration flow if they wish to book or create a profile.`;
+        : `${systemInstruction}\n\nUSER_CONTEXT: The user is not registered yet.`;
 
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
@@ -227,8 +241,10 @@ export const getChatResponse = async (
     });
     
     return response.text;
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error in generateContent:", error);
-    return "سمح لينا، وقع شي مشكل فالاتصال بالذكاء الاصطناعي. \n\nError connecting to AI service.";
+    let detail = "";
+    if (error.message) detail = `Details: ${error.message}`;
+    return `سمح لينا، وقع شي مشكل فالاتصال بالذكاء الاصطناعي.\nSorry, I encountered an error connecting to the AI service.\n\n${detail}`;
   }
 };

@@ -85,11 +85,3 @@ export interface AppointmentForDisplay {
     location: string;
   };
 }
-
-declare global {
-  namespace JSX {
-    interface IntrinsicElements {
-      [elemName: string]: any;
-    }
-  }
-}
