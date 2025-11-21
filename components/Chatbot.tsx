@@ -5,7 +5,7 @@ import { getChatResponse } from '../services/geminiService';
 import { useLocalization } from '../hooks/useLocalization';
 import { supabase } from '../services/supabaseClient';
 import QRCodeDisplay from './QRCodeDisplay';
-import { Send, Bot, User as UserIcon, Loader2, Paperclip, X, Bell, Key, Save, ImageIcon, ArrowRight, Mic, Volume2, VolumeX } from 'lucide-react';
+import { Send, Bot, User as UserIcon, Loader2, Paperclip, X, Bell, Key, Save, ImageIcon, ArrowRight, Mic, Volume2, VolumeX, Camera, StopCircle } from 'lucide-react';
 
 const BookingConfirmation: React.FC<{ details: BookingDetails }> = ({ details }) => {
   const { t } = useLocalization();
@@ -49,7 +49,9 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<any>(null);
 
   // --- Chat History Persistence ---
   useEffect(() => {
@@ -121,23 +123,45 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
 
   // --- Audio Logic ---
   const startListening = () => {
-      if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-          alert("Browser does not support speech recognition.");
+      if (isListening) {
+          recognitionRef.current?.stop();
+          setIsListening(false);
           return;
       }
-      // @ts-ignore
-      const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-      recognition.lang = language === 'ar' ? 'ar-MA' : language === 'fr' ? 'fr-FR' : 'en-US';
-      recognition.continuous = false;
-      recognition.interimResults = false;
 
-      recognition.onstart = () => setIsListening(true);
-      recognition.onend = () => setIsListening(false);
-      recognition.onresult = (event: any) => {
-          const transcript = event.results[0][0].transcript;
-          setInput(transcript);
+      if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+          alert("Browser does not support speech recognition. Try Google Chrome.");
+          return;
+      }
+
+      // @ts-ignore
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.lang = language === 'ar' ? 'ar-MA' : language === 'fr' ? 'fr-FR' : 'en-US';
+      recognitionRef.current.continuous = false;
+      recognitionRef.current.interimResults = false;
+
+      recognitionRef.current.onstart = () => {
+          setIsListening(true);
+          if (navigator.vibrate) navigator.vibrate(100); // Feedback
       };
-      recognition.start();
+      
+      recognitionRef.current.onend = () => setIsListening(false);
+      
+      recognitionRef.current.onresult = (event: any) => {
+          const transcript = event.results[0][0].transcript;
+          setInput(prev => prev + (prev ? ' ' : '') + transcript);
+      };
+
+      recognitionRef.current.onerror = (event: any) => {
+          console.error("Speech recognition error", event.error);
+          setIsListening(false);
+          if (event.error === 'not-allowed') {
+              alert("Please allow microphone access to use voice typing.");
+          }
+      };
+
+      recognitionRef.current.start();
   };
 
   const speakText = (text: string) => {
@@ -149,9 +173,17 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
       
       const utterance = new SpeechSynthesisUtterance(cleanText);
       utterance.lang = language === 'ar' ? 'ar-SA' : language === 'fr' ? 'fr-FR' : 'en-US';
-      utterance.onend = () => setIsSpeaking(false);
       
-      setIsSpeaking(true);
+      // Improve Arabic voice if available
+      if (language === 'ar') {
+          const voices = window.speechSynthesis.getVoices();
+          const arabicVoice = voices.find(v => v.lang.includes('ar'));
+          if (arabicVoice) utterance.voice = arabicVoice;
+      }
+
+      utterance.onend = () => setIsSpeaking(false);
+      utterance.onstart = () => setIsSpeaking(true);
+      
       window.speechSynthesis.speak(utterance);
   };
 
@@ -223,7 +255,6 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
         }
       } else {
         setMessages(prev => [...prev, { role: Role.BOT, text: botResponseText }]);
-        // Auto-speak response if user used mic recently? Or just button. Let's keep it manual for now.
       }
     } catch (error) {
       setMessages(prev => [...prev, { role: Role.BOT, text: t('errorMessage') }]);
@@ -317,10 +348,14 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
     setImageFile(null);
     setImagePreviewUrl(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
+    if (cameraInputRef.current) cameraInputRef.current.value = '';
   };
 
    // Marquee logic
    const getMarqueeClass = () => language === 'ar' ? 'animate-marquee-rtl' : 'animate-marquee-ltr';
+   
+   // Input Bar Logic
+   const hasContent = input.trim().length > 0 || imageFile !== null;
 
   return (
     <div className="flex flex-col w-full h-[calc(100vh-140px)] bg-surface dark:bg-surfaceDark rounded-3xl shadow-2xl border border-white/20 overflow-hidden relative">
@@ -358,7 +393,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
         {/* Chat Background Pattern overlay */}
         <div className="absolute inset-0 opacity-[0.05] dark:opacity-[0.03] pointer-events-none bg-[url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png')]"></div>
 
-        <div className="flex flex-col gap-2 z-10 relative">
+        <div className="flex flex-col gap-2 z-10 relative pb-4">
           {messages.map((msg, index) => {
             if (msg.isComponent && msg.bookingDetails) {
               return <BookingConfirmation key={index} details={msg.bookingDetails} />;
@@ -387,9 +422,15 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
                   )}
                   {msg.text && <p className="whitespace-pre-wrap">{msg.text}</p>}
                   {isBot && (
-                      <button onClick={() => isSpeaking ? stopSpeaking() : speakText(msg.text)} className="absolute -bottom-6 left-2 text-gray-400 hover:text-primary p-1">
-                          {isSpeaking ? <VolumeX size={14}/> : <Volume2 size={14}/>}
-                      </button>
+                      <div className="flex justify-end mt-1">
+                          <button 
+                            onClick={() => isSpeaking ? stopSpeaking() : speakText(msg.text)} 
+                            className="text-gray-400 hover:text-primary p-1 transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+                            title="Read text"
+                          >
+                             {isSpeaking ? <VolumeX size={16} className="animate-pulse text-primary"/> : <Volume2 size={16}/>}
+                          </button>
+                      </div>
                   )}
                 </div>
               </div>
@@ -433,61 +474,80 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
         </div>
       </div>
 
-      {/* Input Area */}
-      <div className="p-3 sm:p-4 bg-surface dark:bg-surfaceDark border-t border-gray-100 dark:border-gray-700">
-        {imagePreviewUrl && (
-          <div className="flex items-center gap-3 mb-3 bg-gray-50 dark:bg-gray-800 p-2 rounded-xl border border-dashed border-gray-300 dark:border-gray-600">
-            <img src={imagePreviewUrl} alt="Preview" className="w-12 h-12 object-cover rounded-lg"/>
-            <span className="text-xs text-gray-500 flex-1 truncate">{imageFile?.name}</span>
-            <button onClick={removeImage} className="p-1.5 bg-red-100 text-red-600 rounded-full hover:bg-red-200">
-              <X size={14} />
-            </button>
-          </div>
-        )}
+      {/* WhatsApp-style Input Area */}
+      <div className="p-2 sm:p-3 bg-surface dark:bg-surfaceDark border-t border-gray-100 dark:border-gray-700 flex items-end gap-2">
         
-        <div className="flex items-end gap-2 relative">
-          <input type="file" ref={fileInputRef} onChange={handleImageChange} accept="image/*" className="hidden" />
-          
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isLoading}
-            className="p-3 text-gray-500 hover:text-primary hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
-          >
-            <Paperclip size={20} />
-          </button>
+        {/* Main Pill Container (Input + Attachments) */}
+        <div className="flex-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-[24px] flex items-end shadow-sm relative px-2">
+            
+             {imagePreviewUrl && (
+                <div className="absolute bottom-full left-0 mb-2 ml-2 bg-white dark:bg-gray-800 p-2 rounded-xl border border-gray-200 dark:border-gray-600 shadow-lg animate-slide-up">
+                    <div className="relative">
+                        <img src={imagePreviewUrl} alt="Preview" className="w-20 h-20 object-cover rounded-lg"/>
+                        <button onClick={removeImage} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 shadow-sm">
+                            <X size={12} />
+                        </button>
+                    </div>
+                </div>
+            )}
 
-          {/* Microphone Button */}
-          <button
-            onClick={startListening}
-            disabled={isLoading}
-            className={`p-3 rounded-full transition-colors ${isListening ? 'bg-red-500 text-white animate-pulse' : 'text-gray-500 hover:text-primary hover:bg-gray-100 dark:hover:bg-gray-800'}`}
-          >
-            <Mic size={20} />
-          </button>
-          
-          <div className="flex-1 bg-gray-100 dark:bg-gray-800 rounded-2xl flex items-center px-4 py-1 focus-within:ring-2 focus-within:ring-primary/30 transition-all border border-transparent focus-within:border-primary/50">
-              <textarea
+            {/* Text Area */}
+            <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyPress={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }}}
-                placeholder={t('inputPlaceholder')}
+                placeholder={isListening ? t('listening') || "Listening..." : t('inputPlaceholder')}
                 rows={1}
-                className="w-full bg-transparent border-none focus:ring-0 text-gray-900 dark:text-white placeholder-gray-400 resize-none py-3 max-h-24 outline-none"
+                className="flex-1 bg-transparent border-none focus:ring-0 text-gray-900 dark:text-white placeholder-gray-400 resize-none py-3 px-4 max-h-32 outline-none text-base"
                 disabled={isLoading}
-                style={{ minHeight: '44px', whiteSpace: 'nowrap', overflow: 'hidden' }} 
-              />
-          </div>
+                style={{ minHeight: '48px' }} 
+            />
 
-          <button
-            onClick={handleSend}
-            disabled={isLoading || (input.trim() === '' && !imageFile)}
-            className={`p-3 rounded-full shadow-lg transition-all duration-200 transform ${
-                input.trim() || imageFile ? 'bg-primary text-white hover:scale-105 active:scale-95' : 'bg-gray-200 dark:bg-gray-700 text-gray-400'
-            }`}
-          >
-            {isLoading ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} className={language === 'ar' ? 'rotate-180' : ''} />}
-          </button>
+            {/* Attachments Inside Pill */}
+            <div className="flex items-center pb-2 pr-1 gap-1">
+                <input type="file" ref={fileInputRef} onChange={handleImageChange} accept="image/*" className="hidden" />
+                <input type="file" ref={cameraInputRef} onChange={handleImageChange} accept="image/*" capture="environment" className="hidden" />
+                
+                <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isLoading}
+                    className="p-2 text-gray-400 hover:text-primary transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+                    title="Attach Image"
+                >
+                    <Paperclip size={20} className="rotate-45" />
+                </button>
+                <button
+                    onClick={() => cameraInputRef.current?.click()}
+                    disabled={isLoading}
+                    className="p-2 text-gray-400 hover:text-primary transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+                    title="Open Camera"
+                >
+                    <Camera size={20} />
+                </button>
+            </div>
         </div>
+
+        {/* Round Action Button (Mic or Send) */}
+        <button
+            onClick={hasContent ? handleSend : startListening}
+            disabled={isLoading}
+            className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-all duration-200 transform hover:scale-105 active:scale-95 flex-shrink-0 
+                ${isListening 
+                    ? 'bg-red-500 animate-pulse text-white' 
+                    : 'bg-green-500 hover:bg-green-600 text-white'
+                }`}
+        >
+            {isLoading ? (
+                <Loader2 className="animate-spin" size={20} />
+            ) : hasContent ? (
+                <Send size={20} className={language === 'ar' ? 'rotate-180' : ''} />
+            ) : isListening ? (
+                <StopCircle size={24} />
+            ) : (
+                <Mic size={20} />
+            )}
+        </button>
+
       </div>
     </div>
   );
