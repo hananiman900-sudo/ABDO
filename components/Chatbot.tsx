@@ -5,7 +5,7 @@ import { getChatResponse } from '../services/geminiService';
 import { useLocalization } from '../hooks/useLocalization';
 import { supabase } from '../services/supabaseClient';
 import QRCodeDisplay from './QRCodeDisplay';
-import { Send, Bot, User as UserIcon, Loader2, Paperclip, X, Bell, Key, Save, ImageIcon, ArrowRight, Mic, Volume2, VolumeX, Camera, StopCircle } from 'lucide-react';
+import { Send, Bot, User as UserIcon, Loader2, Paperclip, X, Bell, Key, ArrowRight, Mic, Volume2, VolumeX, Camera, StopCircle } from 'lucide-react';
 
 const BookingConfirmation: React.FC<{ details: BookingDetails }> = ({ details }) => {
   const { t } = useLocalization();
@@ -157,11 +157,19 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
           console.error("Speech recognition error", event.error);
           setIsListening(false);
           if (event.error === 'not-allowed') {
-              alert("Please allow microphone access to use voice typing.");
+              alert("Microphone access denied. Please allow microphone permissions in your browser settings (click the lock icon in the address bar).");
+          } else if (event.error === 'no-speech') {
+              // Ignore no-speech errors, just stop listening
+          } else {
+              alert("Speech recognition error: " + event.error);
           }
       };
 
-      recognitionRef.current.start();
+      try {
+        recognitionRef.current.start();
+      } catch (e) {
+        console.error("Recognition start failed", e);
+      }
   };
 
   const speakText = (text: string) => {
@@ -475,13 +483,14 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
       </div>
 
       {/* WhatsApp-style Input Area */}
-      <div className="p-2 sm:p-3 bg-surface dark:bg-surfaceDark border-t border-gray-100 dark:border-gray-700 flex items-end gap-2">
+      {/* Force LTR direction for the input bar container so Mic is always on the right */}
+      <div dir="ltr" className="p-2 bg-surface dark:bg-surfaceDark border-t border-gray-100 dark:border-gray-700 flex items-end gap-2 w-full max-w-full">
         
         {/* Main Pill Container (Input + Attachments) */}
-        <div className="flex-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-[24px] flex items-end shadow-sm relative px-2">
+        <div className="flex-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-[24px] flex items-end shadow-sm relative px-2 overflow-hidden">
             
              {imagePreviewUrl && (
-                <div className="absolute bottom-full left-0 mb-2 ml-2 bg-white dark:bg-gray-800 p-2 rounded-xl border border-gray-200 dark:border-gray-600 shadow-lg animate-slide-up">
+                <div className="absolute bottom-full left-0 mb-2 ml-2 bg-white dark:bg-gray-800 p-2 rounded-xl border border-gray-200 dark:border-gray-600 shadow-lg animate-slide-up z-20">
                     <div className="relative">
                         <img src={imagePreviewUrl} alt="Preview" className="w-20 h-20 object-cover rounded-lg"/>
                         <button onClick={removeImage} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 shadow-sm">
@@ -491,8 +500,9 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
                 </div>
             )}
 
-            {/* Text Area */}
+            {/* Text Area - Respects app language for text alignment */}
             <textarea
+                dir={language === 'ar' ? 'rtl' : 'ltr'}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyPress={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }}}
@@ -503,9 +513,12 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
                 style={{ minHeight: '48px' }} 
             />
 
-            {/* Attachments Inside Pill */}
-            <div className="flex items-center pb-2 pr-1 gap-1">
+            {/* Attachments Inside Pill (Always on the Right side of the pill due to LTR container) */}
+            <div className="flex items-center pb-2 pr-1 gap-1 flex-none">
+                {/* Paperclip triggers file selection */}
                 <input type="file" ref={fileInputRef} onChange={handleImageChange} accept="image/*" className="hidden" />
+                
+                {/* Camera triggers Environment Camera */}
                 <input type="file" ref={cameraInputRef} onChange={handleImageChange} accept="image/*" capture="environment" className="hidden" />
                 
                 <button
@@ -527,11 +540,11 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
             </div>
         </div>
 
-        {/* Round Action Button (Mic or Send) */}
+        {/* Round Action Button (Mic or Send) - Always on Right */}
         <button
             onClick={hasContent ? handleSend : startListening}
             disabled={isLoading}
-            className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-all duration-200 transform hover:scale-105 active:scale-95 flex-shrink-0 
+            className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-all duration-200 transform hover:scale-105 active:scale-95 flex-none
                 ${isListening 
                     ? 'bg-red-500 animate-pulse text-white' 
                     : 'bg-green-500 hover:bg-green-600 text-white'
