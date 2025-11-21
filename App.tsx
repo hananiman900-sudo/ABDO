@@ -6,8 +6,38 @@ import ProviderPortal from './components/QRScanner';
 import AppointmentsDrawer from './components/AppointmentsDrawer';
 import DatabaseSetup from './components/DatabaseSetup';
 import { LocalizationProvider, useLocalization, translations } from './hooks/useLocalization';
-import { Globe, User as UserIcon, CheckSquare, Sun, Moon, LogIn, LogOut, X, CalendarDays, Database, AlertTriangle, CreditCard, CheckCircle2, Menu, MoreVertical } from 'lucide-react';
+import { Globe, User as UserIcon, CheckSquare, Sun, Moon, LogIn, LogOut, X, CalendarDays, Database, AlertTriangle, CheckCircle2, Menu } from 'lucide-react';
 import { supabase } from './services/supabaseClient';
+
+// SplashScreen Component
+const SplashScreen: React.FC<{ onFinish: () => void }> = ({ onFinish }) => {
+  const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setVisible(false);
+      setTimeout(onFinish, 500); // Allow fade out animation to finish
+    }, 2500);
+    return () => clearTimeout(timer);
+  }, [onFinish]);
+
+  if (!visible) return null;
+
+  return (
+    <div className={`fixed inset-0 z-[100] bg-gradient-to-br from-primaryDark to-primary flex flex-col items-center justify-center transition-opacity duration-500 ${visible ? 'opacity-100' : 'opacity-0'}`}>
+      <div className="relative w-32 h-32 mb-6">
+        <div className="absolute inset-0 bg-white/20 rounded-full animate-ping"></div>
+        <div className="relative bg-white rounded-full p-6 shadow-2xl">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-20 w-20 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        </div>
+      </div>
+      <h1 className="text-4xl font-bold text-white tracking-tight animate-fade-in font-sans">
+        Tanger<span className="text-accent">Connect</span>
+      </h1>
+      <p className="text-primary/20 text-sm mt-2 font-medium tracking-widest uppercase animate-pulse">AI Assistant</p>
+    </div>
+  );
+};
 
 const RegistrationSuccessModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     const { t } = useLocalization();
@@ -31,6 +61,21 @@ const RegistrationSuccessModal: React.FC<{ onClose: () => void }> = ({ onClose }
         </div>
     );
 };
+
+// FIX: Moved InputField outside to prevent re-rendering and focus loss
+const InputField = ({ label, value, onChange, type = "text", placeholder = "" }: any) => (
+    <div className="mb-4">
+        <label className="block mb-2 text-sm font-semibold text-gray-700 dark:text-gray-300">{label}</label>
+        <input 
+            type={type} 
+            value={value} 
+            onChange={(e) => onChange(e.target.value)} 
+            placeholder={placeholder}
+            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 text-gray-900 rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary dark:bg-gray-700/50 dark:border-gray-600 dark:text-white transition-all outline-none" 
+            required 
+        />
+    </div>
+);
 
 const AuthDrawer: React.FC<{
   isOpen: boolean;
@@ -198,19 +243,6 @@ const AuthDrawer: React.FC<{
     else handleLogin();
   };
   
-  const InputField = ({ label, value, onChange, type = "text", placeholder = "" }: any) => (
-    <div className="mb-4">
-        <label className="block mb-2 text-sm font-semibold text-gray-700 dark:text-gray-300">{label}</label>
-        <input 
-            type={type} 
-            value={value} 
-            onChange={(e) => onChange(e.target.value)} 
-            placeholder={placeholder}
-            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 text-gray-900 rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary dark:bg-gray-700/50 dark:border-gray-600 dark:text-white transition-all outline-none" 
-            required 
-        />
-    </div>
-  );
 
   const renderClientFields = () => (
     <>
@@ -325,6 +357,7 @@ const App: React.FC = () => {
   const [showAppointmentsDrawer, setShowAppointmentsDrawer] = useState(false);
   const [showDbSetup, setShowDbSetup] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
 
   const [theme, setTheme] = useState(() => {
     if (typeof window !== 'undefined' && localStorage.theme) return localStorage.theme;
@@ -338,8 +371,10 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const checkUser = async () => {
+      setIsLoadingUser(true);
       const userId = localStorage.getItem('tangerconnect_user_id');
       const userType = localStorage.getItem('tangerconnect_user_type');
+      
       if (userId && userType) {
         try {
           if (userType === AccountType.CLIENT) {
@@ -357,11 +392,12 @@ const App: React.FC = () => {
                     isActive: data.is_active,
                     subscriptionEndDate: data.subscription_end_date
                 });
+                setView(UserView.PROVIDER);
             }
           }
         } catch (error) {
-          localStorage.removeItem('tangerconnect_user_id');
-          localStorage.removeItem('tangerconnect_user_type');
+          // Keep logged in even if fetch fails slightly (offline), but clear if hard auth error
+          console.error("Session check failed", error);
         }
       }
       setIsLoadingUser(false);
@@ -393,6 +429,10 @@ const App: React.FC = () => {
     setCurrentUser(null);
     setView(UserView.CLIENT);
     setMobileMenuOpen(false);
+    // Also clear local chat history for security if needed, but user requested persistence.
+    // We will keep chat history in localStorage but perhaps clearing it on explicit logout is better?
+    // User requested persistent session, implying simple resumption. 
+    // For explicit logout, we should probably clear the specific user's chat session key in Chatbot.
   };
   
   const handleAuthSuccess = (user: AuthenticatedUser) => {
@@ -578,6 +618,10 @@ const App: React.FC = () => {
       </div>
     );
   };
+
+  if (showSplash) {
+      return <SplashScreen onFinish={() => setShowSplash(false)} />;
+  }
 
   return (
     <LocalizationProvider language={language}>

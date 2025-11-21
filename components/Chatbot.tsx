@@ -5,7 +5,7 @@ import { getChatResponse } from '../services/geminiService';
 import { useLocalization } from '../hooks/useLocalization';
 import { supabase } from '../services/supabaseClient';
 import QRCodeDisplay from './QRCodeDisplay';
-import { Send, Bot, User as UserIcon, Loader2, Paperclip, X, Bell, Key, Save, ImageIcon, ArrowRight } from 'lucide-react';
+import { Send, Bot, User as UserIcon, Loader2, Paperclip, X, Bell, Key, Save, ImageIcon, ArrowRight, Mic, Volume2, VolumeX } from 'lucide-react';
 
 const BookingConfirmation: React.FC<{ details: BookingDetails }> = ({ details }) => {
   const { t } = useLocalization();
@@ -44,22 +44,40 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [showApiKeyInput, setShowApiKeyInput] = useState(false);
   const [userApiKey, setUserApiKey] = useState('');
+  const [isListening, setIsListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
+  // --- Chat History Persistence ---
   useEffect(() => {
+    // Load chat history
     if (!isLoadingUser) {
-        if (currentUser) {
-            setMessages([{ role: Role.BOT, text: t('welcomeBackMessage', { name: currentUser.name }) }]);
-            fetchAnnouncements(currentUser.id);
+        const storageKey = currentUser ? `chat_history_${currentUser.id}` : 'chat_history_guest';
+        const saved = localStorage.getItem(storageKey);
+        if (saved) {
+            setMessages(JSON.parse(saved));
         } else {
-            setMessages([{ role: Role.BOT, text: t('welcomeMessage') }]);
+             if (currentUser) {
+                setMessages([{ role: Role.BOT, text: t('welcomeBackMessage', { name: currentUser.name }) }]);
+            } else {
+                setMessages([{ role: Role.BOT, text: t('welcomeMessage') }]);
+            }
         }
+        if (currentUser) fetchAnnouncements(currentUser.id);
     }
-   }, [isLoadingUser, currentUser, t]);
+  }, [isLoadingUser, currentUser, t]);
 
+  useEffect(() => {
+      // Save chat history whenever messages change
+      if (messages.length > 0 && !isLoadingUser) {
+          const storageKey = currentUser ? `chat_history_${currentUser.id}` : 'chat_history_guest';
+          localStorage.setItem(storageKey, JSON.stringify(messages));
+      }
+  }, [messages, currentUser, isLoadingUser]);
+  // --------------------------------
 
   const fetchAnnouncements = async (userId: number) => {
     const { data: followUps } = await supabase.from('follow_ups').select('provider_id').eq('client_id', userId);
@@ -101,6 +119,49 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
     }
   };
 
+  // --- Audio Logic ---
+  const startListening = () => {
+      if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+          alert("Browser does not support speech recognition.");
+          return;
+      }
+      // @ts-ignore
+      const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+      recognition.lang = language === 'ar' ? 'ar-MA' : language === 'fr' ? 'fr-FR' : 'en-US';
+      recognition.continuous = false;
+      recognition.interimResults = false;
+
+      recognition.onstart = () => setIsListening(true);
+      recognition.onend = () => setIsListening(false);
+      recognition.onresult = (event: any) => {
+          const transcript = event.results[0][0].transcript;
+          setInput(transcript);
+      };
+      recognition.start();
+  };
+
+  const speakText = (text: string) => {
+      if (!('speechSynthesis' in window)) return;
+      window.speechSynthesis.cancel(); // Stop previous
+      
+      // Simple cleanup to remove markdown chars roughly before speaking
+      const cleanText = text.replace(/\*/g, '').replace(/`/g, ''); 
+      
+      const utterance = new SpeechSynthesisUtterance(cleanText);
+      utterance.lang = language === 'ar' ? 'ar-SA' : language === 'fr' ? 'fr-FR' : 'en-US';
+      utterance.onend = () => setIsSpeaking(false);
+      
+      setIsSpeaking(true);
+      window.speechSynthesis.speak(utterance);
+  };
+
+  const stopSpeaking = () => {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+  }
+  // -------------------
+
+
   const handleSend = async () => {
     if ((input.trim() === '' && !imageFile) || isLoading) return;
     
@@ -128,7 +189,12 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
           parts: [{ text: msg.text }],
       }));
       
-      const botResponseText = await getChatResponse(history, userMessage.text, language, imagePayload, currentUser?.id);
+      // Pass announcements to Gemini
+      const announcementText = announcements.length > 0 
+        ? announcements.map(a => `${a.providers.name}: ${a.message}`).join('\n') 
+        : "";
+
+      const botResponseText = await getChatResponse(history, userMessage.text, language, imagePayload, currentUser?.id, announcementText);
 
       if (botResponseText === "MISSING_API_KEY_ERROR") {
         setShowApiKeyInput(true);
@@ -157,6 +223,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
         }
       } else {
         setMessages(prev => [...prev, { role: Role.BOT, text: botResponseText }]);
+        // Auto-speak response if user used mic recently? Or just button. Let's keep it manual for now.
       }
     } catch (error) {
       setMessages(prev => [...prev, { role: Role.BOT, text: t('errorMessage') }]);
@@ -194,13 +261,20 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
 
   const handleBooking = async (details: any) => {
     try {
-      const { data: providerData } = await supabase.from('providers').select('id').eq('name', details.provider).single();
-      if (!providerData || !currentUser) throw new Error('Error');
+      // 1. Find Provider
+      const { data: providerData } = await supabase.from('providers').select('id').ilike('name', `%${details.provider}%`).limit(1).maybeSingle();
+      if (!providerData || !currentUser) throw new Error('Provider not found or User not logged in');
+      
+      // 2. Insert Appointment
       const { data: appointmentData, error } = await supabase.from('appointments').insert({ client_id: currentUser.id, provider_id: providerData.id }).select('id').single();
+      
       if (error) throw error;
+      
+      // 3. Confirm in Chat
       const bookingDetails: BookingDetails = { ...details, appointmentId: appointmentData.id };
       setMessages(prev => [...prev, { role: Role.BOT, text: t('bookingSuccessMessage') }, { role: Role.SYSTEM, text: 'Booking', bookingDetails, isComponent: true }]);
     } catch (e) {
+      console.error(e);
       setMessages(prev => [...prev, { role: Role.BOT, text: t('errorMessage') }]);
     }
   };
@@ -312,6 +386,11 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
                     </div>
                   )}
                   {msg.text && <p className="whitespace-pre-wrap">{msg.text}</p>}
+                  {isBot && (
+                      <button onClick={() => isSpeaking ? stopSpeaking() : speakText(msg.text)} className="absolute -bottom-6 left-2 text-gray-400 hover:text-primary p-1">
+                          {isSpeaking ? <VolumeX size={14}/> : <Volume2 size={14}/>}
+                      </button>
+                  )}
                 </div>
               </div>
             );
@@ -368,12 +447,22 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
         
         <div className="flex items-end gap-2 relative">
           <input type="file" ref={fileInputRef} onChange={handleImageChange} accept="image/*" className="hidden" />
+          
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={isLoading}
             className="p-3 text-gray-500 hover:text-primary hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
           >
-            <Paperclip size={22} />
+            <Paperclip size={20} />
+          </button>
+
+          {/* Microphone Button */}
+          <button
+            onClick={startListening}
+            disabled={isLoading}
+            className={`p-3 rounded-full transition-colors ${isListening ? 'bg-red-500 text-white animate-pulse' : 'text-gray-500 hover:text-primary hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+          >
+            <Mic size={20} />
           </button>
           
           <div className="flex-1 bg-gray-100 dark:bg-gray-800 rounded-2xl flex items-center px-4 py-1 focus-within:ring-2 focus-within:ring-primary/30 transition-all border border-transparent focus-within:border-primary/50">
@@ -385,7 +474,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
                 rows={1}
                 className="w-full bg-transparent border-none focus:ring-0 text-gray-900 dark:text-white placeholder-gray-400 resize-none py-3 max-h-24 outline-none"
                 disabled={isLoading}
-                style={{ minHeight: '44px' }}
+                style={{ minHeight: '44px', whiteSpace: 'nowrap', overflow: 'hidden' }} 
               />
           </div>
 
@@ -396,7 +485,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
                 input.trim() || imageFile ? 'bg-primary text-white hover:scale-105 active:scale-95' : 'bg-gray-200 dark:bg-gray-700 text-gray-400'
             }`}
           >
-            {isLoading ? <Loader2 className="animate-spin" size={22} /> : <Send size={22} className={language === 'ar' ? 'rotate-180' : ''} />}
+            {isLoading ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} className={language === 'ar' ? 'rotate-180' : ''} />}
           </button>
         </div>
       </div>

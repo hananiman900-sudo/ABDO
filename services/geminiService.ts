@@ -6,7 +6,7 @@ import { supabase } from "./supabaseClient";
 // Do not initialize globally to prevent crash on load if key is missing
 // const API_KEY = process.env.API_KEY;
 
-const getSystemInstruction = (language: Language, providersList: string, upcomingAppointments: string) => {
+const getSystemInstruction = (language: Language, providersList: string, upcomingAppointments: string, announcements: string) => {
   const commonInstructions = `
 You are 'TangerConnect', a helpful AI assistant for the city of Tangier. Your responses should be concise, natural, and directly answer the user's question.
 
@@ -47,7 +47,9 @@ You are 'TangerConnect', a helpful AI assistant for the city of Tangier. Your re
 
 3.  **Appointment Reminders:** At the start of a conversation with a registered user, check the list of their upcoming appointments. If any appointment is within the next 24 hours, remind them in your first message. Example: "Welcome back, [Name]! Just a friendly reminder you have an appointment with [Provider] tomorrow."
 4.  **Analyze User Input:** If the user uploads an image, analyze it for context (e.g., a dental problem suggests needing a dentist).
-5.  **Recommend Services:** When a user asks for a service, check the list of available providers.
+5.  **Recommend Services & Announcements:**
+    - When a user asks for a service, check the list of available providers.
+    - **Check the Announcements section.** If a provider has an active announcement (discount, news), MENTION IT to the user as a "Special Offer" or "Update".
     - **Do NOT list all providers.** Find 1-2 relevant providers.
     - Summarize the options conversationally.
 6.  **Booking Flow:**
@@ -95,6 +97,10 @@ ${commonInstructions}
 ---
 ${providersList}
 ---
+**إعلانات وعروض المزودين:**
+---
+${announcements}
+---
 **المواعيد الجاية ديال المستخدم:**
 ---
 ${upcomingAppointments}
@@ -110,6 +116,10 @@ ${commonInstructions}
 **Available Providers:**
 ---
 ${providersList}
+---
+**Provider Announcements:**
+---
+${announcements}
 ---
 **User's Upcoming Appointments:**
 ---
@@ -127,6 +137,10 @@ ${commonInstructions}
 ---
 ${providersList}
 ---
+**Annonces des fournisseurs :**
+---
+${announcements}
+---
 **Rendez-vous à venir de l'utilisateur :**
 ---
 ${upcomingAppointments}
@@ -143,6 +157,7 @@ export const getChatResponse = async (
   language: Language,
   image?: { base64: string; mimeType: string; },
   userId?: number,
+  announcementsText: string = ""
 ): Promise<string> => {
   try {
     // Check Environment Variable first (from index.html window.process)
@@ -198,7 +213,7 @@ export const getChatResponse = async (
     }
 
 
-    const systemInstruction = getSystemInstruction(language, providersListString, upcomingAppointmentsString);
+    const systemInstruction = getSystemInstruction(language, providersListString, upcomingAppointmentsString, announcementsText);
     
     const userParts: any[] = [];
     if (newMessage) userParts.push({ text: newMessage });
