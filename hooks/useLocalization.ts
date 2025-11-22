@@ -601,6 +601,101 @@ export const translations: Translations = {
     ar: 'لتفعيل حساب، انسخ هذا الكود، بدل "username_here" بإسم المستخدم، وشغله. سيقوم بتفعيل الحساب لمدة 30 يوم.',
     en: 'To activate an account, copy this code, replace "username_here" with the username, and run it. It activates for 30 days.',
     fr: 'Pour activer un compte, copiez ce code, remplacez "username_here" par le nom d\'utilisateur et exécutez-le. Il active pour 30 jours.',
+  },
+  providerDirectory: {
+    ar: 'دليل المزودين',
+    en: 'Provider Directory',
+    fr: 'Répertoire des fournisseurs',
+  },
+  follow: {
+    ar: 'متابعة',
+    en: 'Follow',
+    fr: 'Suivre',
+  },
+  unfollow: {
+    ar: 'إلغاء المتابعة',
+    en: 'Unfollow',
+    fr: 'Ne plus suivre',
+  },
+  notifications: {
+    ar: 'الإشعارات',
+    en: 'Notifications',
+    fr: 'Notifications',
+  },
+  noNotifications: {
+    ar: 'ما كاين حتى إشعار.',
+    en: 'No notifications.',
+    fr: 'Pas de notifications.',
+  },
+  reminder: {
+    ar: 'تذكير',
+    en: 'Reminder',
+    fr: 'Rappel',
+  },
+  appointmentReminder: {
+    ar: 'تذكير: عندك رونديفو غدا مع {provider}.',
+    en: 'Reminder: You have an appointment tomorrow with {provider}.',
+    fr: 'Rappel : Vous avez un rendez-vous demain avec {provider}.',
+  },
+  statistics: {
+    ar: 'الإحصائيات',
+    en: 'Statistics',
+    fr: 'Statistiques',
+  },
+  clientsToday: {
+    ar: 'الكليان ديال اليوم',
+    en: 'Clients Today',
+    fr: 'Clients aujourd\'hui',
+  },
+  scanHistory: {
+    ar: 'سجل السكان',
+    en: 'Scan History',
+    fr: 'Historique des scans',
+  },
+  scannedAt: {
+    ar: 'تسكانا ف',
+    en: 'Scanned at',
+    fr: 'Scanné à',
+  },
+  edit: {
+    ar: 'تعديل',
+    en: 'Edit',
+    fr: 'Modifier',
+  },
+  delete: {
+    ar: 'مسح',
+    en: 'Delete',
+    fr: 'Supprimer',
+  },
+  myActiveAds: {
+    ar: 'الإعلانات ديالي',
+    en: 'My Active Ads',
+    fr: 'Mes annonces actives',
+  },
+  accountRestricted: {
+    ar: 'الحساب ديالك باقي مامفعلش. تاصل ب 0617774846 باش تفعلو.',
+    en: 'Account not active. Call 0617774846 to activate.',
+    fr: 'Compte non actif. Appelez le 0617774846 pour activer.',
+  },
+  call: {
+    ar: 'اتصال',
+    en: 'Call',
+    fr: 'Appeler',
+  },
+  message: {
+    ar: 'رسالة',
+    en: 'Message',
+    fr: 'Message',
+  },
+  followers: {
+    ar: 'المتابعين',
+    en: 'Followers',
+    fr: 'Abonnés',
+  },
+  v2UpdateTitle: {
+    ar: 'تحديث V2: خصائص لوحة التحكم',
+    en: 'V2 Update: Dashboard Features',
+    fr: 'Mise à jour V2 : Fonctionnalités du tableau de bord',
   }
 };
 

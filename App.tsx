@@ -6,8 +6,125 @@ import ProviderPortal from './components/QRScanner';
 import AppointmentsDrawer from './components/AppointmentsDrawer';
 import DatabaseSetup from './components/DatabaseSetup';
 import { LocalizationProvider, useLocalization, translations } from './hooks/useLocalization';
-import { Globe, User as UserIcon, CheckSquare, Sun, Moon, LogIn, LogOut, X, CalendarDays, Database, AlertTriangle, CheckCircle2, Menu } from 'lucide-react';
+import { Globe, User as UserIcon, CheckSquare, Sun, Moon, LogIn, LogOut, X, CalendarDays, Database, AlertTriangle, CheckCircle2, Menu, Users, Bell, Phone, MapPin } from 'lucide-react';
 import { supabase } from './services/supabaseClient';
+
+// --- New Components (Directory & Notifications) ---
+
+const ProviderDirectory: React.FC<{ isOpen: boolean; onClose: () => void; currentUser: AuthenticatedUser | null }> = ({ isOpen, onClose, currentUser }) => {
+    const { t } = useLocalization();
+    const [providers, setProviders] = useState<any[]>([]);
+    const [followedIds, setFollowedIds] = useState<number[]>([]);
+
+    useEffect(() => {
+        if(isOpen) {
+            supabase.from('providers').select('*').eq('is_active', true).then(({data}) => setProviders(data || []));
+            if(currentUser) {
+                supabase.from('follows').select('provider_id').eq('client_id', currentUser.id)
+                .then(({data}) => setFollowedIds(data?.map(d => d.provider_id) || []));
+            }
+        }
+    }, [isOpen, currentUser]);
+
+    const toggleFollow = async (providerId: number) => {
+        if (!currentUser) return alert(t('loginTitle'));
+        if (followedIds.includes(providerId)) {
+            await supabase.from('follows').delete().match({ client_id: currentUser.id, provider_id: providerId });
+            setFollowedIds(prev => prev.filter(id => id !== providerId));
+        } else {
+            await supabase.from('follows').insert({ client_id: currentUser.id, provider_id: providerId });
+            setFollowedIds(prev => [...prev, providerId]);
+        }
+    };
+
+    if(!isOpen) return null;
+    
+    return (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
+            <div className="bg-white dark:bg-gray-800 w-full max-w-md max-h-[80vh] rounded-3xl overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+                <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
+                    <h3 className="font-bold text-xl dark:text-white">{t('providerDirectory')}</h3>
+                    <button onClick={onClose}><X className="dark:text-white"/></button>
+                </div>
+                <div className="overflow-y-auto p-4 space-y-3">
+                    {providers.map(p => (
+                        <div key={p.id} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-xl">
+                            <div>
+                                <div className="font-bold dark:text-white">{p.name}</div>
+                                <div className="text-xs text-gray-500 dark:text-gray-400">{p.service_type} • {p.location}</div>
+                            </div>
+                            <button 
+                                onClick={() => toggleFollow(p.id)}
+                                className={`px-4 py-2 rounded-full text-xs font-bold transition-colors ${followedIds.includes(p.id) ? 'bg-gray-200 text-gray-700' : 'bg-primary text-white'}`}
+                            >
+                                {followedIds.includes(p.id) ? t('unfollow') : t('follow')}
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const NotificationCenter: React.FC<{ isOpen: boolean; onClose: () => void; currentUser: AuthenticatedUser | null }> = ({ isOpen, onClose, currentUser }) => {
+    const { t } = useLocalization();
+    const [notifications, setNotifications] = useState<any[]>([]);
+
+    useEffect(() => {
+        if(isOpen && currentUser) {
+            const fetchNotifs = async () => {
+                // 1. Announcements from followed providers
+                const { data: follows } = await supabase.from('follows').select('provider_id').eq('client_id', currentUser.id);
+                const providerIds = follows?.map(f => f.provider_id) || [];
+                let announcements: any[] = [];
+                if(providerIds.length > 0) {
+                     const { data } = await supabase.from('announcements').select('*, providers(name)').in('provider_id', providerIds).order('created_at', {ascending: false}).limit(10);
+                     announcements = data || [];
+                }
+                
+                // 2. Appointment Reminders (Simulated logic: Appointments tomorrow)
+                const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+                const tomorrowStr = tomorrow.toISOString().split('T')[0];
+                const { data: appts } = await supabase.from('follow_ups').select('*, providers(name)').eq('client_id', currentUser.id).gte('next_appointment_date', tomorrowStr).lt('next_appointment_date', new Date(tomorrow.getTime() + 86400000).toISOString());
+                
+                const merged = [
+                    ...announcements.map(a => ({ type: 'ad', ...a })),
+                    ...(appts || []).map(a => ({ type: 'reminder', ...a }))
+                ];
+                setNotifications(merged);
+            };
+            fetchNotifs();
+        }
+    }, [isOpen, currentUser]);
+
+    if(!isOpen) return null;
+    return (
+        <div className="fixed inset-0 bg-black/60 z-50 flex justify-end" onClick={onClose}>
+             <div className="bg-white dark:bg-gray-800 w-80 h-full shadow-2xl p-4 overflow-y-auto" onClick={e => e.stopPropagation()}>
+                 <div className="flex justify-between items-center mb-6">
+                     <h3 className="font-bold text-xl dark:text-white">{t('notifications')}</h3>
+                     <button onClick={onClose}><X className="dark:text-white"/></button>
+                 </div>
+                 <div className="space-y-4">
+                     {notifications.map((n, i) => (
+                         <div key={i} className={`p-4 rounded-xl border-l-4 ${n.type === 'ad' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20'}`}>
+                             <div className="flex items-center gap-2 mb-1">
+                                 {n.type === 'ad' ? <Bell size={14} className="text-blue-500"/> : <CalendarDays size={14} className="text-yellow-500"/>}
+                                 <span className="font-bold text-sm dark:text-white">{n.providers.name}</span>
+                             </div>
+                             <p className="text-sm text-gray-700 dark:text-gray-300">
+                                 {n.type === 'ad' ? n.message : t('appointmentReminder', {provider: n.providers.name})}
+                             </p>
+                         </div>
+                     ))}
+                     {notifications.length === 0 && <p className="text-center text-gray-500">{t('noNotifications')}</p>}
+                 </div>
+             </div>
+        </div>
+    );
+};
+
 
 // SplashScreen Component
 const SplashScreen: React.FC<{ onFinish: () => void }> = ({ onFinish }) => {
@@ -358,6 +475,10 @@ const App: React.FC = () => {
   const [showDbSetup, setShowDbSetup] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
+  
+  // New Drawers
+  const [showProviderDirectory, setShowProviderDirectory] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
 
   const [theme, setTheme] = useState(() => {
     if (typeof window !== 'undefined' && localStorage.theme) return localStorage.theme;
@@ -396,7 +517,6 @@ const App: React.FC = () => {
             }
           }
         } catch (error) {
-          // Keep logged in even if fetch fails slightly (offline), but clear if hard auth error
           console.error("Session check failed", error);
         }
       }
@@ -429,10 +549,6 @@ const App: React.FC = () => {
     setCurrentUser(null);
     setView(UserView.CLIENT);
     setMobileMenuOpen(false);
-    // Also clear local chat history for security if needed, but user requested persistence.
-    // We will keep chat history in localStorage but perhaps clearing it on explicit logout is better?
-    // User requested persistent session, implying simple resumption. 
-    // For explicit logout, we should probably clear the specific user's chat session key in Chatbot.
   };
   
   const handleAuthSuccess = (user: AuthenticatedUser) => {
@@ -494,9 +610,17 @@ const App: React.FC = () => {
                 <div className="h-6 w-px bg-gray-200 dark:bg-gray-700 mx-1"></div>
 
                 {currentUser?.accountType === AccountType.CLIENT && (
-                    <button onClick={() => setShowAppointmentsDrawer(true)} className="p-2 text-gray-600 hover:text-primary hover:bg-gray-100 rounded-full transition-colors" title={t('myAppointments')}>
-                        <CalendarDays size={20} />
-                    </button>
+                    <>
+                        <button onClick={() => setShowProviderDirectory(true)} className="p-2 text-gray-600 hover:text-primary hover:bg-gray-100 rounded-full transition-colors" title={t('providerDirectory')}>
+                            <Users size={20} />
+                        </button>
+                        <button onClick={() => setShowNotifications(true)} className="p-2 text-gray-600 hover:text-primary hover:bg-gray-100 rounded-full transition-colors" title={t('notifications')}>
+                            <Bell size={20} />
+                        </button>
+                        <button onClick={() => setShowAppointmentsDrawer(true)} className="p-2 text-gray-600 hover:text-primary hover:bg-gray-100 rounded-full transition-colors" title={t('myAppointments')}>
+                            <CalendarDays size={20} />
+                        </button>
+                    </>
                 )}
                 
                 <button onClick={() => setShowDbSetup(true)} className="p-2 text-gray-600 hover:text-primary hover:bg-gray-100 rounded-full transition-colors">
@@ -535,8 +659,8 @@ const App: React.FC = () => {
             {/* Mobile Menu Button */}
             <div className="flex md:hidden items-center gap-2">
                 {currentUser?.accountType === AccountType.CLIENT && (
-                     <button onClick={() => setShowAppointmentsDrawer(true)} className="p-2 bg-gray-100 dark:bg-gray-800 rounded-full text-primary">
-                        <CalendarDays size={20} />
+                     <button onClick={() => setShowNotifications(true)} className="p-2 bg-gray-100 dark:bg-gray-800 rounded-full text-primary">
+                        <Bell size={20} />
                      </button>
                 )}
                 <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="p-2 text-dark dark:text-light hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
@@ -547,7 +671,7 @@ const App: React.FC = () => {
 
         {/* Mobile Dropdown Menu */}
         {mobileMenuOpen && (
-            <div className="md:hidden absolute top-16 left-0 w-full bg-surface dark:bg-surfaceDark border-b border-gray-200 dark:border-gray-800 shadow-2xl animate-slide-up">
+            <div className="md:hidden absolute top-16 left-0 w-full bg-surface dark:bg-surfaceDark border-b border-gray-200 dark:border-gray-800 shadow-2xl animate-slide-up z-50">
                 <div className="p-4 space-y-4">
                     {currentUser ? (
                         <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
@@ -564,6 +688,17 @@ const App: React.FC = () => {
                          <button onClick={() => {setShowAuthDrawer(true); setMobileMenuOpen(false);}} className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-primary text-white rounded-xl font-bold shadow-lg shadow-primary/20">
                             <LogIn size={18} /> {t('loginRegister')}
                         </button>
+                    )}
+                    
+                    {currentUser?.accountType === AccountType.CLIENT && (
+                        <>
+                        <button onClick={() => {setShowProviderDirectory(true); setMobileMenuOpen(false);}} className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-xl text-sm text-gray-600 dark:text-gray-300">
+                            <Users size={18}/> {t('providerDirectory')}
+                        </button>
+                        <button onClick={() => {setShowAppointmentsDrawer(true); setMobileMenuOpen(false);}} className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-xl text-sm text-gray-600 dark:text-gray-300">
+                            <CalendarDays size={18}/> {t('myAppointments')}
+                        </button>
+                        </>
                     )}
 
                     <div className="grid grid-cols-2 gap-3">
@@ -635,6 +770,9 @@ const App: React.FC = () => {
             setShowDbSetup(true);
         }}
       />
+      <ProviderDirectory isOpen={showProviderDirectory} onClose={() => setShowProviderDirectory(false)} currentUser={currentUser}/>
+      <NotificationCenter isOpen={showNotifications} onClose={() => setShowNotifications(false)} currentUser={currentUser}/>
+      
        {currentUser?.accountType === AccountType.CLIENT && (
          <AppointmentsDrawer 
             isOpen={showAppointmentsDrawer} 

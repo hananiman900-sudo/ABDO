@@ -3,7 +3,7 @@ import { GoogleGenAI } from "@google/genai";
 import { Language } from "../types";
 import { supabase } from "./supabaseClient";
 
-const getSystemInstruction = (language: Language, providersList: string, upcomingAppointments: string, announcements: string) => {
+const getSystemInstruction = (language: Language, providersList: string, upcomingAppointments: string, announcements: string, userContext: string) => {
   const commonInstructions = `
 You are 'TangerConnect', a helpful AI assistant for the city of Tangier. Your responses should be concise, natural, and directly answer the user's question.
 
@@ -53,14 +53,14 @@ You are 'TangerConnect', a helpful AI assistant for the city of Tangier. Your re
     - Summarize the options conversationally.
 6.  **Booking Flow:**
     - Offer to book appointments with a 19% discount.
-    - To book, you already have the user's name and phone. Just confirm the booking.
-    - Confirm the booking by responding ONLY with the following JSON structure.
+    - **IMPORTANT:** You have the user's context (Name: ${userContext}). USE IT. Do not ask for name/phone if provided in context.
+    - To book, confirm the booking by responding ONLY with the following JSON structure.
 \`\`\`json
 {
   "action": "BOOKING_CONFIRMED",
   "details": {
-    "name": "...",
-    "phone": "...",
+    "name": "INSERT_USER_NAME_HERE",
+    "phone": "INSERT_USER_PHONE_HERE",
     "service": "...",
     "provider": "...",
     "location": "...",
@@ -83,6 +83,9 @@ You are 'TangerConnect', a helpful AI assistant for the city of Tangier. Your re
 }
 \`\`\`
 8.  **Health Inquiries:** Act like a preliminary triage nurse. Be empathetic. **Never give a definitive diagnosis.** Always recommend seeing a real doctor from the list.
+
+**USER CONTEXT:**
+${userContext}
 `;
 
   const langMap = {
@@ -157,17 +160,16 @@ export const getChatResponse = async (
   image?: { base64: string; mimeType: string; },
   audio?: { base64: string; mimeType: string; },
   userId?: number,
+  userName?: string,
+  userPhone?: string,
   announcementsText: string = ""
 ): Promise<string> => {
   try {
-    // FIX: Properly access API Key from window object if process is undefined in browser
     const apiKey = (window as any).process?.env?.API_KEY;
     if (!apiKey) throw new Error("API Key missing. Check index.html configuration.");
 
     const ai = new GoogleGenAI({ apiKey });
 
-    // FIX: Graceful degradation for Supabase errors
-    // If tables don't exist yet, we shouldn't crash the whole AI request.
     let providersListString = "Information unavailable.";
     try {
         const { data: providers, error: providersError } = await supabase
@@ -178,12 +180,8 @@ export const getChatResponse = async (
              providersListString = providers.length > 0
                 ? providers.map(p => `- Provider: ${p.name}, Service: ${p.service_type}, Location: ${p.location}`).join('\n')
                 : "No registered providers yet.";
-        } else {
-            console.warn("Provider fetch skipped or failed (ignoring for chat):", providersError?.message);
         }
-    } catch (e) {
-        console.warn("Supabase access failed", e);
-    }
+    } catch (e) {}
 
     let upcomingAppointmentsString = "None";
     if (userId) {
@@ -199,12 +197,14 @@ export const getChatResponse = async (
                     `- Appointment with ${a.providers.name} on ${new Date(a.next_appointment_date).toLocaleString()}`
                 ).join('\n');
             }
-        } catch (e) {
-             console.warn("Appointments fetch skipped", e);
-        }
+        } catch (e) {}
     }
 
-    const systemInstruction = getSystemInstruction(language, providersListString, upcomingAppointmentsString, announcementsText);
+    const userContextString = userId 
+      ? `Registered Client. ID: ${userId}, Name: ${userName || 'Unknown'}, Phone: ${userPhone || 'Unknown'}.` 
+      : `Guest User (Not registered).`;
+
+    const systemInstruction = getSystemInstruction(language, providersListString, upcomingAppointmentsString, announcementsText, userContextString);
     
     const userParts: any[] = [];
     if (newMessage) userParts.push({ text: newMessage });
@@ -228,15 +228,12 @@ export const getChatResponse = async (
     }
 
     const contents = [...history, { role: 'user', parts: userParts }];
-    const finalSystemInstruction = userId 
-        ? `${systemInstruction}\n\nUSER_CONTEXT: The current user's ID is ${userId}. They are a registered client.`
-        : `${systemInstruction}\n\nUSER_CONTEXT: The user is not registered yet.`;
 
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: contents,
       config: {
-        systemInstruction: finalSystemInstruction,
+        systemInstruction: systemInstruction,
       },
     });
     

@@ -1,20 +1,193 @@
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useLocalization } from '../hooks/useLocalization';
 import { BookingDetails, FollowUp, AuthenticatedUser } from '../types';
 import { supabase } from '../services/supabaseClient';
-import { CheckCircle, XCircle, Camera, Loader2, Upload, Send, LogOut, User, Calendar, FileText, Lock, Phone, X, RefreshCw } from 'lucide-react';
+import { CheckCircle, XCircle, Camera, Loader2, Upload, Send, LogOut, User, Calendar, FileText, Lock, Phone, X, RefreshCw, BarChart, History, Users, Edit, Trash, Smartphone, MessageCircle } from 'lucide-react';
 import jsQR from 'jsqr';
 
 interface ScannedAppointment extends BookingDetails {}
 
-const QRScannerComponent: React.FC = () => {
+// --- Sub-Components ---
+
+const RestrictedGuard: React.FC<{ provider: AuthenticatedUser; children: React.ReactNode; fallback?: React.ReactNode }> = ({ provider, children }) => {
+    const { t } = useLocalization();
+    const isValid = provider.isActive && provider.subscriptionEndDate && new Date(provider.subscriptionEndDate) > new Date();
+    const [showModal, setShowModal] = useState(false);
+
+    if (isValid) return <>{children}</>;
+
+    return (
+        <div className="relative" onClickCapture={(e) => { e.stopPropagation(); setShowModal(true); }}>
+            <div className="pointer-events-none opacity-50 grayscale">{children}</div>
+            {showModal && (
+                <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowModal(false)}>
+                    <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl animate-slide-up">
+                        <Lock size={48} className="text-red-500 mx-auto mb-4" />
+                        <h3 className="text-xl font-bold mb-2 dark:text-white">{t('accountLocked')}</h3>
+                        <p className="text-gray-600 dark:text-gray-300 mb-6">{t('accountRestricted')}</p>
+                        <a href="tel:0617774846" className="block w-full bg-dark dark:bg-white dark:text-dark text-white py-3 rounded-xl font-bold mb-3">{t('callAdmin')}</a>
+                        <button onClick={() => setShowModal(false)} className="text-sm text-gray-500 underline">{t('close')}</button>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+const StatsComponent: React.FC<{ providerId: number }> = ({ providerId }) => {
+    const { t } = useLocalization();
+    const [count, setCount] = useState(0);
+    useEffect(() => {
+        const fetchStats = async () => {
+            const today = new Date().toISOString().split('T')[0];
+            const { count } = await supabase.from('scan_history').select('id', { count: 'exact' }).eq('provider_id', providerId).gte('created_at', today);
+            setCount(count || 0);
+        };
+        fetchStats();
+    }, [providerId]);
+
+    return (
+        <div className="bg-gradient-to-br from-primary to-primaryDark text-white p-6 rounded-3xl shadow-lg mb-6">
+            <h4 className="text-lg font-bold flex items-center gap-2 opacity-90"><BarChart size={20}/> {t('statistics')}</h4>
+            <div className="mt-2">
+                <span className="text-4xl font-bold">{count}</span>
+                <span className="text-sm opacity-80 ml-2">{t('clientsToday')}</span>
+            </div>
+        </div>
+    );
+};
+
+const ScanHistory: React.FC<{ providerId: number }> = ({ providerId }) => {
+    const { t } = useLocalization();
+    const [history, setHistory] = useState<any[]>([]);
+    
+    useEffect(() => {
+        supabase.from('scan_history').select('*').eq('provider_id', providerId).order('created_at', { ascending: false }).limit(20)
+        .then(({ data }) => setHistory(data || []));
+    }, [providerId]);
+
+    return (
+        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+            <h4 className="font-bold mb-4 flex items-center gap-2 dark:text-white"><History size={20}/> {t('scanHistory')}</h4>
+            <div className="space-y-3">
+                {history.map(h => (
+                    <div key={h.id} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-xl">
+                        <div>
+                            <p className="font-bold text-sm dark:text-white">{h.client_name}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">{h.client_phone}</p>
+                        </div>
+                        <div className="text-xs text-gray-400">{new Date(h.created_at).toLocaleDateString()}</div>
+                    </div>
+                ))}
+                {history.length === 0 && <p className="text-center text-gray-400 text-sm py-4">{t('noNotifications')}</p>}
+            </div>
+        </div>
+    );
+};
+
+const ClientList: React.FC<{ providerId: number }> = ({ providerId }) => {
+    const { t } = useLocalization();
+    const [clients, setClients] = useState<any[]>([]);
+
+    useEffect(() => {
+        const fetchClients = async () => {
+            const { data } = await supabase.from('follows').select('client_id, clients(full_name, phone)').eq('provider_id', providerId);
+            if (data) setClients(data.map(d => d.clients));
+        };
+        fetchClients();
+    }, [providerId]);
+
+    return (
+        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 h-full">
+            <h4 className="font-bold mb-4 flex items-center gap-2 dark:text-white"><Users size={20}/> {t('followers')}</h4>
+            <div className="space-y-3 max-h-80 overflow-y-auto">
+                {clients.map((c, i) => (
+                    <div key={i} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-xl">
+                        <div>
+                            <p className="font-bold text-sm dark:text-white">{c.full_name}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">{c.phone}</p>
+                        </div>
+                        <div className="flex gap-2">
+                            <a href={`tel:${c.phone}`} className="p-2 bg-green-100 text-green-600 rounded-full hover:bg-green-200"><Phone size={16}/></a>
+                            <a href={`https://wa.me/${c.phone.replace(/^0/, '212')}`} target="_blank" rel="noreferrer" className="p-2 bg-green-500 text-white rounded-full hover:bg-green-600"><MessageCircle size={16}/></a>
+                        </div>
+                    </div>
+                ))}
+                {clients.length === 0 && <p className="text-center text-gray-400 text-sm py-4">{t('noFollowUps')}</p>}
+            </div>
+        </div>
+    );
+};
+
+const AnnouncementManager: React.FC<{ providerId: number }> = ({ providerId }) => {
+    const { t } = useLocalization();
+    const [ads, setAds] = useState<any[]>([]);
+    const [message, setMessage] = useState('');
+    const [editingId, setEditingId] = useState<number | null>(null);
+    const [isSending, setIsSending] = useState(false);
+
+    const fetchAds = async () => {
+        const { data } = await supabase.from('announcements').select('*').eq('provider_id', providerId).order('created_at', { ascending: false });
+        setAds(data || []);
+    };
+
+    useEffect(() => { fetchAds(); }, [providerId]);
+
+    const handleSend = async () => {
+        if (!message.trim()) return;
+        setIsSending(true);
+        if (editingId) {
+            await supabase.from('announcements').update({ message }).eq('id', editingId);
+        } else {
+            await supabase.from('announcements').insert({ provider_id: providerId, message });
+        }
+        setMessage(''); setEditingId(null); setIsSending(false); fetchAds();
+    };
+
+    const handleDelete = async (id: number) => {
+        if(confirm(t('delete') + '?')) {
+            await supabase.from('announcements').delete().eq('id', id);
+            fetchAds();
+        }
+    }
+
+    return (
+        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+            <h4 className="font-bold mb-4 flex items-center gap-2 dark:text-white"><Send size={20}/> {t('sendAnnouncementTitle')}</h4>
+            <div className="flex gap-2 mb-6">
+                <input 
+                    value={message} 
+                    onChange={e => setMessage(e.target.value)} 
+                    placeholder={t('messagePlaceholder')}
+                    className="flex-1 bg-gray-100 dark:bg-gray-700 rounded-xl px-4 outline-none dark:text-white"
+                />
+                <button onClick={handleSend} disabled={isSending} className="bg-primary text-white p-3 rounded-xl hover:bg-primaryDark">
+                    {isSending ? <Loader2 className="animate-spin"/> : <Send size={20}/>}
+                </button>
+            </div>
+            <h5 className="text-sm font-bold mb-2 text-gray-500">{t('myActiveAds')}</h5>
+            <div className="space-y-2">
+                {ads.map(ad => (
+                    <div key={ad.id} className="flex justify-between items-center p-3 border border-gray-100 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-900/30">
+                        <p className="text-sm dark:text-gray-300 truncate flex-1">{ad.message}</p>
+                        <div className="flex gap-1 ml-2">
+                            <button onClick={() => { setMessage(ad.message); setEditingId(ad.id); }} className="p-1 text-blue-500"><Edit size={16}/></button>
+                            <button onClick={() => handleDelete(ad.id)} className="p-1 text-red-500"><Trash size={16}/></button>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+const QRScannerComponent: React.FC<{ providerId: number }> = ({ providerId }) => {
     const { t } = useLocalization();
     const [scannedData, setScannedData] = useState<ScannedAppointment | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [showScanner, setShowScanner] = useState(false);
     const [isVerifying, setIsVerifying] = useState(false);
-    const fileInputRef = useRef<HTMLInputElement>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
     const requestRef = useRef<number>();
 
@@ -31,10 +204,7 @@ const QRScannerComponent: React.FC = () => {
                     requestRef.current = requestAnimationFrame(scanVideoFrame);
                 };
             }
-        } catch (err) {
-            setError(t('qrScannerInstruction'));
-            setShowScanner(false);
-        }
+        } catch (err) { setError(t('errorMessage')); setShowScanner(false); }
     };
 
     const stopCamera = () => {
@@ -61,211 +231,63 @@ const QRScannerComponent: React.FC = () => {
         requestRef.current = requestAnimationFrame(scanVideoFrame);
     };
 
-    const processQrCodeText = async (qrCodeText: string) => {
+    const handleScanResult = async (result: { text: string }) => {
+        setShowScanner(false); stopCamera(); setIsVerifying(true); setError(null);
         try {
-            const data = JSON.parse(qrCodeText);
-            if (data.appointmentId) await verifyAppointment(data.appointmentId);
-            else throw new Error('Invalid');
-        } catch (e) { setError(t('invalidQR')); }
-    };
-    
-    const verifyAppointment = async (appointmentId: number) => {
-        try {
-            const { data } = await supabase.from('appointments').select(`id, clients (full_name, phone), providers (name, service_type, location)`).eq('id', appointmentId).single();
-            if (!data) throw new Error('NotFound');
+            const data = JSON.parse(result.text);
+            if (!data.appointmentId) throw new Error('Invalid');
+            const { data: appt } = await supabase.from('appointments').select(`id, clients (full_name, phone), providers (name, service_type)`).eq('id', data.appointmentId).single();
+            if (!appt) throw new Error('NotFound');
+            
             setScannedData({
-                appointmentId: data.id,
-                name: data.clients.full_name,
-                phone: data.clients.phone,
-                service: data.providers.service_type,
-                provider: data.providers.name,
-                location: data.providers.location,
+                appointmentId: appt.id,
+                name: appt.clients.full_name,
+                phone: appt.clients.phone,
+                service: appt.providers.service_type,
+                provider: appt.providers.name,
+                location: "",
                 discount: "19%",
             });
+
+            // Archive Scan
+            await supabase.from('scan_history').insert({
+                provider_id: providerId,
+                client_name: appt.clients.full_name,
+                client_phone: appt.clients.phone
+            });
+
         } catch (e) { setError(t('invalidQR')); }
-    }
-
-    const handleScanResult = async (result: { text: string }) => {
-        setShowScanner(false); stopCamera();
-        setIsVerifying(true); setError(null); setScannedData(null);
-        await processQrCodeText(result.text);
-        setIsVerifying(false);
+        finally { setIsVerifying(false); }
     };
-
-    const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (!file) return;
-        setIsVerifying(true); setError(null); setScannedData(null);
-        const process = async () => {
-            const img = new Image(); img.src = URL.createObjectURL(file); await img.decode();
-            const cvs = document.createElement('canvas'); const ctx = cvs.getContext('2d');
-            cvs.width = img.width; cvs.height = img.height; ctx?.drawImage(img, 0,0);
-            const code = jsQR(ctx?.getImageData(0,0,cvs.width,cvs.height).data as any, cvs.width, cvs.height);
-            if (code) await processQrCodeText(code.data); else setError(t('qrNotDetected'));
-        };
-        process().finally(() => setIsVerifying(false));
-    };
-    
-    const reset = () => { setScannedData(null); setError(null); setShowScanner(false); };
 
     return (
-        <div className="p-8 bg-surface dark:bg-surfaceDark rounded-3xl shadow-soft flex flex-col items-center text-center border border-white/20">
-            <h3 className="text-2xl font-bold text-dark dark:text-light mb-2">{t('qrScannerTitle')}</h3>
-            <p className="text-gray-500 mb-8 text-sm">{t('qrScannerInstruction')}</p>
-            
-            {!showScanner && !scannedData && !error && !isVerifying && (
-                 <>
-                    <div className="flex flex-col sm:flex-row gap-4 w-full">
-                        <button onClick={() => setShowScanner(true)} className="flex-1 flex items-center justify-center gap-3 px-6 py-4 bg-dark text-white rounded-2xl hover:bg-black transition-transform active:scale-95 shadow-lg">
-                            <Camera size={24} />
-                            <span className="font-bold">{t('scanWithCamera')}</span>
-                        </button>
-                        <button onClick={() => fileInputRef.current?.click()} className="flex-1 flex items-center justify-center gap-3 px-6 py-4 bg-gray-100 text-dark rounded-2xl hover:bg-gray-200 transition-transform active:scale-95">
-                            <Upload size={24} />
-                            <span className="font-bold">{t('uploadQRCode')}</span>
-                        </button>
-                    </div>
-                    <input type="file" ref={fileInputRef} onChange={handleFileSelect} accept="image/*" className="hidden" />
-                </>
-            )}
-
-            {showScanner && (
-                <div className="relative w-full aspect-square sm:aspect-video bg-black rounded-3xl overflow-hidden shadow-2xl">
-                     <video ref={videoRef} className="w-full h-full object-cover" playsInline muted />
-                     {/* Scanner Overlay */}
-                     <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="w-64 h-64 border-2 border-white/50 rounded-3xl relative">
-                            <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-primary -mt-1 -ml-1 rounded-tl-lg"></div>
-                            <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-primary -mt-1 -mr-1 rounded-tr-lg"></div>
-                            <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-primary -mb-1 -ml-1 rounded-bl-lg"></div>
-                            <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-primary -mb-1 -mr-1 rounded-br-lg"></div>
-                            <div className="absolute inset-0 bg-primary/10 animate-pulse"></div>
-                        </div>
-                     </div>
-                     <button onClick={() => setShowScanner(false)} className="absolute top-4 right-4 bg-black/50 text-white p-3 rounded-full hover:bg-black/80 backdrop-blur-md">
-                        <X size={24} />
-                     </button>
-                </div>
-            )}
-
-            {isVerifying && (<div className="py-12 flex flex-col items-center animate-fade-in"><Loader2 className="animate-spin text-primary mb-4" size={48} /><p className="font-bold text-gray-600">{t('verifying')}</p></div>)}
-            
-            {scannedData && (
-                <div className="w-full animate-slide-up">
-                    <div className="p-6 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-2xl text-left rtl:text-right relative overflow-hidden">
-                        <div className="absolute top-0 right-0 p-4 opacity-10"><CheckCircle size={100} className="text-green-600"/></div>
-                        <div className="flex items-center gap-3 mb-4 relative z-10">
-                            <div className="w-12 h-12 bg-green-100 dark:bg-green-800 rounded-full flex items-center justify-center text-green-600 dark:text-green-300">
-                                <CheckCircle size={28} />
-                            </div>
-                            <h3 className="text-xl font-bold text-green-800 dark:text-green-300">{t('verificationSuccess')}</h3>
-                        </div>
-                        <div className="space-y-2 text-gray-700 dark:text-gray-300 relative z-10 text-sm">
-                            <p className="flex justify-between border-b border-green-200 dark:border-green-800/50 pb-1"><span>{t('appointmentID')}:</span> <span className="font-mono font-bold">#{scannedData.appointmentId}</span></p>
-                            <p className="flex justify-between border-b border-green-200 dark:border-green-800/50 pb-1"><span>{t('clientName')}:</span> <span className="font-bold">{scannedData.name}</span></p>
-                            <p className="flex justify-between border-b border-green-200 dark:border-green-800/50 pb-1"><span>{t('serviceBooked')}:</span> <span>{scannedData.service}</span></p>
-                            <p className="flex justify-between border-b border-green-200 dark:border-green-800/50 pb-1"><span>{t('discount')}:</span> <span className="font-bold text-green-600">{scannedData.discount}</span></p>
-                        </div>
-                    </div>
-                    <button onClick={reset} className="mt-6 w-full px-6 py-4 bg-dark text-white rounded-xl font-bold hover:bg-black transition-colors shadow-lg flex items-center justify-center gap-2">
-                        <RefreshCw size={20} /> {t('scanAnother')}
-                    </button>
-                </div>
-            )}
-
-            {error && (
-                <div className="w-full animate-fade-in">
-                    <div className="p-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl text-center">
-                        <XCircle className="text-red-500 mx-auto mb-3" size={48} />
-                        <h3 className="text-lg font-bold text-red-700 dark:text-red-300 mb-1">{t('verificationFailed')}</h3>
-                        <p className="text-red-600 dark:text-red-400 text-sm mb-4">{error}</p>
-                        <button onClick={reset} className="w-full px-4 py-3 bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 rounded-xl font-bold hover:bg-red-200 transition-colors">
-                            {t('tryAgain')}
-                        </button>
-                    </div>
-                </div>
-            )}
+        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 text-center mb-6">
+             <h3 className="text-xl font-bold dark:text-white mb-4">{t('qrScannerTitle')}</h3>
+             {!showScanner && !scannedData && (
+                 <button onClick={() => setShowScanner(true)} className="w-full bg-dark text-white py-4 rounded-xl font-bold flex justify-center gap-2 hover:bg-black">
+                     <Camera/> {t('scanWithCamera')}
+                 </button>
+             )}
+             {showScanner && (
+                 <div className="relative w-full aspect-square bg-black rounded-xl overflow-hidden">
+                     <video ref={videoRef} className="w-full h-full object-cover"/>
+                     <button onClick={() => setShowScanner(false)} className="absolute top-2 right-2 bg-white/20 p-2 rounded-full text-white"><X/></button>
+                 </div>
+             )}
+             {scannedData && (
+                 <div className="bg-green-50 p-4 rounded-xl mt-4 text-left dark:bg-green-900/20 dark:text-white">
+                     <div className="flex items-center gap-2 mb-2 text-green-600 font-bold"><CheckCircle/> {t('verificationSuccess')}</div>
+                     <p><b>{t('clientName')}:</b> {scannedData.name}</p>
+                     <p><b>{t('discount')}:</b> {scannedData.discount}</p>
+                     <button onClick={() => setScannedData(null)} className="mt-4 w-full bg-green-600 text-white py-2 rounded-lg">{t('scanAnother')}</button>
+                 </div>
+             )}
+             {error && <div className="text-red-500 mt-4 font-bold">{error} <button onClick={() => setError(null)} className="underline ml-2">{t('tryAgain')}</button></div>}
+             {isVerifying && <Loader2 className="animate-spin mx-auto mt-4 text-primary"/>}
         </div>
     );
 };
 
-const AnnouncementSender: React.FC<{ providerId: number }> = ({ providerId }) => {
-    const { t } = useLocalization();
-    const [announcementMessage, setAnnouncementMessage] = useState('');
-    const [isSending, setIsSending] = useState(false);
-    const [status, setStatus] = useState<{type: 'success'|'error', msg: string} | null>(null);
-    
-    const handleSend = async () => {
-        if (!announcementMessage.trim()) return;
-        setIsSending(true); setStatus(null);
-        try {
-            const { error } = await supabase.from('announcements').insert({ provider_id: providerId, message: announcementMessage.trim() });
-            if (error) throw error;
-            setStatus({ type: 'success', msg: t('announcementSuccessMessage') });
-            setAnnouncementMessage('');
-        } catch(e) { setStatus({ type: 'error', msg: t('errorMessage') }); } 
-        finally { setIsSending(false); setTimeout(() => setStatus(null), 5000); }
-    };
-    
-    return (
-        <div className="p-6 bg-surface dark:bg-surfaceDark rounded-3xl shadow-soft border border-white/20 text-center">
-            <div className="w-12 h-12 bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center mx-auto mb-4 text-yellow-600">
-                <Send size={24} />
-            </div>
-            <h3 className="text-xl font-bold text-dark dark:text-light mb-2">{t('sendAnnouncementTitle')}</h3>
-            <p className="text-gray-500 mb-6 text-sm">{t('sendAnnouncementDesc')}</p>
-            <div className="space-y-3">
-                <textarea 
-                    rows={3} 
-                    value={announcementMessage} 
-                    onChange={(e) => setAnnouncementMessage(e.target.value)} 
-                    className="w-full p-4 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-primary outline-none resize-none text-sm transition-all"
-                    placeholder={t('messagePlaceholder')}
-                ></textarea>
-                <button onClick={handleSend} disabled={isSending || !announcementMessage} className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-primary text-white rounded-xl font-bold hover:bg-primaryDark transition-colors disabled:opacity-50 shadow-lg shadow-primary/20">
-                    {isSending ? <Loader2 className="animate-spin" /> : t('sendButton')}
-                </button>
-                {status && <p className={`text-sm font-bold ${status.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>{status.msg}</p>}
-            </div>
-        </div>
-    );
-};
-
-const FollowUpList: React.FC<{ providerId: number }> = ({ providerId }) => {
-    const { t } = useLocalization();
-    const [followUps, setFollowUps] = useState<FollowUp[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-
-    useEffect(() => {
-        supabase.from('follow_ups').select('*, clients(full_name, phone)').eq('provider_id', providerId).order('next_appointment_date', { ascending: true })
-        .then(({ data }) => { setFollowUps(data as FollowUp[] || []); setIsLoading(false); });
-    }, [providerId]);
-    
-    return (
-        <div className="bg-surface dark:bg-surfaceDark rounded-3xl shadow-soft border border-white/20 overflow-hidden flex flex-col h-full max-h-[600px]">
-            <div className="p-6 border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/50">
-                <h3 className="text-xl font-bold text-dark dark:text-light">{t('clientFollowUps')}</h3>
-                <p className="text-sm text-gray-500">{t('clientFollowUpsDesc')}</p>
-            </div>
-            <div className="overflow-y-auto p-4 space-y-3 flex-1">
-                {isLoading ? <div className="flex justify-center p-10"><Loader2 className="animate-spin text-primary" /></div> : 
-                followUps.length === 0 ? <div className="text-center text-gray-400 py-10 flex flex-col items-center"><Calendar size={40} className="mb-2 opacity-20"/>{t('noFollowUps')}</div> : 
-                followUps.map(fu => (
-                    <div key={fu.id} className="p-4 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl hover:shadow-md transition-shadow">
-                        <div className="flex justify-between items-start mb-2">
-                            <div className="font-bold text-dark dark:text-light flex items-center gap-2"><User size={16} className="text-primary"/> {fu.clients.full_name}</div>
-                            <div className="text-xs bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-lg font-mono">{new Date(fu.next_appointment_date).toLocaleDateString()}</div>
-                        </div>
-                        <div className="text-sm text-gray-500 mb-2 flex items-center gap-2"><Phone size={14}/> {fu.clients.phone}</div>
-                        <div className="bg-yellow-50 dark:bg-yellow-900/10 p-3 rounded-xl text-sm text-gray-700 dark:text-gray-300 border border-yellow-100 dark:border-yellow-800/30">
-                            <FileText size={14} className="inline mr-1 text-yellow-600"/> {fu.notes}
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-};
 
 interface ProviderPortalProps {
     provider: AuthenticatedUser;
@@ -275,48 +297,32 @@ interface ProviderPortalProps {
 const ProviderPortal: React.FC<ProviderPortalProps> = ({ provider, onLogout }) => {
     const { t } = useLocalization();
     const isValid = provider.isActive && provider.subscriptionEndDate && new Date(provider.subscriptionEndDate) > new Date();
-    const daysLeft = provider.subscriptionEndDate ? Math.ceil((new Date(provider.subscriptionEndDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : 0;
 
     return (
-        <div className="w-full flex flex-col gap-6 relative pb-20">
-            <div className="bg-gradient-to-r from-dark to-gray-800 rounded-3xl p-6 text-white shadow-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div>
-                    <h2 className="text-2xl font-bold flex items-center gap-2">{t('welcomeProvider', {name: provider.name})}</h2>
-                    <div className="flex items-center gap-2 mt-1">
-                        <div className={`w-2 h-2 rounded-full ${isValid ? 'bg-green-400' : 'bg-red-500 animate-pulse'}`}></div>
-                        <span className="text-sm font-medium opacity-90">
-                            {isValid ? t('daysRemaining', { days: daysLeft }) : (provider.isActive ? t('statusExpired') : t('statusPending'))}
-                        </span>
-                    </div>
-                </div>
-                <button onClick={onLogout} className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-sm font-bold backdrop-blur-sm transition-colors flex items-center gap-2">
-                    <LogOut size={16} /> {t('logout')}
-                </button>
-            </div>
+        <div className="pb-20">
+             <div className="flex justify-between items-center mb-6">
+                 <div>
+                     <h2 className="text-2xl font-bold text-dark dark:text-white">{t('welcomeProvider', {name: provider.name})}</h2>
+                     <span className={`text-xs font-bold px-2 py-1 rounded-full ${isValid ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                         {isValid ? t('statusActive') : t('statusPending')}
+                     </span>
+                 </div>
+                 <button onClick={onLogout} className="p-2 bg-gray-100 dark:bg-gray-700 rounded-full"><LogOut size={20} className="text-gray-600 dark:text-white"/></button>
+             </div>
 
-            <div className={`grid grid-cols-1 lg:grid-cols-2 gap-6 transition-all duration-500 ${!isValid ? 'blur-sm pointer-events-none opacity-50' : ''}`}>
-                <div className="space-y-6">
-                    <QRScannerComponent />
-                    <AnnouncementSender providerId={provider.id} />
-                </div>
-                <FollowUpList providerId={provider.id} />
-            </div>
-
-            {!isValid && (
-                <div className="absolute inset-0 z-50 flex items-center justify-center p-4">
-                    <div className="bg-surface dark:bg-surfaceDark border border-red-100 dark:border-red-900 rounded-3xl shadow-2xl p-8 max-w-sm w-full text-center animate-slide-up">
-                        <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <Lock size={32} className="text-red-600" />
-                        </div>
-                        <h2 className="text-2xl font-bold text-dark dark:text-light mb-2">{t('accountLocked')}</h2>
-                        <p className="text-gray-500 mb-6">{t('accountLockedDesc')}</p>
-                        <a href="tel:0617774846" className="block w-full py-3 bg-dark text-white rounded-xl font-bold hover:bg-black transition-colors mb-3 shadow-lg">
-                            {t('callAdmin')}
-                        </a>
-                        <button onClick={onLogout} className="text-sm text-gray-500 hover:text-dark underline">{t('logout')}</button>
-                    </div>
-                </div>
-            )}
+             <RestrictedGuard provider={provider}>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                     <div>
+                         <StatsComponent providerId={provider.id} />
+                         <QRScannerComponent providerId={provider.id} />
+                         <AnnouncementManager providerId={provider.id} />
+                     </div>
+                     <div className="space-y-6">
+                         <ClientList providerId={provider.id} />
+                         <ScanHistory providerId={provider.id} />
+                     </div>
+                 </div>
+             </RestrictedGuard>
         </div>
     );
 };
