@@ -14,6 +14,136 @@ export const translations: Translations = {
     en: 'TangerConnect AI',
     fr: 'TangerConnect AI',
   },
+  searchPlaceholder: {
+    ar: 'بحث عن طبيب، خدمة، تبييض...',
+    en: 'Search doctor, service, whitening...',
+    fr: 'Chercher médecin, service, blanchiment...',
+  },
+  search: {
+    ar: 'بحث',
+    en: 'Search',
+    fr: 'Rechercher',
+  },
+  myFollowing: {
+    ar: 'المتابعات ديالي',
+    en: 'My Following',
+    fr: 'Mes abonnements',
+  },
+  allProviders: {
+    ar: 'كل المزودين',
+    en: 'All Providers',
+    fr: 'Tous les fournisseurs',
+  },
+  providerProfile: {
+    ar: 'الملف الشخصي للمزود',
+    en: 'Provider Profile',
+    fr: 'Profil du fournisseur',
+  },
+  servicesAndOffers: {
+    ar: 'الخدمات والعروض',
+    en: 'Services & Offers',
+    fr: 'Services et Offres',
+  },
+  about: {
+    ar: 'معلومات عامة',
+    en: 'About',
+    fr: 'À propos',
+  },
+  followersCount: {
+    ar: '{count} متابع',
+    en: '{count} Followers',
+    fr: '{count} Abonnés',
+  },
+  savedSuccessfully: {
+    ar: 'تم الحفظ بنجاح!',
+    en: 'Saved successfully!',
+    fr: 'Enregistré avec succès !',
+  },
+  selectNeighborhood: {
+    ar: 'ختار الحي (طنجة)',
+    en: 'Select Neighborhood (Tangier)',
+    fr: 'Sélectionner le quartier (Tanger)',
+  },
+  neighborhoods: {
+    ar: 'مسنانة, كسبارطا, درادب, وسط المدينة, مالاباطا, مجيمع, فال فلوري, بني مكادة, العوامة, مرشان, بوخالف, طنجة البالية, سيدي ادريس, المصلى, شارع محمد الخامس, بلاصاطورو, الزياتن',
+    en: 'Mesnana, Casabarata, Dradeb, City Center, Malabata, Mojamaa, Val Fleuri, Bani Makada, Aouama, Marchan, Boukhalef, Tanger Balia, Sidi Driss, Msalla, Mohamed V Blvd, Placatoro, Ziaten',
+    fr: 'Mesnana, Casabarata, Dradeb, Centre Ville, Malabata, Mojamaa, Val Fleuri, Bani Makada, Aouama, Marchan, Boukhalef, Tanger Balia, Sidi Driss, Msalla, Bd Mohamed V, Placatoro, Ziaten',
+  },
+  removeProfileImage: {
+    ar: 'مسح الصورة',
+    en: 'Remove Image',
+    fr: 'Supprimer l\'image',
+  },
+  v5UpdateTitle: {
+    ar: 'تحديث V5: تحسين البحث والإشعارات',
+    en: 'V5 Update: Search & Notifications',
+    fr: 'Mise à jour V5 : Recherche et Notifications',
+  },
+  v6UpdateTitle: {
+    ar: 'تحديث V6: إصلاح الصور و GPS',
+    en: 'V6 Update: Images & GPS Fixes',
+    fr: 'Mise à jour V6 : Correctifs Images & GPS',
+  },
+  v7UpdateTitle: {
+    ar: 'تحديث V7: إصلاح نهائي للصور',
+    en: 'V7 Update: Final Image Fix',
+    fr: 'Mise à jour V7 : Correctif Final Images',
+  },
+  v8UpdateTitle: {
+    ar: 'تحديث V8: إصلاح مستعجل للصور',
+    en: 'V8 Update: Emergency Image Fix',
+    fr: 'Mise à jour V8 : Correctif Urgent Images',
+  },
+  v9UpdateTitle: {
+    ar: 'تحديث V9: فتح الرفع للجميع (الحل النهائي)',
+    en: 'V9 Update: Public Upload Access (Final Fix)',
+    fr: 'Mise à jour V9 : Accès Public Téléchargement',
+  },
+  v10UpdateTitle: {
+    ar: 'تحديث V10: نظام إشعارات المزودين',
+    en: 'V10 Update: Provider Notifications System',
+    fr: 'Mise à jour V10 : Système de notifications des fournisseurs',
+  },
+  locationError: {
+    ar: 'فشل تحديد الموقع.',
+    en: 'Failed to get location.',
+    fr: 'Échec de la localisation.',
+  },
+  gpsPermissionDenied: {
+    ar: 'ممنوع الوصول للموقع. عافاك فعل الخاصية فإعدادات المتصفح.',
+    en: 'Location permission denied. Please enable it in browser settings.',
+    fr: 'Permission de localisation refusée. Veuillez l\'activer dans les paramètres du navigateur.',
+  },
+  gpsUnavailable: {
+    ar: 'الإشارة ديال GPS ضعيفة أو غير متوفرة.',
+    en: 'GPS signal unavailable.',
+    fr: 'Signal GPS indisponible.',
+  },
+  gpsTimeout: {
+    ar: 'تعطل الطلب ديال GPS. حاول مرة خرى.',
+    en: 'GPS request timed out.',
+    fr: 'La demande GPS a expiré.',
+  },
+  uploading: {
+    ar: 'جاري رفع الصورة...',
+    en: 'Uploading image...',
+    fr: 'Téléchargement de l\'image...',
+  },
+  uploadError: {
+    ar: 'فشل رفع الصورة. تأكد بلي شغلتي كود التحديث V9 فإعدادات قاعدة البيانات.',
+    en: 'Upload failed. Ensure you ran V9 Update script in Database Setup.',
+    fr: 'Échec du téléchargement. Assurez-vous d\'avoir exécuté le script de mise à jour V9.',
+  },
+  locationSet: {
+    ar: 'تم تحديد الموقع بنجاح!',
+    en: 'Location set successfully!',
+    fr: 'Emplacement défini avec succès !',
+  },
+  newNotifications: {
+    ar: 'إشعارات جديدة',
+    en: 'New Notifications',
+    fr: 'Nouvelles notifications',
+  },
   providerView: {
     ar: 'واجهة المزود',
     en: 'Provider View',
@@ -692,36 +822,138 @@ export const translations: Translations = {
     en: 'Followers',
     fr: 'Abonnés',
   },
-  v2UpdateTitle: {
-    ar: 'تحديث V2: خصائص لوحة التحكم',
-    en: 'V2 Update: Dashboard Features',
-    fr: 'Mise à jour V2 : Fonctionnalités du tableau de bord',
+  profileAndServices: {
+    ar: 'البروفايل والخدمات',
+    en: 'Profile & Services',
+    fr: 'Profil & Services',
+  },
+  setLocation: {
+    ar: 'تحديد الموقع الحالي (GPS)',
+    en: 'Set Current Location (GPS)',
+    fr: 'Définir la position actuelle (GPS)',
+  },
+  bioLabel: {
+    ar: 'السيرة الذاتية / وصف النشاط',
+    en: 'Bio / Description',
+    fr: 'Bio / Description',
+  },
+  saveProfile: {
+    ar: 'حفظ المعلومات',
+    en: 'Save Profile',
+    fr: 'Enregistrer le profil',
+  },
+  addService: {
+    ar: 'إضافة خدمة',
+    en: 'Add Service',
+    fr: 'Ajouter un service',
+  },
+  serviceName: {
+    ar: 'إسم الخدمة',
+    en: 'Service Name',
+    fr: 'Nom du service',
+  },
+  price: {
+    ar: 'الثمن (درهم)',
+    en: 'Price (DH)',
+    fr: 'Prix (DH)',
+  },
+  discountPrice: {
+    ar: 'ثمن التخفيض (اختياري)',
+    en: 'Discounted Price (Optional)',
+    fr: 'Prix réduit (Optionnel)',
+  },
+  servicesList: {
+    ar: 'لائحة الخدمات',
+    en: 'Services List',
+    fr: 'Liste des services',
+  },
+  distance: {
+    ar: 'المسافة',
+    en: 'Distance',
+    fr: 'Distance',
+  },
+  away: {
+    ar: 'بعيد ب',
+    en: 'away',
+    fr: 'à',
+  },
+  meters: { ar: 'متر', en: 'm', fr: 'm' },
+  km: { ar: 'كلم', en: 'km', fr: 'km' },
+  viewRoute: {
+    ar: 'شوف الطريق (GPS)',
+    en: 'View Route (GPS)',
+    fr: 'Voir l\'itinéraire (GPS)',
+  },
+  uploadProfileImage: {
+    ar: 'تصويرة البروفايل',
+    en: 'Profile Image',
+    fr: 'Image de profil',
+  },
+  subscriptionExpired: {
+    ar: 'اشتراكك انتهى!',
+    en: 'Subscription Expired!',
+    fr: 'Abonnement expiré !',
+  },
+  renewNow: {
+    ar: 'جدد دابا',
+    en: 'Renew Now',
+    fr: 'Renouveler maintenant',
+  },
+  daysLeft: {
+    ar: '{days} يوم باقي',
+    en: '{days} days left',
+    fr: '{days} jours restants',
+  },
+  subscriptionWarning: {
+    ar: 'تنبيه: اشتراكك قرب يسالي!',
+    en: 'Warning: Subscription expiring soon!',
+    fr: 'Attention : Abonnement expire bientôt !',
+  },
+  techSupport: {
+    ar: 'الدعم التقني',
+    en: 'Tech Support',
+    fr: 'Support Technique',
+  },
+  providerNotifications: {
+    ar: 'إشعارات المزود',
+    en: 'Provider Notifications',
+    fr: 'Notifications du fournisseur',
+  },
+  uploadQRImage: {
+    ar: 'تيليشارجي صورة QR',
+    en: 'Upload QR Image',
+    fr: 'Télécharger l\'image QR',
   }
 };
 
 interface LocalizationContextType {
   language: Language;
-  t: (key: keyof typeof translations, placeholders?: TranslationPlaceholder) => string;
+  t: (key: keyof typeof translations | string, placeholders?: TranslationPlaceholder) => string;
 }
 
 const LocalizationContext = createContext<LocalizationContextType | undefined>(undefined);
 
 export const LocalizationProvider: React.FC<{ language: Language; children: ReactNode }> = ({ language, children }) => {
-  const t = (key: keyof typeof translations, placeholders?: TranslationPlaceholder): string => {
-    let translation = translations[key]?.[language] || translations[key]?.[Language.EN] || key;
+  const t = (key: keyof typeof translations | string, placeholders?: TranslationPlaceholder) => {
+    const translationKey = key as string;
+    let translation = translations[translationKey]?.[language] || translations[translationKey]?.[Language.EN] || translationKey;
+    
     if (placeholders) {
-      Object.keys(placeholders).forEach(placeholderKey => {
-        const regex = new RegExp(`{${placeholderKey}}`, 'g');
-        translation = translation.replace(regex, String(placeholders[placeholderKey]));
+      Object.entries(placeholders).forEach(([k, v]) => {
+        translation = translation.replace(`{${k}}`, String(v));
       });
     }
     return translation;
   };
 
-  return React.createElement(LocalizationContext.Provider, { value: { language, t } }, children);
+  return React.createElement(
+    LocalizationContext.Provider,
+    { value: { language, t } },
+    children
+  );
 };
 
-export const useLocalization = (): LocalizationContextType => {
+export const useLocalization = () => {
   const context = useContext(LocalizationContext);
   if (!context) {
     throw new Error('useLocalization must be used within a LocalizationProvider');

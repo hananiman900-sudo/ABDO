@@ -5,7 +5,7 @@ import { getChatResponse } from '../services/geminiService';
 import { useLocalization } from '../hooks/useLocalization';
 import { supabase } from '../services/supabaseClient';
 import QRCodeDisplay from './QRCodeDisplay';
-import { Send, Bot, User as UserIcon, Loader2, Paperclip, X, Bell, Key, ArrowRight, Mic, Volume2, VolumeX, Camera, StopCircle } from 'lucide-react';
+import { Send, Bot, User as UserIcon, Loader2, Paperclip, X, Bell, Key, ArrowRight, Mic, Volume2, VolumeX, Camera, StopCircle, MapPin } from 'lucide-react';
 
 const BookingConfirmation: React.FC<{ details: BookingDetails }> = ({ details }) => {
   const { t } = useLocalization();
@@ -49,10 +49,30 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
+  // Location State
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | undefined>(undefined);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+
+  // --- Get Location on Mount ---
+  useEffect(() => {
+      if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+              (position) => {
+                  setUserLocation({
+                      lat: position.coords.latitude,
+                      lng: position.coords.longitude
+                  });
+              },
+              (error) => {
+                  console.log("Location access denied or error", error);
+              }
+          );
+      }
+  }, []);
 
   // --- Chat History Persistence ---
   useEffect(() => {
@@ -241,7 +261,8 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
           currentUser?.id, 
           currentUser?.name,
           currentUser?.phone,
-          announcementText
+          announcementText,
+          userLocation
       );
 
       // Intelligent JSON Parsing
@@ -262,6 +283,30 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
           }
       } catch (e) {
           console.warn("Failed to parse JSON from response", e);
+      }
+
+      // NORMALIZE JSON: Handle cases where AI returns { "BOOKING_CONFIRMED": { ... } } instead of { "action": "BOOKING_CONFIRMED", "details": ... }
+      if (parsedJson) {
+          if (parsedJson.BOOKING_CONFIRMED) {
+              const d = parsedJson.BOOKING_CONFIRMED;
+              parsedJson = {
+                  action: 'BOOKING_CONFIRMED',
+                  details: {
+                      name: d.client_name || d.name || 'Unknown',
+                      phone: d.client_phone || d.phone || 'Unknown',
+                      service: d.service || 'General Service',
+                      provider: d.provider_name || d.provider || 'Provider',
+                      location: d.location || 'Tangier',
+                      discount: d.price || d.discount || 'Standard Price'
+                  }
+              };
+          } else if (parsedJson.REGISTER_USER) {
+              parsedJson = { action: 'REGISTER_USER', details: parsedJson.REGISTER_USER };
+          } else if (parsedJson.REGISTER_PROVIDER) {
+               parsedJson = { action: 'REGISTER_PROVIDER', details: parsedJson.REGISTER_PROVIDER };
+          } else if (parsedJson.FOLLOW_UP_CREATED) {
+               parsedJson = { action: 'FOLLOW_UP_CREATED', details: parsedJson.FOLLOW_UP_CREATED };
+          }
       }
 
       if (parsedJson && parsedJson.action) {
@@ -316,16 +361,18 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
   const handleBooking = async (details: any) => {
     try {
       // 1. Find Provider
-      const { data: providerData } = await supabase.from('providers').select('id').ilike('name', `%${details.provider}%`).limit(1).maybeSingle();
+      // Try exact match first
+      let { data: providerData } = await supabase.from('providers').select('id').ilike('name', `${details.provider}`).limit(1).maybeSingle();
       
-      // If provider not found by exact name match, try simpler match or use first available for demo purposes (in production logic should be stricter)
+      // If not found, try partial match
+      if (!providerData) {
+         ({ data: providerData } = await supabase.from('providers').select('id').ilike('name', `%${details.provider}%`).limit(1).maybeSingle());
+      }
+      
       let targetProviderId = providerData?.id;
       
       if (!targetProviderId) {
-         // Fallback: if user typed generic "doctor", maybe find any doctor. For now, throw.
-         // In a real app, we might want to ask the user to confirm from a list.
-         // However, let's try to be robust:
-          console.warn("Exact provider match failed, continuing with booking display only if critical.");
+          console.warn("Provider match failed for:", details.provider);
           if (!currentUser) throw new Error('User not logged in');
       }
 
@@ -335,8 +382,16 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
           const { data: appointmentData, error } = await supabase.from('appointments').insert({ client_id: currentUser.id, provider_id: targetProviderId }).select('id').single();
           if (error) throw error;
           appointmentId = appointmentData.id;
+
+          // --- NEW: SEND NOTIFICATION TO PROVIDER ---
+          const notificationMsg = `New Booking: ${details.name} for ${details.service}`;
+          await supabase.from('provider_notifications').insert({
+              provider_id: targetProviderId,
+              message: notificationMsg,
+              type: 'BOOKING'
+          });
       } else {
-          // Fallback for demo if DB insert fails or guest mode, generate random ID
+          // Fallback for demo/guest
            appointmentId = Math.floor(Math.random() * 10000);
       }
       

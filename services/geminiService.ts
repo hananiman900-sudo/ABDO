@@ -3,86 +3,59 @@ import { GoogleGenAI } from "@google/genai";
 import { Language } from "../types";
 import { supabase } from "./supabaseClient";
 
-const getSystemInstruction = (language: Language, providersList: string, upcomingAppointments: string, announcements: string, userContext: string) => {
+// Haversine Formula to calculate distance in km
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const R = 6371; // Radius of the earth in km
+  const dLat = deg2rad(lat2 - lat1);
+  const dLon = deg2rad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const d = R * c; // Distance in km
+  return d;
+}
+
+function deg2rad(deg: number) {
+  return deg * (Math.PI / 180);
+}
+
+const getSystemInstruction = (language: Language, providersList: string, upcomingAppointments: string, announcements: string, userContext: string, userLocationString: string) => {
   const commonInstructions = `
 You are 'TangerConnect', a helpful AI assistant for the city of Tangier. Your responses should be concise, natural, and directly answer the user's question.
 
 **Core Instructions:**
-1.  **Registration Flow (for new users):**
-    - New users can chat as guests for general inquiries. If a guest wants to perform an action that requires an account (like booking, creating a medical profile), you must guide them to register. You can suggest they use the "Login / Register" button in the app.
-    - Alternatively, you can handle registration conversationally. If you do, your first step is to ask if they want to register as a 'Client' or a 'Service Provider'.
-    - **If they choose Client:** Ask for their full name, phone number, and a password. Once you have these three details, respond ONLY with the following JSON structure.
-\`\`\`json
-{
-  "action": "REGISTER_USER",
-  "details": {
-    "fullName": "...",
-    "phone": "...",
-    "password": "..."
-  }
-}
-\`\`\`
-    - **If they choose Provider:** Ask for their business name, service type, location, a desired username, a contact phone number (important for activation), and a password. Mention that there is a 50 DH subscription fee. Once you have these six details, respond ONLY with the following JSON structure.
-\`\`\`json
-{
-  "action": "REGISTER_PROVIDER",
-  "details": {
-    "name": "...",
-    "service": "...",
-    "location": "...",
-    "username": "...",
-    "phone": "...",
-    "password": "..."
-  }
-}
-\`\`\`
-2.  **Role Change (for existing clients):**
-    - If a registered user (User ID is provided) asks to become a provider (e.g., "I want to be a provider", "change my status"), initiate the provider registration flow.
-    - Inform them about the 50 DH fee.
-    - Ask for service type, location, username, contact phone, and password.
-    - Then, respond with the 'REGISTER_PROVIDER' JSON action as described above.
-
-3.  **Appointment Reminders:** At the start of a conversation with a registered user, check the list of their upcoming appointments. If any appointment is within the next 24 hours, remind them in your first message. Example: "Welcome back, [Name]! Just a friendly reminder you have an appointment with [Provider] tomorrow."
-4.  **Analyze User Input:** 
-    - If the user uploads an image, analyze it for context (e.g., a dental problem suggests needing a dentist).
-    - **If the user sends AUDIO:** Listen carefully to the request. The user might be speaking in Darija, Arabic, French, or English. Transcribe the intent internally and respond accordingly.
-5.  **Recommend Services & Announcements:**
+1.  **Registration Flow:** Handle client/provider registration.
+2.  **Appointment Reminders:** Remind users of upcoming appointments.
+3.  **Analyze Input:** Handle text, images, and audio.
+4.  **Recommend Services & Announcements:**
     - When a user asks for a service, check the list of available providers.
-    - **Check the Announcements section.** If a provider has an active announcement (discount, news), MENTION IT to the user as a "Special Offer" or "Update".
-    - **Do NOT list all providers.** Find 1-2 relevant providers.
-    - Summarize the options conversationally.
-6.  **Booking Flow:**
-    - Offer to book appointments with a 19% discount.
-    - **IMPORTANT:** You have the user's context (Name: ${userContext}). USE IT. Do not ask for name/phone if provided in context.
-    - To book, confirm the booking by responding ONLY with the following JSON structure.
+    - Use the **Distance** information provided to recommend the nearest provider.
+    - Explicitly mention the distance (e.g., "Dr. X is 300 meters away").
+    - Provide the Google Maps link if available.
+    - **CHECK FOR OFFERS:** If a provider service has a 'Discount Price', YOU MUST mention it. (e.g. "Dr. X has Teeth Whitening for 1500DH instead of 2000DH").
+    - Mention active announcements/discounts.
+5.  **Booking Flow:** 
+    - Offer to book appointments with a discount.
+    - **IMPORTANT:** When you confirm a booking, you **MUST** return the JSON in the EXACT format below. Do NOT use any other key like "BOOKING_CONFIRMED" at the root level.
 \`\`\`json
 {
   "action": "BOOKING_CONFIRMED",
   "details": {
-    "name": "INSERT_USER_NAME_HERE",
-    "phone": "INSERT_USER_PHONE_HERE",
-    "service": "...",
-    "provider": "...",
-    "location": "...",
-    "discount": "19%"
+    "name": "User Name",
+    "phone": "User Phone",
+    "service": "Service Name",
+    "provider": "Provider Name",
+    "location": "Provider Location",
+    "discount": "Price/Discount details"
   }
 }
 \`\`\`
-7.  **Medical Follow-up Profile:**
-    - If a user wants to track an appointment or create a medical file, engage in a conversation to get the details.
-    - Ask for: provider's name, the date/time of the next appointment, and any notes or medication photos.
-    - Once you have the details, respond ONLY with the following JSON structure.
-\`\`\`json
-{
-  "action": "FOLLOW_UP_CREATED",
-  "details": {
-    "providerName": "...",
-    "nextAppointmentDate": "YYYY-MM-DD HH:MM:SS",
-    "notes": "..."
-  }
-}
-\`\`\`
-8.  **Health Inquiries:** Act like a preliminary triage nurse. Be empathetic. **Never give a definitive diagnosis.** Always recommend seeing a real doctor from the list.
+6.  **Medical Follow-up:** Create follow-ups with JSON 'FOLLOW_UP_CREATED'.
+7.  **Geolocation:** 
+    - User Location: ${userLocationString}
+    - If the user asks for the nearest provider, prioritize by distance.
 
 **USER CONTEXT:**
 ${userContext}
@@ -93,9 +66,12 @@ ${userContext}
       langName: "Moroccan Darija",
       prompt: `
 ${commonInstructions}
-9.  **اللغة:** هضر بالدارجة المغربية. كون محترف وعاونو مزيان.
+8.  **اللغة:** هضر بالدارجة المغربية. 
+    - استعمل معلومات المسافة باش تنصح الكليان (مثلاً: "كاين الطبيب فلان قريب ليك بـ 200 متر").
+    - **العروض:** ضروري تذكر التخفيضات يلا كانت (مثلاً: "عندهم برومو ف تبييض الأسنان ب 1500 درهم").
+    - استعمل وصف الخدمات وال Bio باش تجاوب بدقة.
 
-**المزودين لي كاينين:**
+**المزودين (مع المسافة والخدمات والعروض):**
 ---
 ${providersList}
 ---
@@ -113,9 +89,12 @@ ${upcomingAppointments}
       langName: "English",
       prompt: `
 ${commonInstructions}
-9.  **Language:** Speak in English. Be professional and helpful.
+8.  **Language:** Speak in English.
+    - Use distance info to recommend nearest providers.
+    - **OFFERS:** You must mention discounts if listed in the services.
+    - Use detailed service info and Bio.
 
-**Available Providers:**
+**Available Providers (with Distance & Services):**
 ---
 ${providersList}
 ---
@@ -133,9 +112,12 @@ ${upcomingAppointments}
       langName: "French",
       prompt: `
 ${commonInstructions}
-9.  **Langue :** Parlez en français. Soyez professionnel et serviable.
+8.  **Langue :** Parlez en français.
+    - Utilisez les informations de distance pour recommander les fournisseurs les plus proches.
+    - **OFFRES:** Mentionnez impérativement les réductions si elles existent.
+    - Utilisez les informations détaillées sur les services et la Bio.
 
-**Fournisseurs disponibles :**
+**Fournisseurs disponibles (avec Distance & Services) :**
 ---
 ${providersList}
 ---
@@ -162,7 +144,8 @@ export const getChatResponse = async (
   userId?: number,
   userName?: string,
   userPhone?: string,
-  announcementsText: string = ""
+  announcementsText: string = "",
+  userLocation?: { lat: number, lng: number }
 ): Promise<string> => {
   try {
     const apiKey = (window as any).process?.env?.API_KEY;
@@ -171,15 +154,59 @@ export const getChatResponse = async (
     const ai = new GoogleGenAI({ apiKey });
 
     let providersListString = "Information unavailable.";
+    let userLocationString = "User location not available (GPS off).";
+
+    if (userLocation) {
+        userLocationString = `User Coordinates: ${userLocation.lat}, ${userLocation.lng}`;
+    }
+
     try {
+        // Fetch providers with their services
         const { data: providers, error: providersError } = await supabase
         .from('providers')
-        .select('name, service_type, location');
+        .select(`
+            id, name, service_type, location, latitude, longitude, bio, 
+            provider_services (name, price, discount_price)
+        `);
         
         if (!providersError && providers) {
-             providersListString = providers.length > 0
-                ? providers.map(p => `- Provider: ${p.name}, Service: ${p.service_type}, Location: ${p.location}`).join('\n')
-                : "No registered providers yet.";
+             // Process providers: calculate distance and format string
+             const processedProviders = providers.map((p: any) => {
+                 let distString = "Distance unknown";
+                 let distVal = 999999;
+                 
+                 if (userLocation && p.latitude && p.longitude) {
+                     const km = calculateDistance(userLocation.lat, userLocation.lng, p.latitude, p.longitude);
+                     distVal = km;
+                     if (km < 1) {
+                         distString = `${Math.round(km * 1000)} meters away`;
+                     } else {
+                         distString = `${km.toFixed(2)} km away`;
+                     }
+                 }
+
+                 const servicesStr = p.provider_services && p.provider_services.length > 0
+                    ? p.provider_services.map((s: any) => {
+                        if (s.discount_price) {
+                            return `[OFFER: ${s.name} for ${s.discount_price}DH (was ${s.price}DH)]`;
+                        }
+                        return `[${s.name}: ${s.price}DH]`;
+                    }).join(', ')
+                    : "General Services";
+
+                 return {
+                     ...p,
+                     distVal,
+                     info: `- Name: ${p.name} (${p.service_type})\n  Location: ${p.location}\n  GPS Distance: ${distString}\n  Bio: ${p.bio || 'N/A'}\n  Services & Offers: ${servicesStr}\n  Map Link: https://www.google.com/maps/dir/?api=1&destination=${p.latitude},${p.longitude}`
+                 };
+             });
+
+             // Sort by distance if location is available
+             if (userLocation) {
+                 processedProviders.sort((a, b) => a.distVal - b.distVal);
+             }
+
+             providersListString = processedProviders.map((p: any) => p.info).join('\n\n');
         }
     } catch (e) {}
 
@@ -204,7 +231,7 @@ export const getChatResponse = async (
       ? `Registered Client. ID: ${userId}, Name: ${userName || 'Unknown'}, Phone: ${userPhone || 'Unknown'}.` 
       : `Guest User (Not registered).`;
 
-    const systemInstruction = getSystemInstruction(language, providersListString, upcomingAppointmentsString, announcementsText, userContextString);
+    const systemInstruction = getSystemInstruction(language, providersListString, upcomingAppointmentsString, announcementsText, userContextString, userLocationString);
     
     const userParts: any[] = [];
     if (newMessage) userParts.push({ text: newMessage });

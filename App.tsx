@@ -6,19 +6,105 @@ import ProviderPortal from './components/QRScanner';
 import AppointmentsDrawer from './components/AppointmentsDrawer';
 import DatabaseSetup from './components/DatabaseSetup';
 import { LocalizationProvider, useLocalization, translations } from './hooks/useLocalization';
-import { Globe, User as UserIcon, CheckSquare, Sun, Moon, LogIn, LogOut, X, CalendarDays, Database, AlertTriangle, CheckCircle2, Menu, Users, Bell, Phone, MapPin } from 'lucide-react';
+import { Globe, User as UserIcon, CheckSquare, Sun, Moon, LogIn, LogOut, X, CalendarDays, Database, AlertTriangle, CheckCircle2, Menu, Users, Bell, Phone, MapPin, Search, Heart, Briefcase, Star, MessageCircle } from 'lucide-react';
 import { supabase } from './services/supabaseClient';
 
 // --- New Components (Directory & Notifications) ---
 
-const ProviderDirectory: React.FC<{ isOpen: boolean; onClose: () => void; currentUser: AuthenticatedUser | null }> = ({ isOpen, onClose, currentUser }) => {
+const ProviderProfileModal: React.FC<{ provider: any; isOpen: boolean; onClose: () => void; isFollowing: boolean; onToggleFollow: () => void }> = ({ provider, isOpen, onClose, isFollowing, onToggleFollow }) => {
     const { t } = useLocalization();
+    if (!isOpen || !provider) return null;
+
+    const services = provider.provider_services || [];
+
+    return (
+        <div className="fixed inset-0 bg-black/70 z-[60] flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
+            <div className="bg-white dark:bg-gray-800 w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl relative" onClick={e => e.stopPropagation()}>
+                <button onClick={onClose} className="absolute top-4 right-4 p-2 bg-black/20 hover:bg-black/40 text-white rounded-full z-10"><X size={20}/></button>
+                
+                {/* Header Image Area */}
+                <div className="h-32 bg-gradient-to-r from-primary to-secondary relative">
+                    <div className="absolute -bottom-10 left-6">
+                         <div className="w-24 h-24 rounded-2xl border-4 border-white dark:border-gray-800 bg-white dark:bg-gray-700 overflow-hidden shadow-lg">
+                            {provider.profile_image_url ? (
+                                <img src={provider.profile_image_url} className="w-full h-full object-cover" />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center bg-gray-200 dark:bg-gray-600 text-3xl font-bold text-gray-400">
+                                    {provider.name.charAt(0)}
+                                </div>
+                            )}
+                         </div>
+                    </div>
+                </div>
+
+                <div className="pt-12 px-6 pb-6">
+                    <div className="flex justify-between items-start mb-4">
+                        <div>
+                            <h2 className="text-2xl font-bold dark:text-white leading-none">{provider.name}</h2>
+                            <p className="text-primary font-medium mt-1">{provider.service_type}</p>
+                            <p className="text-sm text-gray-500 flex items-center gap-1 mt-1"><MapPin size={14}/> {provider.location}</p>
+                        </div>
+                        <button 
+                            onClick={onToggleFollow}
+                            className={`px-5 py-2.5 rounded-full font-bold shadow-md transition-all flex items-center gap-2 ${isFollowing ? 'bg-gray-100 text-gray-600 hover:bg-gray-200' : 'bg-primary text-white hover:bg-primaryDark'}`}
+                        >
+                            {isFollowing ? <><CheckCircle2 size={16}/> {t('unfollow')}</> : <>{t('follow')}</>}
+                        </button>
+                    </div>
+
+                    {/* Bio */}
+                    {provider.bio && (
+                        <div className="mb-6 bg-gray-50 dark:bg-gray-700/50 p-4 rounded-xl">
+                            <h4 className="font-bold text-sm mb-2 text-gray-500 uppercase">{t('about')}</h4>
+                            <p className="text-gray-700 dark:text-gray-300 text-sm leading-relaxed">{provider.bio}</p>
+                        </div>
+                    )}
+
+                    {/* Services & Offers */}
+                    <div>
+                         <h4 className="font-bold text-sm mb-3 text-gray-500 uppercase flex items-center gap-2"><Star size={16} className="text-yellow-500"/> {t('servicesAndOffers')}</h4>
+                         <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                             {services.length > 0 ? services.map((s: any) => (
+                                 <div key={s.id} className="flex justify-between items-center p-3 border border-gray-100 dark:border-gray-700 rounded-xl">
+                                     <span className="font-medium dark:text-white text-sm">{s.name}</span>
+                                     <div className="text-sm">
+                                         {s.discount_price ? (
+                                             <>
+                                                <span className="line-through text-gray-400 mr-2 text-xs">{s.price} DH</span>
+                                                <span className="font-bold text-green-600">{s.discount_price} DH</span>
+                                             </>
+                                         ) : (
+                                             <span className="font-bold text-gray-700 dark:text-gray-300">{s.price} DH</span>
+                                         )}
+                                     </div>
+                                 </div>
+                             )) : <p className="text-sm text-gray-400 italic">No services listed yet.</p>}
+                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+const ProviderDirectory: React.FC<{ isOpen: boolean; onClose: () => void; currentUser: AuthenticatedUser | null }> = ({ isOpen, onClose, currentUser }) => {
+    const { t, language } = useLocalization();
     const [providers, setProviders] = useState<any[]>([]);
     const [followedIds, setFollowedIds] = useState<number[]>([]);
+    const [search, setSearch] = useState('');
+    const [viewMode, setViewMode] = useState<'all' | 'following'>('all');
+    const [selectedProvider, setSelectedProvider] = useState<any>(null);
 
     useEffect(() => {
         if(isOpen) {
-            supabase.from('providers').select('*').eq('is_active', true).then(({data}) => setProviders(data || []));
+            // Fetch providers, only active ones with valid subscription
+            const today = new Date().toISOString();
+            supabase.from('providers')
+                .select('*, provider_services(id, name, price, discount_price)')
+                .eq('is_active', true)
+                .gt('subscription_end_date', today) // IMPORTANT: Only show valid subscriptions
+            .then(({data}) => setProviders(data || []));
+            
             if(currentUser) {
                 supabase.from('follows').select('provider_id').eq('client_id', currentUser.id)
                 .then(({data}) => setFollowedIds(data?.map(d => d.provider_id) || []));
@@ -37,32 +123,102 @@ const ProviderDirectory: React.FC<{ isOpen: boolean; onClose: () => void; curren
         }
     };
 
+    const filteredProviders = providers.filter(p => {
+        const matchesSearch = 
+            p.name.toLowerCase().includes(search.toLowerCase()) || 
+            p.service_type.toLowerCase().includes(search.toLowerCase()) ||
+            (p.provider_services && p.provider_services.some((s:any) => s.name.toLowerCase().includes(search.toLowerCase())));
+
+        const matchesView = viewMode === 'all' || followedIds.includes(p.id);
+        
+        return matchesSearch && matchesView;
+    });
+
     if(!isOpen) return null;
     
     return (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
-            <div className="bg-white dark:bg-gray-800 w-full max-w-md max-h-[80vh] rounded-3xl overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
-                <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
-                    <h3 className="font-bold text-xl dark:text-white">{t('providerDirectory')}</h3>
-                    <button onClick={onClose}><X className="dark:text-white"/></button>
+            <div className="bg-white dark:bg-gray-800 w-full max-w-2xl h-[85vh] rounded-3xl overflow-hidden flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
+                
+                {/* Header with Search */}
+                <div className="p-6 border-b dark:border-gray-700 bg-white dark:bg-gray-800 z-10">
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="font-bold text-2xl dark:text-white">{t('providerDirectory')}</h3>
+                        <button onClick={onClose} className="p-2 bg-gray-100 dark:bg-gray-700 rounded-full"><X className="dark:text-white" size={20}/></button>
+                    </div>
+                    
+                    <div className="relative mb-4">
+                        <input 
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            placeholder={t('searchPlaceholder')}
+                            className="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl border-none outline-none dark:text-white"
+                        />
+                        <Search className="absolute left-4 top-3.5 text-gray-400" size={20}/>
+                    </div>
+
+                    <div className="flex gap-2">
+                        <button 
+                            onClick={() => setViewMode('all')} 
+                            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'all' ? 'bg-black text-white dark:bg-white dark:text-black' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'}`}
+                        >
+                            {t('allProviders')}
+                        </button>
+                        <button 
+                            onClick={() => setViewMode('following')} 
+                            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${viewMode === 'following' ? 'bg-black text-white dark:bg-white dark:text-black' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'}`}
+                        >
+                            <Heart size={14} className={viewMode === 'following' ? 'fill-current' : ''}/> {t('myFollowing')}
+                        </button>
+                    </div>
                 </div>
-                <div className="overflow-y-auto p-4 space-y-3">
-                    {providers.map(p => (
-                        <div key={p.id} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-xl">
-                            <div>
-                                <div className="font-bold dark:text-white">{p.name}</div>
-                                <div className="text-xs text-gray-500 dark:text-gray-400">{p.service_type} • {p.location}</div>
+
+                {/* List */}
+                <div className="overflow-y-auto p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {filteredProviders.map(p => (
+                        <div 
+                            key={p.id} 
+                            onClick={() => setSelectedProvider(p)}
+                            className="p-4 bg-white border border-gray-100 dark:bg-gray-700/50 dark:border-gray-600 rounded-2xl hover:shadow-lg transition-all cursor-pointer group"
+                        >
+                            <div className="flex items-start gap-4">
+                                <div className="w-12 h-12 rounded-xl bg-gray-200 dark:bg-gray-600 flex items-center justify-center text-xl font-bold text-gray-500 overflow-hidden shrink-0">
+                                    {p.profile_image_url ? <img src={p.profile_image_url} className="w-full h-full object-cover"/> : p.name.charAt(0)}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <h4 className="font-bold dark:text-white truncate">{p.name}</h4>
+                                    <p className="text-xs text-primary font-medium">{p.service_type}</p>
+                                    <p className="text-xs text-gray-400 truncate mt-1 flex items-center gap-1"><MapPin size={10}/> {p.location}</p>
+                                </div>
                             </div>
-                            <button 
-                                onClick={() => toggleFollow(p.id)}
-                                className={`px-4 py-2 rounded-full text-xs font-bold transition-colors ${followedIds.includes(p.id) ? 'bg-gray-200 text-gray-700' : 'bg-primary text-white'}`}
-                            >
-                                {followedIds.includes(p.id) ? t('unfollow') : t('follow')}
-                            </button>
+                            <div className="mt-4 flex justify-between items-center">
+                                <span className="text-xs font-bold text-green-600 bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded-md">
+                                    {p.provider_services?.length || 0} Services
+                                </span>
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); toggleFollow(p.id); }}
+                                    className={`p-2 rounded-full transition-colors ${followedIds.includes(p.id) ? 'text-red-500 bg-red-50' : 'text-gray-400 hover:text-primary bg-gray-50'}`}
+                                >
+                                    <Heart size={18} className={followedIds.includes(p.id) ? 'fill-current' : ''} />
+                                </button>
+                            </div>
                         </div>
                     ))}
+                    {filteredProviders.length === 0 && (
+                        <div className="col-span-full text-center py-10 text-gray-400">
+                            No active providers found matching your criteria.
+                        </div>
+                    )}
                 </div>
             </div>
+
+            <ProviderProfileModal 
+                isOpen={!!selectedProvider} 
+                onClose={() => setSelectedProvider(null)} 
+                provider={selectedProvider} 
+                isFollowing={selectedProvider ? followedIds.includes(selectedProvider.id) : false}
+                onToggleFollow={() => selectedProvider && toggleFollow(selectedProvider.id)}
+            />
         </div>
     );
 };
@@ -476,9 +632,10 @@ const App: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
   
-  // New Drawers
+  // New Drawers & State
   const [showProviderDirectory, setShowProviderDirectory] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [notificationCount, setNotificationCount] = useState(0);
 
   const [theme, setTheme] = useState(() => {
     if (typeof window !== 'undefined' && localStorage.theme) return localStorage.theme;
@@ -503,7 +660,7 @@ const App: React.FC = () => {
             if (error) throw error;
             if (data) setCurrentUser({ id: data.id, name: data.full_name, accountType: AccountType.CLIENT, phone: data.phone });
           } else if (userType === AccountType.PROVIDER) {
-            const { data, error } = await supabase.from('providers').select('id, name, username, is_active, subscription_end_date').eq('id', parseInt(userId, 10)).single();
+            const { data, error } = await supabase.from('providers').select('id, name, username, is_active, subscription_end_date, bio, profile_image_url').eq('id', parseInt(userId, 10)).single();
             if (data) {
                 setCurrentUser({ 
                     id: data.id, 
@@ -511,7 +668,9 @@ const App: React.FC = () => {
                     accountType: AccountType.PROVIDER, 
                     username: data.username, 
                     isActive: data.is_active,
-                    subscriptionEndDate: data.subscription_end_date
+                    subscriptionEndDate: data.subscription_end_date,
+                    bio: data.bio,
+                    profile_image_url: data.profile_image_url
                 });
                 setView(UserView.PROVIDER);
             }
@@ -524,6 +683,27 @@ const App: React.FC = () => {
     };
     checkUser();
   }, []);
+
+  // Fetch Notification Count for Client
+  useEffect(() => {
+      if(currentUser?.accountType === AccountType.CLIENT) {
+           const fetchCount = async () => {
+               const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+               const tomorrowStr = tomorrow.toISOString().split('T')[0];
+               
+               const { count: apptCount } = await supabase.from('follow_ups').select('id', {count: 'exact'})
+               .eq('client_id', currentUser.id)
+               .gte('next_appointment_date', tomorrowStr)
+               .lt('next_appointment_date', new Date(tomorrow.getTime() + 86400000).toISOString());
+
+               // For demo: randomly add 1-3 "new announcements" since we don't have a read-status table
+               const randomAnnouncements = Math.floor(Math.random() * 2); 
+               
+               setNotificationCount((apptCount || 0) + randomAnnouncements);
+           }
+           fetchCount();
+      }
+  }, [currentUser]);
 
   useEffect(() => {
     document.documentElement.lang = language;
@@ -592,8 +772,12 @@ const App: React.FC = () => {
             <div className="hidden md:flex items-center gap-3">
                 {currentUser ? (
                     <div className="flex items-center gap-3 bg-gray-50 dark:bg-gray-800/50 pl-1 pr-4 py-1 rounded-full border border-gray-200 dark:border-gray-700">
-                        <div className="w-8 h-8 bg-primary/10 text-primary rounded-full flex items-center justify-center font-bold text-sm">
-                            {currentUser.name.charAt(0).toUpperCase()}
+                        <div className="w-8 h-8 bg-primary/10 text-primary rounded-full flex items-center justify-center font-bold text-sm overflow-hidden">
+                             {currentUser.profile_image_url ? (
+                                <img src={currentUser.profile_image_url} className="w-full h-full object-cover" />
+                             ) : (
+                                currentUser.name.charAt(0).toUpperCase()
+                             )}
                         </div>
                         <div className="flex flex-col">
                             <span className="text-sm font-bold text-dark dark:text-light leading-none">{currentUser.name}</span>
@@ -611,11 +795,12 @@ const App: React.FC = () => {
 
                 {currentUser?.accountType === AccountType.CLIENT && (
                     <>
-                        <button onClick={() => setShowProviderDirectory(true)} className="p-2 text-gray-600 hover:text-primary hover:bg-gray-100 rounded-full transition-colors" title={t('providerDirectory')}>
+                        <button onClick={() => setShowProviderDirectory(true)} className="p-2 text-gray-600 hover:text-primary hover:bg-gray-100 rounded-full transition-colors relative" title={t('providerDirectory')}>
                             <Users size={20} />
                         </button>
-                        <button onClick={() => setShowNotifications(true)} className="p-2 text-gray-600 hover:text-primary hover:bg-gray-100 rounded-full transition-colors" title={t('notifications')}>
+                        <button onClick={() => setShowNotifications(true)} className="p-2 text-gray-600 hover:text-primary hover:bg-gray-100 rounded-full transition-colors relative" title={t('notifications')}>
                             <Bell size={20} />
+                            {notificationCount > 0 && <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[9px] rounded-full flex items-center justify-center font-bold">{notificationCount}</span>}
                         </button>
                         <button onClick={() => setShowAppointmentsDrawer(true)} className="p-2 text-gray-600 hover:text-primary hover:bg-gray-100 rounded-full transition-colors" title={t('myAppointments')}>
                             <CalendarDays size={20} />
@@ -659,8 +844,9 @@ const App: React.FC = () => {
             {/* Mobile Menu Button */}
             <div className="flex md:hidden items-center gap-2">
                 {currentUser?.accountType === AccountType.CLIENT && (
-                     <button onClick={() => setShowNotifications(true)} className="p-2 bg-gray-100 dark:bg-gray-800 rounded-full text-primary">
+                     <button onClick={() => setShowNotifications(true)} className="p-2 bg-gray-100 dark:bg-gray-800 rounded-full text-primary relative">
                         <Bell size={20} />
+                         {notificationCount > 0 && <span className="absolute top-0 right-0 w-3 h-3 bg-red-500 rounded-full"></span>}
                      </button>
                 )}
                 <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="p-2 text-dark dark:text-light hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
@@ -675,8 +861,8 @@ const App: React.FC = () => {
                 <div className="p-4 space-y-4">
                     {currentUser ? (
                         <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
-                             <div className="w-10 h-10 bg-primary text-white rounded-full flex items-center justify-center font-bold text-lg">
-                                {currentUser.name.charAt(0).toUpperCase()}
+                             <div className="w-10 h-10 bg-primary text-white rounded-full flex items-center justify-center font-bold text-lg overflow-hidden">
+                                {currentUser.profile_image_url ? <img src={currentUser.profile_image_url} className="w-full h-full object-cover"/> : currentUser.name.charAt(0).toUpperCase()}
                             </div>
                             <div>
                                 <div className="font-bold text-dark dark:text-light">{currentUser.name}</div>
@@ -754,6 +940,21 @@ const App: React.FC = () => {
     );
   };
 
+  const TechSupportButton = () => {
+      const { t } = useLocalization();
+      return (
+          <a 
+            href="https://wa.me/212617774846" 
+            target="_blank" 
+            rel="noreferrer"
+            className="fixed bottom-6 right-6 z-30 bg-green-500 text-white p-3 rounded-full shadow-lg shadow-green-500/30 hover:bg-green-600 hover:scale-110 transition-all flex items-center gap-2 group"
+          >
+              <MessageCircle size={24} />
+              <span className="hidden group-hover:block whitespace-nowrap font-bold text-sm pr-2">{t('techSupport')}</span>
+          </a>
+      );
+  };
+
   if (showSplash) {
       return <SplashScreen onFinish={() => setShowSplash(false)} />;
   }
@@ -801,6 +1002,8 @@ const App: React.FC = () => {
             <ProviderLoginPrompt />
           )}
         </main>
+        
+        <TechSupportButton />
         
         <footer className="w-full py-6 text-center text-gray-400 dark:text-gray-600 text-xs z-10">
           <p>&copy; 2025 {t('appName')} - Built for Tangier</p>

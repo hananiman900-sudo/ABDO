@@ -31,6 +31,10 @@ export interface AuthenticatedUser {
   username?: string;
   isActive?: boolean;
   subscriptionEndDate?: string;
+  latitude?: number;
+  longitude?: number;
+  bio?: string;
+  profile_image_url?: string;
 }
 
 
@@ -84,4 +88,21 @@ export interface AppointmentForDisplay {
     service_type: string;
     location: string;
   };
+}
+
+export interface ProviderService {
+  id: number;
+  provider_id: number;
+  name: string;
+  price: number;
+  discount_price?: number;
+}
+
+export interface ProviderNotification {
+  id: number;
+  provider_id: number;
+  message: string;
+  created_at: string;
+  is_read: boolean;
+  type: 'BOOKING' | 'SYSTEM';
 }
