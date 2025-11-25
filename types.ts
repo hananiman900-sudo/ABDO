@@ -80,6 +80,15 @@ export interface Announcement {
   providers: { name: string };
 }
 
+export interface SystemAnnouncement {
+  id: number;
+  title: string;
+  message: string;
+  image_url: string;
+  is_active: boolean;
+  created_at: string;
+}
+
 export interface AppointmentForDisplay {
   id: number;
   created_at: string;
@@ -105,4 +114,38 @@ export interface ProviderNotification {
   created_at: string;
   is_read: boolean;
   type: 'BOOKING' | 'SYSTEM';
+  status: 'pending' | 'completed'; // New: Track if client arrived
+  booking_id?: number; // Link to appointment
+  client_details?: any; // virtual field for UI
+}
+
+export interface Product {
+  id: number;
+  name: string;
+  description: string;
+  price: number;
+  image_url: string;
+  category: string;
+  sizes?: string[]; // New: Available sizes
+  created_at: string;
+}
+
+export interface CartItem extends Product {
+  quantity: number;
+  selectedSize?: string; // New: User selected size
+  note?: string; // New: User note
+}
+
+export interface Order {
+  id: number;
+  user_id: number;
+  user_type: string; // 'CLIENT' or 'PROVIDER'
+  total_amount: number;
+  status: 'pending' | 'delivered' | 'cancelled';
+  items: CartItem[];
+  customer_details?: {
+    name: string;
+    phone: string;
+  };
+  created_at: string;
 }

@@ -1,9 +1,9 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useLocalization } from '../hooks/useLocalization';
-import { BookingDetails, FollowUp, AuthenticatedUser, ProviderService, ProviderNotification } from '../types';
+import { BookingDetails, FollowUp, AuthenticatedUser, ProviderService, ProviderNotification, Product } from '../types';
 import { supabase } from '../services/supabaseClient';
-import { CheckCircle, XCircle, Camera, Loader2, Upload, Send, LogOut, User, Calendar, FileText, Lock, Phone, X, RefreshCw, BarChart, History, Users, Edit, Trash, Smartphone, MessageCircle, MapPin, Briefcase, Save, Image as ImageIcon, Map, Bell, Clock, AlertTriangle } from 'lucide-react';
+import { CheckCircle, XCircle, Camera, Loader2, Upload, Send, LogOut, User, Calendar, FileText, Lock, Phone, X, RefreshCw, BarChart, History, Users, Edit, Trash, Smartphone, MessageCircle, MapPin, Briefcase, Save, Image as ImageIcon, Map, Bell, Clock, AlertTriangle, Package, Plus, ShoppingBag } from 'lucide-react';
 import jsQR from 'jsqr';
 
 interface ScannedAppointment extends BookingDetails {}
@@ -83,44 +83,76 @@ const StatsComponent: React.FC<{ providerId: number }> = ({ providerId }) => {
     );
 };
 
-const ProviderNotifications: React.FC<{ providerId: number }> = ({ providerId }) => {
+const ProviderNotifications: React.FC<{ providerId: number; refreshTrigger: number }> = ({ providerId, refreshTrigger }) => {
     const { t } = useLocalization();
     const [notifs, setNotifs] = useState<ProviderNotification[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
+    const [selectedNotif, setSelectedNotif] = useState<ProviderNotification | null>(null);
 
     const fetchNotifs = async () => {
-        const { data } = await supabase.from('provider_notifications').select('*').eq('provider_id', providerId).order('created_at', { ascending: false }).limit(20);
+        const { data } = await supabase.from('provider_notifications')
+            .select('*')
+            .eq('provider_id', providerId)
+            .order('created_at', { ascending: false })
+            .limit(20);
+            
         if (data) {
             setNotifs(data as ProviderNotification[]);
             setUnreadCount(data.filter((n: any) => !n.is_read).length);
         }
     };
 
-    useEffect(() => { fetchNotifs(); }, [providerId]);
+    useEffect(() => { fetchNotifs(); }, [providerId, refreshTrigger]);
 
-    const markAsRead = async (id: number) => {
-        await supabase.from('provider_notifications').update({ is_read: true }).eq('id', id);
-        fetchNotifs();
+    const handleClick = async (n: ProviderNotification) => {
+        if (!n.is_read) {
+            await supabase.from('provider_notifications').update({ is_read: true }).eq('id', n.id);
+            fetchNotifs();
+        }
+        setSelectedNotif(n);
     }
 
     return (
         <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 relative max-h-96 overflow-y-auto">
              <div className="absolute top-6 right-6 flex items-center gap-2">
                 {unreadCount > 0 && <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">{unreadCount}</span>}
+                <button onClick={() => fetchNotifs()} className="p-1 text-gray-400 hover:text-primary"><RefreshCw size={14}/></button>
             </div>
             <h4 className="font-bold mb-4 flex items-center gap-2 dark:text-white"><Bell size={20}/> {t('providerNotifications')}</h4>
             <div className="space-y-3">
                 {notifs.map(n => (
-                    <div key={n.id} onClick={() => markAsRead(n.id)} className={`flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-colors ${n.is_read ? 'bg-gray-50 dark:bg-gray-700' : 'bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800'}`}>
-                         <div className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${n.is_read ? 'bg-gray-300' : 'bg-blue-500'}`}></div>
+                    <div key={n.id} onClick={() => handleClick(n)} className={`flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-colors ${n.is_read ? 'bg-gray-50 dark:bg-gray-700' : 'bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800'}`}>
+                         {/* Status Dot */}
+                         <div className={`mt-1.5 w-3 h-3 rounded-full flex-shrink-0 shadow-sm ${n.status === 'completed' ? 'bg-green-500' : 'bg-red-500 animate-pulse'}`}></div>
                          <div>
-                             <p className="text-sm dark:text-white">{n.message}</p>
+                             <p className="text-sm dark:text-white font-medium">{n.message}</p>
                              <p className="text-xs text-gray-400 mt-1">{new Date(n.created_at).toLocaleString()}</p>
                          </div>
                     </div>
                 ))}
                 {notifs.length === 0 && <p className="text-center text-gray-400 text-sm py-4">{t('noNotifications')}</p>}
             </div>
+
+            {/* Detail Modal */}
+            {selectedNotif && (
+                <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setSelectedNotif(null)}>
+                    <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl max-w-sm w-full shadow-2xl" onClick={e => e.stopPropagation()}>
+                        <h3 className="text-xl font-bold mb-4 dark:text-white">{t('notificationDetails')}</h3>
+                        <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-xl mb-4">
+                            <p className="text-gray-800 dark:text-white">{selectedNotif.message}</p>
+                            <div className="mt-3 flex items-center gap-2 text-sm">
+                                <span className={`px-2 py-1 rounded-full font-bold ${selectedNotif.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                    {selectedNotif.status === 'completed' ? t('clientHasArrived') : t('clientPending')}
+                                </span>
+                                <span className="text-gray-400">{new Date(selectedNotif.created_at).toLocaleDateString()}</span>
+                            </div>
+                        </div>
+                        <button onClick={() => setSelectedNotif(null)} className="w-full py-3 bg-gray-100 dark:bg-gray-700 rounded-xl font-bold dark:text-white hover:bg-gray-200">
+                            {t('close')}
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
@@ -252,6 +284,73 @@ const AnnouncementManager: React.FC<{ providerId: number }> = ({ providerId }) =
                             <button onClick={() => { setMessage(ad.message); setEditingId(ad.id); }} className="p-1 text-blue-500"><Edit size={16}/></button>
                             <button onClick={() => handleDelete(ad.id)} className="p-1 text-red-500"><Trash size={16}/></button>
                         </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+const StoreManager: React.FC<{ provider: AuthenticatedUser }> = ({ provider }) => {
+    const { t } = useLocalization();
+    const [products, setProducts] = useState<Product[]>([]);
+    const [newProduct, setNewProduct] = useState({ name: '', description: '', price: '', category: 'General' });
+    const [isLoading, setIsLoading] = useState(false);
+
+    const fetchProducts = async () => {
+        const { data } = await supabase.from('products').select('*').order('created_at', { ascending: false });
+        setProducts(data || []);
+    };
+
+    useEffect(() => { fetchProducts(); }, []);
+
+    const handleAddProduct = async () => {
+        if(!newProduct.name || !newProduct.price) return;
+        setIsLoading(true);
+        await supabase.from('products').insert({
+            name: newProduct.name,
+            description: newProduct.description,
+            price: parseFloat(newProduct.price),
+            category: newProduct.category
+        });
+        setNewProduct({ name: '', description: '', price: '', category: 'General' });
+        setIsLoading(false);
+        fetchProducts();
+    };
+
+    const handleDelete = async (id: number) => {
+        if(confirm(t('delete'))) {
+            await supabase.from('products').delete().eq('id', id);
+            fetchProducts();
+        }
+    }
+
+    return (
+        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+            <div className="flex justify-between items-center mb-4">
+                <h4 className="font-bold flex items-center gap-2 dark:text-white"><ShoppingBag size={20}/> {t('storeManager')}</h4>
+                <span className="bg-purple-100 text-purple-600 px-2 py-1 rounded text-xs font-bold">Admin Access</span>
+            </div>
+            
+            <div className="space-y-3 mb-6">
+                <input placeholder={t('productName')} value={newProduct.name} onChange={e => setNewProduct({...newProduct, name: e.target.value})} className="w-full p-3 bg-gray-50 dark:bg-gray-700 rounded-xl outline-none dark:text-white"/>
+                <input placeholder={t('productDescription')} value={newProduct.description} onChange={e => setNewProduct({...newProduct, description: e.target.value})} className="w-full p-3 bg-gray-50 dark:bg-gray-700 rounded-xl outline-none dark:text-white"/>
+                <div className="flex gap-2">
+                    <input placeholder={t('price')} type="number" value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: e.target.value})} className="w-full p-3 bg-gray-50 dark:bg-gray-700 rounded-xl outline-none dark:text-white"/>
+                    <button onClick={handleAddProduct} disabled={isLoading} className="bg-green-500 text-white px-6 rounded-xl font-bold hover:bg-green-600">
+                        {isLoading ? <Loader2 className="animate-spin"/> : <Plus/>}
+                    </button>
+                </div>
+            </div>
+
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+                {products.map(p => (
+                    <div key={p.id} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-900/30 rounded-xl border dark:border-gray-700">
+                        <div>
+                            <p className="font-bold dark:text-white">{p.name}</p>
+                            <p className="text-sm text-primary font-bold">{p.price} DH</p>
+                        </div>
+                        <button onClick={() => handleDelete(p.id)} className="text-red-500 p-2"><Trash size={16}/></button>
                     </div>
                 ))}
             </div>
@@ -471,12 +570,13 @@ const ProfileManager: React.FC<{ provider: AuthenticatedUser }> = ({ provider })
     );
 }
 
-const QRScannerComponent: React.FC<{ providerId: number }> = ({ providerId }) => {
+const QRScannerComponent: React.FC<{ providerId: number; onScanSuccess: () => void }> = ({ providerId, onScanSuccess }) => {
     const { t } = useLocalization();
     const [scannedData, setScannedData] = useState<ScannedAppointment | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [showScanner, setShowScanner] = useState(false);
     const [isVerifying, setIsVerifying] = useState(false);
+    const [confirmationMsg, setConfirmationMsg] = useState('');
     const videoRef = useRef<HTMLVideoElement>(null);
     const requestRef = useRef<number>();
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -554,7 +654,7 @@ const QRScannerComponent: React.FC<{ providerId: number }> = ({ providerId }) =>
         try {
             const data = JSON.parse(result.text);
             if (!data.appointmentId) throw new Error('Invalid');
-            const { data: appt } = await supabase.from('appointments').select(`id, clients (full_name, phone), providers (name, service_type)`).eq('id', data.appointmentId).single();
+            const { data: appt } = await supabase.from('appointments').select(`id, clients (full_name, phone), providers (name, service_type, provider_services(name, price, discount_price))`).eq('id', data.appointmentId).single();
             if (!appt) throw new Error('NotFound');
             
             setScannedData({
@@ -564,22 +664,52 @@ const QRScannerComponent: React.FC<{ providerId: number }> = ({ providerId }) =>
                 service: appt.providers.service_type,
                 provider: appt.providers.name,
                 location: "",
-                discount: "19%",
-            });
-
-            // Archive Scan
-            await supabase.from('scan_history').insert({
-                provider_id: providerId,
-                client_name: appt.clients.full_name,
-                client_phone: appt.clients.phone
+                discount: "View Details",
             });
 
         } catch (e) { setError(t('invalidQR')); }
         finally { setIsVerifying(false); }
     };
 
+    const confirmScan = async () => {
+        if(!scannedData) return;
+        setIsVerifying(true);
+        try {
+            // 1. Archive Scan
+            await supabase.from('scan_history').insert({
+                provider_id: providerId,
+                client_name: scannedData.name,
+                client_phone: scannedData.phone
+            });
+
+            // 2. Update Notification to Green (Completed)
+            // Robust update: Search for pending notification by booking_id
+            const { error: updateError } = await supabase.from('provider_notifications')
+                .update({ status: 'completed', is_read: true })
+                .eq('booking_id', scannedData.appointmentId);
+
+            if (updateError) console.warn("Notification update warning:", updateError);
+
+            setConfirmationMsg(t('verificationSuccess'));
+            setScannedData(null);
+            onScanSuccess(); // Trigger refresh
+            setTimeout(() => setConfirmationMsg(''), 3000);
+        } catch(e) {
+            setError(t('errorMessage'));
+        } finally {
+            setIsVerifying(false);
+        }
+    }
+
     return (
-        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 text-center mb-6">
+        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 text-center mb-6 relative">
+             {confirmationMsg && (
+                 <div className="absolute top-0 left-0 w-full h-full bg-green-50 dark:bg-green-900/90 z-10 rounded-3xl flex items-center justify-center flex-col animate-fade-in">
+                     <CheckCircle size={48} className="text-green-500 mb-2"/>
+                     <h3 className="text-xl font-bold text-green-700 dark:text-white">{confirmationMsg}</h3>
+                 </div>
+             )}
+
              <h3 className="text-xl font-bold dark:text-white mb-4">{t('qrScannerTitle')}</h3>
              {!showScanner && !scannedData && (
                  <div className="space-y-3">
@@ -600,15 +730,36 @@ const QRScannerComponent: React.FC<{ providerId: number }> = ({ providerId }) =>
                  </div>
              )}
              {scannedData && (
-                 <div className="bg-green-50 p-4 rounded-xl mt-4 text-left dark:bg-green-900/20 dark:text-white">
-                     <div className="flex items-center gap-2 mb-2 text-green-600 font-bold"><CheckCircle/> {t('verificationSuccess')}</div>
-                     <p><b>{t('clientName')}:</b> {scannedData.name}</p>
-                     <p><b>{t('discount')}:</b> {scannedData.discount}</p>
-                     <button onClick={() => setScannedData(null)} className="mt-4 w-full bg-green-600 text-white py-2 rounded-lg">{t('scanAnother')}</button>
+                 <div className="bg-white border-2 border-blue-500 p-4 rounded-xl mt-4 text-left dark:bg-gray-700 dark:text-white dark:border-blue-400 shadow-lg transform scale-105 transition-transform">
+                     <div className="text-center mb-4">
+                         <h4 className="text-lg font-bold text-blue-600 dark:text-blue-400">{t('clientHasArrived')}</h4>
+                         <div className="text-sm text-gray-500">{new Date().toLocaleDateString()}</div>
+                     </div>
+                     
+                     <div className="space-y-2 mb-4">
+                         <div className="flex justify-between border-b border-gray-100 dark:border-gray-600 pb-2">
+                             <span className="text-gray-500 dark:text-gray-300">{t('clientName')}:</span>
+                             <span className="font-bold">{scannedData.name}</span>
+                         </div>
+                         <div className="flex justify-between border-b border-gray-100 dark:border-gray-600 pb-2">
+                             <span className="text-gray-500 dark:text-gray-300">{t('service')}:</span>
+                             <span className="font-bold">{scannedData.service}</span>
+                         </div>
+                         <div className="flex justify-between border-b border-gray-100 dark:border-gray-600 pb-2">
+                             <span className="text-gray-500 dark:text-gray-300">{t('price')}:</span>
+                             <span className="font-bold text-green-600">Check Services</span>
+                         </div>
+                     </div>
+
+                     <div className="flex gap-2">
+                         <button onClick={() => setScannedData(null)} className="flex-1 bg-gray-200 text-gray-800 py-3 rounded-xl font-bold">{t('close')}</button>
+                         <button onClick={confirmScan} disabled={isVerifying} className="flex-1 bg-green-500 text-white py-3 rounded-xl font-bold hover:bg-green-600 flex justify-center items-center">
+                             {isVerifying ? <Loader2 className="animate-spin"/> : t('markAsCompleted')}
+                         </button>
+                     </div>
                  </div>
              )}
              {error && <div className="text-red-500 mt-4 font-bold">{error} <button onClick={() => setError(null)} className="underline ml-2">{t('tryAgain')}</button></div>}
-             {isVerifying && <Loader2 className="animate-spin mx-auto mt-4 text-primary"/>}
         </div>
     );
 };
@@ -621,7 +772,10 @@ interface ProviderPortalProps {
 
 const ProviderPortal: React.FC<ProviderPortalProps> = ({ provider, onLogout }) => {
     const { t } = useLocalization();
+    const [refreshNotifs, setRefreshNotifs] = useState(0);
     const isValid = provider.isActive && provider.subscriptionEndDate && new Date(provider.subscriptionEndDate) > new Date();
+    // Admin Check: Strict Phone Match
+    const isAdmin = provider.phone === '0617774846';
 
     return (
         <div className="pb-20">
@@ -639,12 +793,13 @@ const ProviderPortal: React.FC<ProviderPortalProps> = ({ provider, onLogout }) =
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                      <div className="space-y-6">
                          <StatsComponent providerId={provider.id} />
-                         <ProviderNotifications providerId={provider.id} />
-                         <QRScannerComponent providerId={provider.id} />
+                         <ProviderNotifications providerId={provider.id} refreshTrigger={refreshNotifs} />
+                         <QRScannerComponent providerId={provider.id} onScanSuccess={() => setRefreshNotifs(prev => prev + 1)} />
                          <ProfileManager provider={provider} />
                      </div>
                      <div className="space-y-6">
                          <AnnouncementManager providerId={provider.id} />
+                         {isAdmin && <StoreManager provider={provider} />}
                          <ClientList providerId={provider.id} />
                          <ScanHistory providerId={provider.id} />
                      </div>

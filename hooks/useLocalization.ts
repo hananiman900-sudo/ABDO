@@ -19,6 +19,11 @@ export const translations: Translations = {
     en: 'Search doctor, service, whitening...',
     fr: 'Chercher médecin, service, blanchiment...',
   },
+  searchProductPlaceholder: {
+    ar: 'بحث عن منتج (جلابة، قفطان...)',
+    en: 'Search product...',
+    fr: 'Rechercher un produit...',
+  },
   search: {
     ar: 'بحث',
     en: 'Search',
@@ -104,6 +109,21 @@ export const translations: Translations = {
     en: 'V10 Update: Provider Notifications System',
     fr: 'Mise à jour V10 : Système de notifications des fournisseurs',
   },
+  v11UpdateTitle: {
+    ar: 'تحديث V11: المتجر الإلكتروني وتحسين الإشعارات',
+    en: 'V11 Update: E-commerce & Notification Status',
+    fr: 'Mise à jour V11 : E-commerce et statut des notifications',
+  },
+  v12UpdateTitle: {
+    ar: 'تحديث V12: إدارة المتجر المتقدمة (Admin Store)',
+    en: 'V12 Update: Advanced Store Management',
+    fr: 'Mise à jour V12 : Gestion avancée de la boutique',
+  },
+  v13UpdateTitle: {
+    ar: 'تحديث V13: نظام الإعلانات المرئية وصور المنتجات',
+    en: 'V13 Update: Visual Ads & Product Images',
+    fr: 'Mise à jour V13 : Publicités visuelles et images produits',
+  },
   locationError: {
     ar: 'فشل تحديد الموقع.',
     en: 'Failed to get location.',
@@ -130,9 +150,9 @@ export const translations: Translations = {
     fr: 'Téléchargement de l\'image...',
   },
   uploadError: {
-    ar: 'فشل رفع الصورة. تأكد بلي شغلتي كود التحديث V9 فإعدادات قاعدة البيانات.',
-    en: 'Upload failed. Ensure you ran V9 Update script in Database Setup.',
-    fr: 'Échec du téléchargement. Assurez-vous d\'avoir exécuté le script de mise à jour V9.',
+    ar: 'فشل رفع الصورة. تأكد بلي شغلتي كود التحديث V13 فإعدادات قاعدة البيانات.',
+    en: 'Upload failed. Ensure you ran V13 Update script in Database Setup.',
+    fr: 'Échec du téléchargement. Assurez-vous d\'avoir exécuté le script de mise à jour V13.',
   },
   locationSet: {
     ar: 'تم تحديد الموقع بنجاح!',
@@ -923,7 +943,202 @@ export const translations: Translations = {
     ar: 'تيليشارجي صورة QR',
     en: 'Upload QR Image',
     fr: 'Télécharger l\'image QR',
-  }
+  },
+  shop: {
+    ar: 'المتجر',
+    en: 'Shop',
+    fr: 'Boutique',
+  },
+  products: {
+    ar: 'المنتجات',
+    en: 'Products',
+    fr: 'Produits',
+  },
+  cart: {
+    ar: 'سلة التسوق',
+    en: 'Cart',
+    fr: 'Panier',
+  },
+  addToCart: {
+    ar: 'أضف للسلة',
+    en: 'Add to Cart',
+    fr: 'Ajouter au panier',
+  },
+  checkout: {
+    ar: 'طلب الآن (الدفع عند الاستلام)',
+    en: 'Checkout (Cash on Delivery)',
+    fr: 'Commander (Paiement à la livraison)',
+  },
+  orderPlaced: {
+    ar: 'تم الطلب بنجاح!',
+    en: 'Order Placed Successfully!',
+    fr: 'Commande passée avec succès !',
+  },
+  myOrders: {
+    ar: 'طلباتي',
+    en: 'My Orders',
+    fr: 'Mes commandes',
+  },
+  storeManager: {
+    ar: 'مدير المتجر',
+    en: 'Store Manager',
+    fr: 'Gestionnaire de boutique',
+  },
+  addProduct: {
+    ar: 'إضافة منتج',
+    en: 'Add Product',
+    fr: 'Ajouter un produit',
+  },
+  editProduct: {
+    ar: 'تعديل المنتج',
+    en: 'Edit Product',
+    fr: 'Modifier le produit',
+  },
+  productName: {
+    ar: 'إسم المنتج',
+    en: 'Product Name',
+    fr: 'Nom du produit',
+  },
+  productDescription: {
+    ar: 'وصف المنتج',
+    en: 'Product Description',
+    fr: 'Description du produit',
+  },
+  category: {
+    ar: 'التصنيف',
+    en: 'Category',
+    fr: 'Catégorie',
+  },
+  notificationDetails: {
+    ar: 'تفاصيل الموعد',
+    en: 'Appointment Details',
+    fr: 'Détails du rendez-vous',
+  },
+  markAsCompleted: {
+    ar: 'تحديد كمكتمل',
+    en: 'Mark as Completed',
+    fr: 'Marquer comme terminé',
+  },
+  clientHasArrived: {
+    ar: 'الكليان وصل',
+    en: 'Client Arrived',
+    fr: 'Client arrivé',
+  },
+  clientPending: {
+    ar: 'في الانتظار',
+    en: 'Pending',
+    fr: 'En attente',
+  },
+  sizes: {
+    ar: 'المقاسات (مفروقة بفاصلة)',
+    en: 'Sizes (Comma separated)',
+    fr: 'Tailles (séparées par des virgules)',
+  },
+  availableSizes: {
+    ar: 'المقاسات المتوفرة',
+    en: 'Available Sizes',
+    fr: 'Tailles disponibles',
+  },
+  selectSize: {
+    ar: 'ختار المقاس',
+    en: 'Select Size',
+    fr: 'Sélectionner une taille',
+  },
+  productImage: {
+    ar: 'رابط الصورة',
+    en: 'Image URL',
+    fr: 'URL de l\'image',
+  },
+  customerNotes: {
+    ar: 'ملاحظات الكليان',
+    en: 'Customer Notes',
+    fr: 'Notes du client',
+  },
+  orderStatus: {
+    ar: 'حالة الطلب',
+    en: 'Order Status',
+    fr: 'Statut de la commande',
+  },
+  customerInfo: {
+    ar: 'معلومات الكليان',
+    en: 'Customer Info',
+    fr: 'Infos client',
+  },
+  markDelivered: {
+    ar: 'تحديد كـ تم التسليم',
+    en: 'Mark as Delivered',
+    fr: 'Marquer comme livré',
+  },
+  orders: {
+    ar: 'الطلبات',
+    en: 'Orders',
+    fr: 'Commandes',
+  },
+  catalog: {
+    ar: 'الكاتالوج',
+    en: 'Catalog',
+    fr: 'Catalogue',
+  },
+  addNote: {
+    ar: 'إضافة ملاحظة (اختياري)',
+    en: 'Add Note (Optional)',
+    fr: 'Ajouter une note (Optionnel)',
+  },
+  connectionError: {
+    ar: 'مشكل فالإتصال بالخادم. تأكد من الأنترنت ولا واش السيرفر خدام.',
+    en: 'Connection error. Check your internet or server status.',
+    fr: 'Erreur de connexion. Vérifiez votre internet ou le statut du serveur.',
+  },
+  createAdminUser: {
+    ar: 'إنشاء حساب المدير (Admin)',
+    en: 'Create Admin Account',
+    fr: 'Créer un compte Admin',
+  },
+  freeDelivery: {
+    ar: 'توصيل بالمجان - الخلاص عند الاستلام',
+    en: 'Free Delivery - Cash on Delivery',
+    fr: 'Livraison gratuite - Paiement à la livraison',
+  },
+  contactWithin24h: {
+    ar: 'غادي نتاصلو بيك ف أقل من 24 ساعة لتأكيد الطلب.',
+    en: 'We will contact you within 24 hours to confirm.',
+    fr: 'Nous vous contacterons dans les 24 heures pour confirmer.',
+  },
+  backToStore: {
+    ar: 'رجوع للمتجر',
+    en: 'Back to Store',
+    fr: 'Retour au magasin',
+  },
+  trackOrder: {
+    ar: 'تتبع الطلب',
+    en: 'Track Order',
+    fr: 'Suivre la commande',
+  },
+  helloUser: {
+    ar: 'مرحبا، {name}',
+    en: 'Hello, {name}',
+    fr: 'Bonjour, {name}',
+  },
+  systemAds: {
+    ar: 'إعلانات النظام',
+    en: 'System Ads',
+    fr: 'Annonces Système',
+  },
+  addSystemAd: {
+    ar: 'إضافة إعلان مرئي (شات بوت)',
+    en: 'Add Visual Ad (Chatbot)',
+    fr: 'Ajouter une publicité visuelle (Chatbot)',
+  },
+  adTitle: {
+    ar: 'عنوان الإعلان',
+    en: 'Ad Title',
+    fr: 'Titre de l\'annonce',
+  },
+  uploadImageFile: {
+    ar: 'رفع ملف صورة',
+    en: 'Upload Image File',
+    fr: 'Télécharger un fichier image',
+  },
 };
 
 interface LocalizationContextType {
