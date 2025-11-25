@@ -7,7 +7,7 @@ import AppointmentsDrawer from './components/AppointmentsDrawer';
 import DatabaseSetup from './components/DatabaseSetup';
 import Store from './components/Store'; // Import Store
 import { LocalizationProvider, useLocalization, translations } from './hooks/useLocalization';
-import { Globe, User as UserIcon, CheckSquare, Sun, Moon, LogIn, LogOut, X, CalendarDays, Database, AlertTriangle, CheckCircle2, Menu, Users, Bell, Phone, MapPin, Search, Heart, Briefcase, Star, MessageCircle, ShoppingBag } from 'lucide-react';
+import { Globe, User as UserIcon, CheckSquare, Sun, Moon, LogIn, LogOut, X, CalendarDays, Database, AlertTriangle, CheckCircle2, Menu, Users, Bell, Phone, MapPin, Search, Heart, Briefcase, Star, MessageCircle, ShoppingBag, Eye, EyeOff } from 'lucide-react';
 import { supabase } from './services/supabaseClient';
 
 // ... ProviderProfileModal code (no changes) ...
@@ -287,12 +287,37 @@ const RegistrationSuccessModal: React.FC<{ onClose: () => void }> = ({ onClose }
     );
 };
 
-const InputField = ({ label, value, onChange, type = "text", placeholder = "" }: any) => (
-    <div className="mb-4">
-        <label className="block mb-2 text-sm font-semibold text-gray-700 dark:text-gray-300">{label}</label>
-        <input type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 text-gray-900 rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary dark:bg-gray-700/50 dark:border-gray-600 dark:text-white transition-all outline-none" required />
-    </div>
-);
+// IMPROVED INPUT FIELD WITH EYE ICON
+const InputField = ({ label, value, onChange, type = "text", placeholder = "" }: any) => {
+    const [showPassword, setShowPassword] = useState(false);
+    const isPassword = type === "password";
+    const inputType = isPassword ? (showPassword ? "text" : "password") : type;
+
+    return (
+        <div className="mb-4">
+            <label className="block mb-2 text-sm font-semibold text-gray-700 dark:text-gray-300">{label}</label>
+            <div className="relative">
+                <input 
+                    type={inputType} 
+                    value={value} 
+                    onChange={(e) => onChange(e.target.value)} 
+                    placeholder={placeholder} 
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 text-gray-900 rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary dark:bg-gray-700/50 dark:border-gray-600 dark:text-white transition-all outline-none" 
+                    required 
+                />
+                {isPassword && (
+                    <button 
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-3 text-gray-400 hover:text-primary transition-colors"
+                    >
+                        {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+};
 
 const AuthDrawer: React.FC<{ isOpen: boolean; onClose: () => void; onAuthSuccess: (user: AuthenticatedUser) => void; onDatabaseError: () => void; }> = ({ isOpen, onClose, onAuthSuccess, onDatabaseError }) => {
   const { t } = useLocalization();

@@ -147,7 +147,7 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser }) => {
 
         setIsLoading(true);
         try {
-            await supabase.from('orders').insert({
+            const { error } = await supabase.from('orders').insert({
                 user_id: currentUser.id,
                 user_type: currentUser.accountType,
                 total_amount: cartTotal,
@@ -158,12 +158,15 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser }) => {
                     phone: currentUser.phone || 'N/A'
                 }
             });
+            
+            if (error) throw error;
+
             setOrderPlaced(true);
             setCart([]);
-            fetchMyOrders();
-        } catch (e) {
+            await fetchMyOrders(); // Wait for orders to refresh
+        } catch (e: any) {
             console.error(e);
-            alert(t('errorMessage'));
+            alert(t('errorMessage') + (e.message ? `: ${e.message}` : ''));
         } finally {
             setIsLoading(false);
         }
@@ -174,29 +177,37 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser }) => {
     const handleSaveProduct = async () => {
         if(!newProduct.name || !newProduct.price) return;
         setIsLoading(true);
-        const sizeArray = newProduct.sizes.split(',').map(s => s.trim()).filter(s => s.length > 0);
-        
-        const productData = {
-            name: newProduct.name,
-            description: newProduct.description,
-            price: parseFloat(newProduct.price),
-            category: newProduct.category,
-            image_url: newProduct.image_url,
-            sizes: sizeArray
-        };
+        try {
+            const sizeArray = newProduct.sizes.split(',').map(s => s.trim()).filter(s => s.length > 0);
+            
+            const productData = {
+                name: newProduct.name,
+                description: newProduct.description,
+                price: parseFloat(newProduct.price),
+                category: newProduct.category,
+                image_url: newProduct.image_url,
+                sizes: sizeArray
+            };
 
-        if (isEditingProduct && newProduct.id) {
-            await supabase.from('products').update(productData).eq('id', newProduct.id);
-            alert(t('savedSuccessfully'));
-        } else {
-            await supabase.from('products').insert(productData);
-            alert(t('savedSuccessfully'));
+            if (isEditingProduct && newProduct.id) {
+                const { error } = await supabase.from('products').update(productData).eq('id', newProduct.id);
+                if (error) throw error;
+                alert(t('savedSuccessfully'));
+            } else {
+                const { error } = await supabase.from('products').insert(productData);
+                if (error) throw error;
+                alert(t('savedSuccessfully'));
+            }
+
+            setNewProduct({ id: 0, name: '', description: '', price: '', category: 'General', image_url: '', sizes: '' });
+            setIsEditingProduct(false);
+            await fetchProducts(); // Refresh list immediately
+        } catch (e: any) {
+            console.error(e);
+            alert("Error saving product. Please ensure V14 update is applied in DB Setup.");
+        } finally {
+            setIsLoading(false);
         }
-
-        setNewProduct({ id: 0, name: '', description: '', price: '', category: 'General', image_url: '', sizes: '' });
-        setIsEditingProduct(false);
-        setIsLoading(false);
-        fetchProducts();
     };
 
     const handleEditProductClick = (product: Product) => {
@@ -217,8 +228,12 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser }) => {
 
     const handleDeleteProduct = async (id: number) => {
         if(confirm(t('delete') + '?')) {
-            await supabase.from('products').delete().eq('id', id);
-            fetchProducts();
+            const { error } = await supabase.from('products').delete().eq('id', id);
+            if (error) {
+                alert("Error deleting product. Check permissions (V14 Update).");
+            } else {
+                fetchProducts();
+            }
         }
     }
 

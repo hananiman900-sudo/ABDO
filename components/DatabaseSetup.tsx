@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { useLocalization } from '../hooks/useLocalization';
-import { X, Copy, Database, Image as ImageIcon, Users, AlertTriangle, ShieldAlert, CheckCircle, Unlock, Bell, ShoppingBag, ListPlus, UserCheck, Megaphone } from 'lucide-react';
+import { X, Copy, Database, Image as ImageIcon, Users, AlertTriangle, ShieldAlert, CheckCircle, Unlock, Bell, ShoppingBag, ListPlus, UserCheck, Megaphone, ShieldCheck } from 'lucide-react';
 
 const CodeBlock: React.FC<{ title: string; code: string }> = ({ title, code }) => {
   const { t } = useLocalization();
@@ -211,6 +211,18 @@ CREATE POLICY "Public Access AdImages" ON storage.objects FOR ALL USING (bucket_
 
 NOTIFY pgrst, 'reload config';`;
 
+const v14UpdateSQL = `-- Update V14: FIX PERMISSIONS (Edit Products & Save Orders)
+
+-- 1. Reset permissions for Products to allow Admin edits/deletes
+DROP POLICY IF EXISTS "Public Access Products" ON public.products;
+CREATE POLICY "Public Access Products" ON public.products FOR ALL USING (true) WITH CHECK (true);
+
+-- 2. Reset permissions for Orders to allow Users to create orders
+DROP POLICY IF EXISTS "Public Access Orders" ON public.orders;
+CREATE POLICY "Public Access Orders" ON public.orders FOR ALL USING (true) WITH CHECK (true);
+
+NOTIFY pgrst, 'reload config';`;
+
 const createAdminSQL = `-- Create Admin User
 INSERT INTO public.providers (
   name, service_type, location, username, password, phone, is_active, subscription_end_date
@@ -270,6 +282,15 @@ INSERT INTO storage.buckets (id, name, public) VALUES ('announcement-images', 'a
                 <UserCheck /> {t('createAdminUser')}
              </h3>
              <CodeBlock title={t('createAdminUser')} code={createAdminSQL.trim()} />
+          </div>
+
+          {/* V14 Update Block (Fix Permissions) */}
+          <div className="mb-8 p-4 border-l-4 border-red-500 bg-red-50 dark:bg-red-900/20 rounded-r-lg shadow-lg animate-fade-in">
+             <h3 className="text-xl font-bold text-red-600 dark:text-red-400 flex items-center gap-2 mb-4">
+                <ShieldCheck /> V14 Update: Fix Edit/Delete & Orders
+             </h3>
+             <p className="mb-2 text-sm text-gray-600 dark:text-gray-400">Run this to allow Admin to edit products and Users to save orders.</p>
+             <CodeBlock title="V14 Permissions Fix" code={v14UpdateSQL.trim()} />
           </div>
           
           {/* V13 Update Block */}
