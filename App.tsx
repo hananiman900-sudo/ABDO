@@ -7,7 +7,7 @@ import AppointmentsDrawer from './components/AppointmentsDrawer';
 import DatabaseSetup from './components/DatabaseSetup';
 import Store from './components/Store'; // Import Store
 import { LocalizationProvider, useLocalization, translations } from './hooks/useLocalization';
-import { Globe, User as UserIcon, CheckSquare, Sun, Moon, LogIn, LogOut, X, CalendarDays, Database, AlertTriangle, CheckCircle2, Menu, Users, Bell, Phone, MapPin, Search, Heart, Briefcase, Star, MessageCircle, ShoppingBag, Eye, EyeOff } from 'lucide-react';
+import { Globe, User as UserIcon, CheckSquare, Sun, Moon, LogIn, LogOut, X, CalendarDays, Database, AlertTriangle, CheckCircle2, Menu, Users, Bell, Phone, MapPin, Search, Heart, Briefcase, Star, MessageCircle, ShoppingBag, Eye, EyeOff, Megaphone, Headset } from 'lucide-react';
 import { supabase } from './services/supabaseClient';
 
 // ... ProviderProfileModal code (no changes) ...
@@ -202,23 +202,32 @@ const NotificationCenter: React.FC<{ isOpen: boolean; onClose: () => void; curre
     const [notifications, setNotifications] = useState<any[]>([]);
 
     useEffect(() => {
-        if(isOpen && currentUser) {
+        if(isOpen) {
             const fetchNotifs = async () => {
-                const { data: follows } = await supabase.from('follows').select('provider_id').eq('client_id', currentUser.id);
-                const providerIds = follows?.map(f => f.provider_id) || [];
+                // Fetch System Ads
+                const { data: systemAds } = await supabase.from('system_announcements').select('*').eq('is_active', true).order('created_at', { ascending: false });
+                
                 let announcements: any[] = [];
-                if(providerIds.length > 0) {
-                     const { data } = await supabase.from('announcements').select('*, providers(name)').in('provider_id', providerIds).order('created_at', {ascending: false}).limit(10);
-                     announcements = data || [];
+                let appts: any[] = [];
+
+                if (currentUser) {
+                    const { data: follows } = await supabase.from('follows').select('provider_id').eq('client_id', currentUser.id);
+                    const providerIds = follows?.map(f => f.provider_id) || [];
+                    if(providerIds.length > 0) {
+                         const { data } = await supabase.from('announcements').select('*, providers(name)').in('provider_id', providerIds).order('created_at', {ascending: false}).limit(10);
+                         announcements = data || [];
+                    }
+                    
+                    const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+                    const tomorrowStr = tomorrow.toISOString().split('T')[0];
+                    const { data: userAppts } = await supabase.from('follow_ups').select('*, providers(name)').eq('client_id', currentUser.id).gte('next_appointment_date', tomorrowStr).lt('next_appointment_date', new Date(tomorrow.getTime() + 86400000).toISOString());
+                    appts = userAppts || [];
                 }
                 
-                const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
-                const tomorrowStr = tomorrow.toISOString().split('T')[0];
-                const { data: appts } = await supabase.from('follow_ups').select('*, providers(name)').eq('client_id', currentUser.id).gte('next_appointment_date', tomorrowStr).lt('next_appointment_date', new Date(tomorrow.getTime() + 86400000).toISOString());
-                
                 const merged = [
+                    ...(systemAds || []).map(a => ({ type: 'system_ad', ...a })),
                     ...announcements.map(a => ({ type: 'ad', ...a })),
-                    ...(appts || []).map(a => ({ type: 'reminder', ...a }))
+                    ...appts.map(a => ({ type: 'reminder', ...a }))
                 ];
                 setNotifications(merged);
             };
@@ -236,13 +245,18 @@ const NotificationCenter: React.FC<{ isOpen: boolean; onClose: () => void; curre
                  </div>
                  <div className="space-y-4">
                      {notifications.map((n, i) => (
-                         <div key={i} className={`p-4 rounded-xl border-l-4 ${n.type === 'ad' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20'}`}>
+                         <div key={i} className={`p-4 rounded-xl border-l-4 ${n.type === 'system_ad' ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20' : n.type === 'ad' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20'}`}>
                              <div className="flex items-center gap-2 mb-1">
-                                 {n.type === 'ad' ? <Bell size={14} className="text-blue-500"/> : <CalendarDays size={14} className="text-yellow-500"/>}
-                                 <span className="font-bold text-sm dark:text-white">{n.providers.name}</span>
+                                 {n.type === 'system_ad' ? <Megaphone size={14} className="text-purple-500"/> : n.type === 'ad' ? <Bell size={14} className="text-blue-500"/> : <CalendarDays size={14} className="text-yellow-500"/>}
+                                 <span className="font-bold text-sm dark:text-white">
+                                    {n.type === 'system_ad' ? 'System Announcement' : n.providers?.name}
+                                 </span>
                              </div>
+                             {n.type === 'system_ad' && n.image_url && (
+                                <img src={n.image_url} className="w-full h-32 object-cover rounded-lg mb-2" alt="ad"/>
+                             )}
                              <p className="text-sm text-gray-700 dark:text-gray-300">
-                                 {n.type === 'ad' ? n.message : t('appointmentReminder', {provider: n.providers.name})}
+                                 {n.type === 'system_ad' ? n.message : n.type === 'ad' ? n.message : t('appointmentReminder', {provider: n.providers.name})}
                              </p>
                          </div>
                      ))}
@@ -287,7 +301,7 @@ const RegistrationSuccessModal: React.FC<{ onClose: () => void }> = ({ onClose }
     );
 };
 
-// IMPROVED INPUT FIELD WITH EYE ICON
+// IMPROVED INPUT FIELD WITH EYE ICON ON RIGHT
 const InputField = ({ label, value, onChange, type = "text", placeholder = "" }: any) => {
     const [showPassword, setShowPassword] = useState(false);
     const isPassword = type === "password";
@@ -302,7 +316,7 @@ const InputField = ({ label, value, onChange, type = "text", placeholder = "" }:
                     value={value} 
                     onChange={(e) => onChange(e.target.value)} 
                     placeholder={placeholder} 
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 text-gray-900 rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary dark:bg-gray-700/50 dark:border-gray-600 dark:text-white transition-all outline-none" 
+                    className={`w-full py-3 bg-gray-50 border border-gray-200 text-gray-900 rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary dark:bg-gray-700/50 dark:border-gray-600 dark:text-white transition-all outline-none ${isPassword ? 'pr-10 pl-4' : 'px-4'}`}
                     required 
                 />
                 {isPassword && (
@@ -472,7 +486,25 @@ const App: React.FC = () => {
     checkUser();
   }, []);
 
-  useEffect(() => { if(currentUser?.accountType === AccountType.CLIENT) { const fetchCount = async () => { const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1); const tomorrowStr = tomorrow.toISOString().split('T')[0]; const { count: apptCount } = await supabase.from('follow_ups').select('id', {count: 'exact'}).eq('client_id', currentUser.id).gte('next_appointment_date', tomorrowStr).lt('next_appointment_date', new Date(tomorrow.getTime() + 86400000).toISOString()); const randomAnnouncements = Math.floor(Math.random() * 2); setNotificationCount((apptCount || 0) + randomAnnouncements); }; fetchCount(); } }, [currentUser]);
+  useEffect(() => { 
+    const fetchCount = async () => {
+      let count = 0;
+      
+      // System Ads
+      const { count: sysCount } = await supabase.from('system_announcements').select('id', { count: 'exact' }).eq('is_active', true);
+      count += (sysCount || 0);
+
+      if(currentUser?.accountType === AccountType.CLIENT) { 
+        const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1); 
+        const tomorrowStr = tomorrow.toISOString().split('T')[0]; 
+        const { count: apptCount } = await supabase.from('follow_ups').select('id', {count: 'exact'}).eq('client_id', currentUser.id).gte('next_appointment_date', tomorrowStr).lt('next_appointment_date', new Date(tomorrow.getTime() + 86400000).toISOString()); 
+        count += (apptCount || 0);
+      }
+      setNotificationCount(count); 
+    }; 
+    fetchCount(); 
+  }, [currentUser]);
+
   useEffect(() => { document.documentElement.lang = language; document.documentElement.dir = language === Language.AR ? 'rtl' : 'ltr'; document.body.className = language === Language.AR ? 'font-arabic' : 'font-sans'; }, [language]);
   useEffect(() => { if (theme === 'dark') { document.documentElement.classList.add('dark'); localStorage.setItem('theme', 'dark'); } else { document.documentElement.classList.remove('dark'); localStorage.setItem('theme', 'light'); } }, [theme]);
   const toggleTheme = () => setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
@@ -488,8 +520,8 @@ const App: React.FC = () => {
     }
 
     return (
-      <header className="fixed top-0 left-0 right-0 bg-surface/80 dark:bg-dark/80 backdrop-blur-md border-b border-gray-200/50 dark:border-gray-800/50 z-40 transition-all duration-300">
-        <div className="max-w-6xl mx-auto px-4 h-16 flex justify-between items-center">
+      <header className="fixed top-0 left-0 right-0 bg-surface/90 dark:bg-dark/90 backdrop-blur-md border-b border-gray-200/50 dark:border-gray-800/50 z-40 transition-all duration-300">
+        <div className="w-full md:max-w-6xl mx-auto px-4 h-16 flex justify-between items-center">
             <div className="flex items-center gap-2.5">
                 <div className="bg-gradient-to-br from-primary to-secondary p-1.5 rounded-lg shadow-lg shadow-primary/20">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
@@ -508,96 +540,90 @@ const App: React.FC = () => {
                 <button onClick={() => setShowStore(true)} className="p-2 text-gray-600 hover:text-primary hover:bg-gray-100 rounded-full transition-colors relative" title={t('shop')}>
                     <ShoppingBag size={20} />
                 </button>
+                <button onClick={() => setShowProviderDirectory(true)} className="p-2 text-gray-600 hover:text-primary hover:bg-gray-100 rounded-full transition-colors relative" title={t('providerDirectory')}><Users size={20} /></button>
+                
+                {/* NOTIFICATIONS AND DB SETUP */}
+                <button onClick={() => setShowNotifications(true)} className="p-2 text-gray-600 hover:text-primary hover:bg-gray-100 rounded-full transition-colors relative" title={t('notifications')}><Bell size={20} />{notificationCount > 0 && <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[9px] rounded-full flex items-center justify-center font-bold">{notificationCount}</span>}</button>
+                
+                {/* SUPPORT ICON */}
+                <a href="https://wa.me/212617774846" target="_blank" rel="noreferrer" className="p-2 text-gray-600 hover:text-green-500 hover:bg-green-50 rounded-full transition-colors" title={t('techSupport')}><Headset size={20} /></a>
+
+                <button onClick={() => setShowDbSetup(true)} className="p-2 text-gray-600 hover:text-primary hover:bg-gray-100 rounded-full transition-colors" title={t('databaseSetupTitle')}><Database size={20} /></button>
 
                 {currentUser?.accountType === AccountType.CLIENT && (
-                    <>
-                        <button onClick={() => setShowProviderDirectory(true)} className="p-2 text-gray-600 hover:text-primary hover:bg-gray-100 rounded-full transition-colors relative" title={t('providerDirectory')}><Users size={20} /></button>
-                        <button onClick={() => setShowNotifications(true)} className="p-2 text-gray-600 hover:text-primary hover:bg-gray-100 rounded-full transition-colors relative" title={t('notifications')}><Bell size={20} />{notificationCount > 0 && <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[9px] rounded-full flex items-center justify-center font-bold">{notificationCount}</span>}</button>
-                        <button onClick={() => setShowAppointmentsDrawer(true)} className="p-2 text-gray-600 hover:text-primary hover:bg-gray-100 rounded-full transition-colors" title={t('myAppointments')}><CalendarDays size={20} /></button>
-                    </>
+                    <button onClick={() => setShowAppointmentsDrawer(true)} className="p-2 text-gray-600 hover:text-primary hover:bg-gray-100 rounded-full transition-colors" title={t('myAppointments')}><CalendarDays size={20} /></button>
                 )}
-                <button onClick={() => setShowDbSetup(true)} className="p-2 text-gray-600 hover:text-primary hover:bg-gray-100 rounded-full transition-colors"><Database size={20} /></button>
+                
                 <button onClick={toggleTheme} className="p-2 text-gray-600 hover:text-primary hover:bg-gray-100 rounded-full transition-colors">{theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}</button>
                 <div className="relative group"><button className="flex items-center gap-1 p-2 text-gray-600 hover:text-primary hover:bg-gray-100 rounded-full transition-colors"><Globe size={20} /></button><div className="absolute right-0 top-full mt-2 w-32 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden hidden group-hover:block animate-fade-in">{[Language.AR, Language.EN, Language.FR].map(lang => (<button key={lang} onClick={() => setLanguage(lang)} className={`w-full text-left rtl:text-right px-4 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 ${language === lang ? 'text-primary font-bold' : 'text-gray-600 dark:text-gray-300'}`}>{lang === Language.AR ? 'العربية' : lang === Language.EN ? 'English' : 'Français'}</button>))}</div></div>
                 <button onClick={() => setView(view === UserView.CLIENT ? UserView.PROVIDER : UserView.CLIENT)} className="ml-2 flex items-center gap-2 px-4 py-2 bg-secondary/10 text-secondary hover:bg-secondary hover:text-white rounded-full transition-all font-medium text-sm">{view === UserView.CLIENT ? <CheckSquare size={16} /> : <UserIcon size={16} />}<span>{view === UserView.CLIENT ? t('providerView') : t('clientView')}</span></button>
                 {currentUser && ( <button onClick={handleLogout} className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors"><LogOut size={20} /></button> )}
             </div>
             <div className="flex md:hidden items-center gap-2">
-                {currentUser?.accountType === AccountType.CLIENT && ( <button onClick={() => setShowNotifications(true)} className="p-2 bg-gray-100 dark:bg-gray-800 rounded-full text-primary relative"><Bell size={20} />{notificationCount > 0 && <span className="absolute top-0 right-0 w-3 h-3 bg-red-500 rounded-full"></span>}</button> )}
+                <a href="https://wa.me/212617774846" target="_blank" rel="noreferrer" className="p-2 text-gray-600 dark:text-gray-300"><Headset size={20} /></a>
+                <button onClick={() => setShowDbSetup(true)} className="p-2 text-gray-600 dark:text-gray-300"><Database size={20} /></button>
+                <button onClick={() => setShowNotifications(true)} className="p-2 bg-gray-100 dark:bg-gray-800 rounded-full text-primary relative"><Bell size={20} />{notificationCount > 0 && <span className="absolute top-0 right-0 w-3 h-3 bg-red-500 rounded-full"></span>}</button>
                 <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="p-2 text-dark dark:text-light hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">{mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}</button>
             </div>
         </div>
         {mobileMenuOpen && (
-            <div className="md:hidden absolute top-16 left-0 w-full bg-surface dark:bg-surfaceDark border-b border-gray-200 dark:border-gray-800 shadow-2xl animate-slide-up z-50">
-                <div className="p-4 space-y-4">
-                    {currentUser ? (
-                        <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
-                             <div className="w-10 h-10 bg-primary text-white rounded-full flex items-center justify-center font-bold text-lg overflow-hidden">{currentUser.profile_image_url ? <img src={currentUser.profile_image_url} className="w-full h-full object-cover"/> : currentUser.name.charAt(0).toUpperCase()}</div>
-                            <div><div className="font-bold text-dark dark:text-light">{currentUser.name}</div><div className="text-xs text-gray-500">{currentUser.accountType}</div></div>{statusBadge}
-                        </div>
-                    ) : ( <button onClick={() => {setShowAuthDrawer(true); setMobileMenuOpen(false);}} className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-primary text-white rounded-xl font-bold shadow-lg shadow-primary/20"><LogIn size={18} /> {t('loginRegister')}</button> )}
-                    
-                    <button onClick={() => {setShowStore(true); setMobileMenuOpen(false);}} className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-xl text-sm text-gray-600 dark:text-gray-300">
-                        <ShoppingBag size={18}/> {t('shop')}
-                    </button>
-
-                    {currentUser?.accountType === AccountType.CLIENT && (
-                        <>
-                        <button onClick={() => {setShowProviderDirectory(true); setMobileMenuOpen(false);}} className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-xl text-sm text-gray-600 dark:text-gray-300"><Users size={18}/> {t('providerDirectory')}</button>
-                        <button onClick={() => {setShowAppointmentsDrawer(true); setMobileMenuOpen(false);}} className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-xl text-sm text-gray-600 dark:text-gray-300"><CalendarDays size={18}/> {t('myAppointments')}</button>
-                        </>
-                    )}
-                    <div className="grid grid-cols-2 gap-3">
-                         <button onClick={() => {setView(view === UserView.CLIENT ? UserView.PROVIDER : UserView.CLIENT); setMobileMenuOpen(false);}} className="flex items-center justify-center gap-2 p-3 bg-gray-100 dark:bg-gray-800 rounded-xl font-medium text-sm text-dark dark:text-light">{view === UserView.CLIENT ? <CheckSquare size={18} className="text-secondary" /> : <UserIcon size={18} className="text-secondary" />}<span>{view === UserView.CLIENT ? t('providerView') : t('clientView')}</span></button>
-                        <button onClick={toggleTheme} className="flex items-center justify-center gap-2 p-3 bg-gray-100 dark:bg-gray-800 rounded-xl font-medium text-sm text-dark dark:text-light">{theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}<span>{theme === 'light' ? 'Dark Mode' : 'Light Mode'}</span></button>
-                    </div>
-                    <div className="flex items-center justify-between p-3 border border-gray-100 dark:border-gray-700 rounded-xl"><span className="text-sm font-medium text-gray-600 dark:text-gray-300 flex items-center gap-2"><Globe size={18} /> Language</span><select value={language} onChange={(e) => setLanguage(e.target.value as Language)} className="bg-transparent font-bold text-primary outline-none"><option value={Language.AR}>العربية</option><option value={Language.EN}>English</option><option value={Language.FR}>Français</option></select></div>
-                    <button onClick={() => {setShowDbSetup(true); setMobileMenuOpen(false);}} className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-xl text-sm text-gray-600 dark:text-gray-300 transition-colors"><Database size={18} /> {t('databaseSetupTitle')}</button>
-                    {currentUser && ( <button onClick={handleLogout} className="w-full flex items-center gap-3 p-3 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-xl font-bold text-sm"><LogOut size={18} /> {t('logout')}</button> )}
-                </div>
+            <div className="md:hidden absolute top-16 left-0 w-full bg-surface dark:bg-surfaceDark border-b border-gray-200 dark:border-gray-700 shadow-xl p-4 z-40 animate-fade-in">
+                 <div className="flex flex-col gap-4">
+                     <button onClick={() => { setShowProviderDirectory(true); setMobileMenuOpen(false); }} className="text-left font-bold dark:text-white flex items-center gap-2"><Users size={20}/> {t('providerDirectory')}</button>
+                     <button onClick={() => { setShowStore(true); setMobileMenuOpen(false); }} className="text-left font-bold dark:text-white flex items-center gap-2"><ShoppingBag size={20}/> {t('shop')}</button>
+                     {currentUser?.accountType === AccountType.CLIENT && (
+                         <button onClick={() => { setShowAppointmentsDrawer(true); setMobileMenuOpen(false); }} className="text-left font-bold dark:text-white flex items-center gap-2"><CalendarDays size={20}/> {t('myAppointments')}</button>
+                     )}
+                     
+                     <div className="h-px bg-gray-200 dark:bg-gray-700 my-2"></div>
+                     
+                     <div className="flex justify-between items-center">
+                         <span className="text-sm text-gray-500">{t('language')}</span>
+                         <div className="flex gap-2">
+                             {[Language.AR, Language.EN, Language.FR].map(lang => (
+                                 <button key={lang} onClick={() => setLanguage(lang)} className={`px-2 py-1 text-xs rounded ${language === lang ? 'bg-primary text-white' : 'bg-gray-100 dark:bg-gray-700 dark:text-gray-300'}`}>{lang.toUpperCase()}</button>
+                             ))}
+                         </div>
+                     </div>
+                     <div className="flex justify-between items-center">
+                         <span className="text-sm text-gray-500">{t('theme')}</span>
+                         <button onClick={toggleTheme} className="p-2 bg-gray-100 dark:bg-gray-700 rounded-full">{theme === 'light' ? <Moon size={16}/> : <Sun size={16}/>}</button>
+                     </div>
+                     {currentUser && (
+                         <button onClick={handleLogout} className="w-full py-2 mt-2 bg-red-50 text-red-600 rounded-lg font-bold flex items-center justify-center gap-2"><LogOut size={18}/> {t('logout')}</button>
+                     )}
+                     {!currentUser && (
+                         <button onClick={() => { setShowAuthDrawer(true); setMobileMenuOpen(false); }} className="w-full py-2 mt-2 bg-primary text-white rounded-lg font-bold flex items-center justify-center gap-2"><LogIn size={18}/> {t('loginRegister')}</button>
+                     )}
+                 </div>
             </div>
         )}
       </header>
     );
   };
 
-  const ProviderLoginPrompt = () => {
-    const { t } = useLocalization();
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-6">
-        <div className="w-20 h-20 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-6"><UserIcon size={40} className="text-gray-400" /></div>
-        <h2 className="text-2xl font-bold text-dark dark:text-light mb-3">{t('providerLoginTitle')}</h2>
-        <p className="text-gray-500 dark:text-gray-400 mb-8 max-w-xs mx-auto">{t('pleaseLoginAsProvider')}</p>
-        <button onClick={() => setShowAuthDrawer(true)} className="flex items-center gap-2 px-8 py-3 bg-primary text-white rounded-xl hover:bg-primaryDark transition-all shadow-lg shadow-primary/20 font-bold"><LogIn size={20} />{t('loginRegister')}</button>
-      </div>
-    );
-  };
-
-  const TechSupportButton = () => {
-      const { t } = useLocalization();
-      return ( <a href="https://wa.me/212617774846" target="_blank" rel="noreferrer" className="fixed bottom-6 right-6 z-30 bg-green-500 text-white p-3 rounded-full shadow-lg shadow-green-500/30 hover:bg-green-600 hover:scale-110 transition-all flex items-center gap-2 group"><MessageCircle size={24} /><span className="hidden group-hover:block whitespace-nowrap font-bold text-sm pr-2">{t('techSupport')}</span></a> );
-  };
-
-  if (showSplash) { return <SplashScreen onFinish={() => setShowSplash(false)} />; }
+  if (showSplash) return <SplashScreen onFinish={() => setShowSplash(false)} />;
 
   return (
     <LocalizationProvider language={language}>
-      <DatabaseSetup isOpen={showDbSetup} onClose={() => setShowDbSetup(false)} />
-      <AuthDrawer isOpen={showAuthDrawer} onClose={() => setShowAuthDrawer(false)} onAuthSuccess={handleAuthSuccess} onDatabaseError={() => { setShowAuthDrawer(false); setShowDbSetup(true); }} />
-      <ProviderDirectory isOpen={showProviderDirectory} onClose={() => setShowProviderDirectory(false)} currentUser={currentUser}/>
-      <NotificationCenter isOpen={showNotifications} onClose={() => setShowNotifications(false)} currentUser={currentUser}/>
-      <Store isOpen={showStore} onClose={() => setShowStore(false)} currentUser={currentUser} />
-      {currentUser?.accountType === AccountType.CLIENT && ( <AppointmentsDrawer isOpen={showAppointmentsDrawer} onClose={() => setShowAppointmentsDrawer(false)} user={currentUser} /> )}
-      <div className="bg-light dark:bg-dark min-h-screen flex flex-col relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-96 bg-gradient-to-b from-primary/5 to-transparent pointer-events-none z-0"></div>
-        <div className="absolute -top-20 -right-20 w-64 h-64 bg-secondary/10 rounded-full blur-3xl pointer-events-none z-0"></div>
-        <div className="absolute top-40 -left-20 w-72 h-72 bg-primary/10 rounded-full blur-3xl pointer-events-none z-0"></div>
+      <div className={`h-screen bg-surface dark:bg-dark text-dark dark:text-light transition-colors duration-300 flex flex-col ${language === Language.AR ? 'font-arabic' : 'font-sans'}`} dir={language === Language.AR ? 'rtl' : 'ltr'}>
         <Header />
-        <main className="flex-1 w-full max-w-6xl mx-auto px-4 pt-20 pb-6 z-10 flex flex-col">
-          {view === UserView.CLIENT ? ( <Chatbot currentUser={currentUser} setCurrentUser={setCurrentUser} isLoadingUser={isLoadingUser} /> ) : view === UserView.PROVIDER && currentUser?.accountType === AccountType.PROVIDER ? ( <ProviderPortal provider={currentUser} onLogout={handleLogout} /> ) : ( <ProviderLoginPrompt /> )}
+        
+        {/* Main Content Area - Full Width/Height on Mobile */}
+        <main className="flex-1 pt-16 md:pt-20 pb-0 md:pb-4 w-full md:max-w-6xl md:mx-auto md:px-4 flex flex-col overflow-hidden">
+            {view === UserView.PROVIDER && currentUser?.accountType === AccountType.PROVIDER ? (
+                <ProviderPortal provider={currentUser} onLogout={handleLogout} />
+            ) : (
+                <Chatbot currentUser={currentUser} setCurrentUser={setCurrentUser} isLoadingUser={isLoadingUser} />
+            )}
         </main>
-        <TechSupportButton />
-        <footer className="w-full py-6 text-center text-gray-400 dark:text-gray-600 text-xs z-10"><p>&copy; 2025 {t('appName')} - Built for Tangier</p></footer>
+
+        <AuthDrawer isOpen={showAuthDrawer} onClose={() => setShowAuthDrawer(false)} onAuthSuccess={handleAuthSuccess} onDatabaseError={() => setShowDbSetup(true)} />
+        <AppointmentsDrawer isOpen={showAppointmentsDrawer} onClose={() => setShowAppointmentsDrawer(false)} user={currentUser} />
+        <ProviderDirectory isOpen={showProviderDirectory} onClose={() => setShowProviderDirectory(false)} currentUser={currentUser} />
+        <NotificationCenter isOpen={showNotifications} onClose={() => setShowNotifications(false)} currentUser={currentUser} />
+        <Store isOpen={showStore} onClose={() => setShowStore(false)} currentUser={currentUser} />
+        <DatabaseSetup isOpen={showDbSetup} onClose={() => setShowDbSetup(false)} />
       </div>
     </LocalizationProvider>
   );

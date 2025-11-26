@@ -6,7 +6,7 @@ import { getChatResponse } from '../services/geminiService';
 import { useLocalization } from '../hooks/useLocalization';
 import { supabase } from '../services/supabaseClient';
 import QRCodeDisplay from './QRCodeDisplay';
-import { Send, Bot, User as UserIcon, Loader2, Paperclip, X, Bell, Key, ArrowRight, Mic, Volume2, VolumeX, Camera, StopCircle, MapPin, XCircle } from 'lucide-react';
+import { Send, Bot, User as UserIcon, Loader2, Paperclip, X, Bell, Key, ArrowRight, Mic, Volume2, VolumeX, Camera, StopCircle, MapPin, XCircle, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
 
 // ... BookingConfirmation ...
 const BookingConfirmation: React.FC<{ details: BookingDetails }> = ({ details }) => {
@@ -30,6 +30,47 @@ const BookingConfirmation: React.FC<{ details: BookingDetails }> = ({ details })
   );
 };
 
+// --- SYSTEM AD CARD COMPONENT (SINGLE IMAGE, NO SLIDER) ---
+const SystemAdCard: React.FC<{ ad: SystemAnnouncement; onDismiss: () => void }> = ({ ad, onDismiss }) => {
+    // Priority to image_url or first image in array, basically revert to single image view
+    const displayImage = (ad.images && ad.images.length > 0) ? ad.images[0] : ad.image_url;
+    const [expanded, setExpanded] = useState(false);
+    
+    // Truncate logic
+    const MAX_LENGTH = 100;
+    const isLongText = ad.message.length > MAX_LENGTH;
+    const displayText = expanded ? ad.message : (isLongText ? ad.message.substring(0, MAX_LENGTH) + '...' : ad.message);
+
+    return (
+        <div className="w-full bg-white dark:bg-gray-800 rounded-2xl shadow-lg border-2 border-primary/20 overflow-hidden mb-4 relative animate-fade-in mx-auto max-w-sm mt-4">
+            <button onClick={onDismiss} className="absolute top-2 right-2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1 z-20"><X size={16}/></button>
+            
+            {/* Single Image */}
+            {displayImage && (
+                <div className="relative h-48 w-full bg-gray-100">
+                    <img src={displayImage} className="w-full h-full object-cover" alt="Ad"/>
+                </div>
+            )}
+
+            <div className="p-4">
+                <h4 className="font-bold text-lg dark:text-white mb-1">{ad.title}</h4>
+                <p className="text-sm text-gray-600 dark:text-gray-300 transition-all duration-300">
+                    {displayText}
+                </p>
+                {isLongText && (
+                    <button 
+                        onClick={() => setExpanded(!expanded)} 
+                        className="text-primary text-xs font-bold mt-2 flex items-center gap-1 hover:underline"
+                    >
+                        {expanded ? <><ChevronUp size={12}/> Read Less</> : <><ChevronDown size={12}/> Read More</>}
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+};
+
+
 // ... ChatbotProps ...
 interface ChatbotProps {
     currentUser: AuthenticatedUser | null;
@@ -47,7 +88,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [systemAds, setSystemAds] = useState<SystemAnnouncement[]>([]); // New System Ads
+  const [systemAds, setSystemAds] = useState<SystemAnnouncement[]>([]); 
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -74,7 +115,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
         const saved = localStorage.getItem(storageKey);
         if (saved) { setMessages(JSON.parse(saved)); } else { if (currentUser) { setMessages([{ role: Role.BOT, text: t('welcomeBackMessage', { name: currentUser.name }) }]); } else { setMessages([{ role: Role.BOT, text: t('welcomeMessage') }]); } }
         if (currentUser) fetchAnnouncements(currentUser.id);
-        fetchSystemAds(); // Fetch system ads for everyone
+        fetchSystemAds(); 
     }
   }, [isLoadingUser, currentUser, t]);
 
@@ -101,7 +142,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
   }
 
   const scrollToBottom = () => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); };
-  useEffect(scrollToBottom, [messages, isRecording]);
+  useEffect(scrollToBottom, [messages, isRecording, systemAds.length]); 
 
   // ... Audio and TTS functions ...
   const startRecording = async () => {
@@ -304,7 +345,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
    const hasContent = input.trim().length > 0 || imageFile !== null;
 
   return (
-    <div className="flex flex-col w-full h-[calc(100vh-110px)] bg-surface dark:bg-surfaceDark rounded-3xl shadow-2xl border border-white/20 overflow-hidden relative mb-0">
+    <div className="flex flex-col w-full h-full bg-surface dark:bg-surfaceDark relative">
         <style>{` @keyframes marquee-ltr { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } } @keyframes marquee-rtl { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } } .animate-marquee-ltr { display: inline-block; white-space: nowrap; animation: marquee-ltr 30s linear infinite; } .animate-marquee-rtl { display: inline-block; white-space: nowrap; animation: marquee-rtl 30s linear infinite; } `}</style>
         {announcements.length > 0 && (
             <div className="w-full bg-yellow-400/90 backdrop-blur-sm text-yellow-900 text-sm h-8 flex items-center relative overflow-hidden z-20 shadow-sm">
@@ -312,47 +353,90 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
                 <div className="w-full overflow-hidden relative pl-28"><div className={`${getMarqueeClass()} w-full`}>{announcements.map((ann) => (<span key={ann.id} className="inline-flex items-center mx-6"><Bell className="w-3 h-3 mr-1" /><span className="font-bold underline mx-1">{ann.providers.name}:</span><span>{ann.message}</span></span>))}</div></div>
             </div>
         )}
-      <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 sm:p-6 bg-[#F0F2F5] dark:bg-[#111B21] scroll-smooth relative">
+      
+      {/* Messages Area - Takes remaining space */}
+      <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 bg-[#F0F2F5] dark:bg-[#111B21] scroll-smooth relative pb-20">
         <div className="absolute inset-0 opacity-[0.05] dark:opacity-[0.03] pointer-events-none bg-[url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png')]"></div>
-        <div className="flex flex-col gap-2 z-10 relative pb-4">
+        <div className="flex flex-col gap-2 z-10 relative">
           
-          {/* SYSTEM ADS (ADMIN) */}
-          {systemAds.map(ad => (
-              <div key={ad.id} className="w-full bg-white dark:bg-gray-800 rounded-2xl shadow-lg border-2 border-primary/20 overflow-hidden mb-4 relative animate-fade-in">
-                  <button onClick={() => dismissSystemAd(ad.id)} className="absolute top-2 right-2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1 z-10"><X size={16}/></button>
-                  <img src={ad.image_url} className="w-full h-32 sm:h-40 object-cover" />
-                  <div className="p-4">
-                      <h4 className="font-bold text-lg dark:text-white mb-1">{ad.title}</h4>
-                      <p className="text-sm text-gray-600 dark:text-gray-300">{ad.message}</p>
-                  </div>
-              </div>
-          ))}
-
           {messages.map((msg, index) => {
             if (msg.isComponent && msg.bookingDetails) { return <BookingConfirmation key={index} details={msg.bookingDetails} />; }
             const isUser = msg.role === Role.USER; const isBot = msg.role === Role.BOT;
             return (
               <div key={index} className={`flex items-end gap-2 group mb-1 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white flex-shrink-0 shadow-md ${isBot ? 'bg-gradient-to-br from-secondary to-primary' : 'bg-gray-400 dark:bg-gray-600'}`}>{isBot ? <Bot size={18} /> : <UserIcon size={18} />}</div>
-                <div className={`relative max-w-[85%] sm:max-w-[75%] px-4 py-2.5 shadow-sm text-sm leading-relaxed ${isUser ? 'bg-primary text-white rounded-2xl rounded-tr-none' : 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-2xl rounded-tl-none'}`}>
+                {/* Avatar only for bot */}
+                {isBot && <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white flex-shrink-0 shadow-md bg-gradient-to-br from-secondary to-primary`}><Bot size={18} /></div>}
+                <div className={`relative max-w-[85%] sm:max-w-[75%] px-3 py-2 shadow-sm text-sm leading-relaxed ${isUser ? 'bg-[#005c4b] text-white rounded-lg rounded-tr-none' : 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg rounded-tl-none'}`}>
                   {msg.imageUrl && ( <div className="mb-2 rounded-lg overflow-hidden"><img src={msg.imageUrl} alt="Uploaded" className="w-full h-auto object-cover"/></div> )}
                   {msg.text && <p className="whitespace-pre-wrap">{msg.text}</p>}
-                  {isBot && ( <div className="flex justify-end mt-1"><button onClick={() => isSpeaking ? stopSpeaking() : speakText(msg.text)} className="text-gray-400 hover:text-primary p-1 transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-gray-700" title="Read text">{isSpeaking ? <VolumeX size={16} className="animate-pulse text-primary"/> : <Volume2 size={16}/>}</button></div> )}
+                  {/* Read Aloud button small overlay */}
+                  {isBot && ( <button onClick={() => isSpeaking ? stopSpeaking() : speakText(msg.text)} className="absolute -bottom-5 right-0 text-gray-400 hover:text-primary p-1"><Volume2 size={12}/></button> )}
                 </div>
               </div>
             );
           })}
           {isLoading && ( <div className="flex items-end gap-2"><div className="w-8 h-8 rounded-full bg-gradient-to-br from-secondary to-primary flex items-center justify-center text-white shadow-md"><Bot size={18} /></div><div className="bg-white dark:bg-gray-800 p-3 rounded-2xl rounded-tl-none shadow-sm"><div className="flex gap-1"><span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></span><span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:0.2s]"></span><span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:0.4s]"></span></div></div></div> )}
+          
+          {/* SYSTEM ADS - Rendered at bottom of chat */}
+          {systemAds.map(ad => (
+              <SystemAdCard key={ad.id} ad={ad} onDismiss={() => dismissSystemAd(ad.id)} />
+          ))}
+
           <div ref={messagesEndRef} />
         </div>
       </div>
-      <div dir="ltr" className="p-2 bg-surface dark:bg-surfaceDark border-t border-gray-100 dark:border-gray-700 flex items-end gap-2 w-full max-w-full">
-        <div className={`flex-1 bg-white dark:bg-gray-800 border ${isRecording ? 'border-red-500 ring-1 ring-red-500' : 'border-gray-200 dark:border-gray-600'} rounded-[24px] flex items-end shadow-sm relative px-2 overflow-hidden transition-all duration-200`}>
-             {imagePreviewUrl && ( <div className="absolute bottom-full left-0 mb-2 ml-2 bg-white dark:bg-gray-800 p-2 rounded-xl border border-gray-200 dark:border-gray-600 shadow-lg animate-slide-up z-20"><div className="relative"><img src={imagePreviewUrl} alt="Preview" className="w-20 h-20 object-cover rounded-lg"/><button onClick={removeImage} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 shadow-sm"><X size={12} /></button></div></div> )}
-            {isRecording ? ( <div className="flex-1 py-3 px-4 text-red-600 font-bold animate-pulse flex items-center gap-2 h-[48px]"><div className="w-3 h-3 bg-red-600 rounded-full animate-ping"></div>Recording Audio...</div> ) : ( <textarea dir={language === 'ar' ? 'rtl' : 'ltr'} value={input} onChange={(e) => setInput(e.target.value)} onKeyPress={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }}} placeholder={t('inputPlaceholder')} rows={1} className="flex-1 bg-transparent border-none focus:ring-0 text-gray-900 dark:text-white placeholder-gray-400 resize-none py-3 px-4 max-h-32 outline-none text-base" disabled={isLoading} style={{ minHeight: '48px' }} /> )}
-            {!isRecording && ( <div className="flex items-center pb-2 pr-1 gap-1 flex-none"><input type="file" ref={fileInputRef} onChange={handleImageChange} accept="image/*" className="hidden" /><input type="file" ref={cameraInputRef} onChange={handleImageChange} accept="image/*" capture="environment" className="hidden" /><button onClick={() => fileInputRef.current?.click()} disabled={isLoading} className="p-2 text-gray-400 hover:text-primary transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-gray-700" title="Attach Image"><Paperclip size={20} className="rotate-45" /></button><button onClick={() => cameraInputRef.current?.click()} disabled={isLoading} className="p-2 text-gray-400 hover:text-primary transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-gray-700" title="Open Camera"><Camera size={20} /></button></div> )}
+
+      {/* Input Bar - WhatsApp Style - Fixed Bottom */}
+      <div dir="ltr" className="absolute bottom-0 left-0 right-0 p-2 bg-gray-100 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 flex items-center gap-2 z-30">
+        
+        {/* Attachment & Camera */}
+        {!isRecording && (
+           <div className="flex gap-1">
+               <input type="file" ref={fileInputRef} onChange={handleImageChange} accept="image/*" className="hidden" />
+               <input type="file" ref={cameraInputRef} onChange={handleImageChange} accept="image/*" capture="environment" className="hidden" />
+               <button onClick={() => fileInputRef.current?.click()} disabled={isLoading} className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400"><Paperclip size={22} /></button>
+               <button onClick={() => cameraInputRef.current?.click()} disabled={isLoading} className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400"><Camera size={22} /></button>
+           </div>
+        )}
+
+        {/* Input Field Area */}
+        <div className="flex-1 bg-white dark:bg-gray-800 rounded-full flex items-center shadow-sm px-4 py-2 relative border border-gray-200 dark:border-gray-700">
+             {imagePreviewUrl && ( 
+                 <div className="absolute bottom-full left-0 mb-2 ml-2 bg-white dark:bg-gray-800 p-2 rounded-xl border border-gray-200 dark:border-gray-600 shadow-lg animate-slide-up z-20">
+                     <div className="relative">
+                         <img src={imagePreviewUrl} alt="Preview" className="w-20 h-20 object-cover rounded-lg"/>
+                         <button onClick={removeImage} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 shadow-sm"><X size={12} /></button>
+                     </div>
+                 </div> 
+             )}
+            
+            {isRecording ? (
+                 <div className="flex-1 flex items-center gap-2 text-red-500 font-bold animate-pulse">
+                     <div className="w-2 h-2 bg-red-500 rounded-full animate-ping"></div> Recording...
+                 </div>
+            ) : (
+                <textarea 
+                    dir={language === 'ar' ? 'rtl' : 'ltr'} 
+                    value={input} 
+                    onChange={(e) => setInput(e.target.value)} 
+                    onKeyPress={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }}} 
+                    placeholder="" 
+                    rows={1} 
+                    className="flex-1 bg-transparent border-none focus:ring-0 text-gray-900 dark:text-white placeholder-gray-400 resize-none max-h-32 outline-none py-1 text-base" 
+                    disabled={isLoading}
+                    style={{ minHeight: '24px' }}
+                />
+            )}
         </div>
-        <button onClick={hasContent ? handleSend : (isRecording ? stopRecording : startRecording)} disabled={isLoading} className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-all duration-200 transform hover:scale-105 active:scale-95 flex-none ${isRecording ? 'bg-red-600 hover:bg-red-700 text-white scale-110' : hasContent ? 'bg-green-500 hover:bg-green-600 text-white' : 'bg-green-500 hover:bg-green-600 text-white'}`}>{isLoading ? ( <Loader2 className="animate-spin" size={20} /> ) : hasContent ? ( <Send size={20} className={language === 'ar' ? 'rotate-180' : ''} /> ) : isRecording ? ( <Send size={20} className={language === 'ar' ? 'rotate-180' : ''} /> ) : ( <Mic size={20} /> )}</button>
+
+        {/* Mic / Send Button */}
+        <button 
+            onClick={hasContent ? handleSend : (isRecording ? stopRecording : startRecording)} 
+            disabled={isLoading} 
+            className={`w-12 h-12 rounded-full flex items-center justify-center shadow-md transition-all duration-200 transform active:scale-95 flex-none ${isRecording ? 'bg-red-500 text-white' : 'bg-[#005c4b] text-white'}`}
+        >
+            {isLoading ? ( <Loader2 className="animate-spin" size={20} /> ) : hasContent ? ( <Send size={20} className={language === 'ar' ? 'rotate-180' : ''} /> ) : isRecording ? ( <Send size={20} className={language === 'ar' ? 'rotate-180' : ''} /> ) : ( <Mic size={20} /> )}
+        </button>
       </div>
     </div>
   );

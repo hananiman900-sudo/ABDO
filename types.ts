@@ -1,4 +1,5 @@
 
+
 export enum Role {
   USER = 'USER',
   BOT = 'BOT',
@@ -84,7 +85,8 @@ export interface SystemAnnouncement {
   id: number;
   title: string;
   message: string;
-  image_url: string;
+  image_url?: string;
+  images?: string[]; // Added support for multiple images
   is_active: boolean;
   created_at: string;
 }
