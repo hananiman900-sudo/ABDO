@@ -1,22 +1,21 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocalization } from '../hooks/useLocalization';
-import { Product, CartItem, AuthenticatedUser, Order, SystemAnnouncement } from '../types';
+import { Product, CartItem, AuthenticatedUser, Order, SystemAnnouncement, Category } from '../types';
 import { supabase } from '../services/supabaseClient';
-import { ShoppingBag, ShoppingCart, Plus, Minus, X, CheckCircle, Loader2, Package, Search, History, Trash, Settings, List, Save, User, Phone, Edit, MessageSquare, Image as ImageIcon, ArrowLeft, Truck, Clock, Star, Send, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ShoppingBag, ShoppingCart, Plus, Minus, X, CheckCircle, Loader2, Package, Search, History, Trash, Settings, List, Save, User, Phone, Edit, MessageSquare, Image as ImageIcon, ArrowLeft, Truck, Clock, Star, Send, Filter, ChevronLeft, ChevronRight, FolderPlus, LogIn } from 'lucide-react';
 
 interface StoreProps {
     isOpen: boolean;
     onClose: () => void;
     currentUser: AuthenticatedUser | null;
+    onOpenAuth: () => void; // Callback to open auth drawer
 }
 
-// Categories list
-const CATEGORIES = ['All', 'Clothing', 'Jewelry', 'Accessories', 'Home', 'Electronics', 'Beauty', 'Kids'];
-
-const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser }) => {
+const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth }) => {
     const { t, language } = useLocalization();
     const [products, setProducts] = useState<any[]>([]);
+    const [categories, setCategories] = useState<Category[]>([]);
     const [cart, setCart] = useState<CartItem[]>([]);
     const [view, setView] = useState<'catalog' | 'cart' | 'orders' | 'admin'>('catalog');
     const [search, setSearch] = useState('');
@@ -24,6 +23,7 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser }) => {
     const [isLoading, setIsLoading] = useState(false);
     const [orderPlaced, setOrderPlaced] = useState(false);
     const [myOrders, setMyOrders] = useState<Order[]>([]);
+    const [showLoginPrompt, setShowLoginPrompt] = useState(false); // Guest checkout prompt
     
     // User Selection State
     const [selectedSize, setSelectedSize] = useState<string>('');
@@ -37,12 +37,14 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser }) => {
     const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
     // Admin State
-    const [adminTab, setAdminTab] = useState<'products' | 'orders' | 'ads'>('products');
+    const [adminTab, setAdminTab] = useState<'products' | 'orders' | 'ads' | 'categories'>('products');
     const [adminOrders, setAdminOrders] = useState<Order[]>([]);
     const [systemAds, setSystemAds] = useState<SystemAnnouncement[]>([]);
     const [newProduct, setNewProduct] = useState({ id: 0, name: '', description: '', price: '', category: 'General', image_url: '', images: [] as string[], sizes: '' });
     const [newAd, setNewAd] = useState<{ title: string; message: string; images: string[] }>({ title: '', message: '', images: [] });
+    const [newCategoryName, setNewCategoryName] = useState('');
     const [isEditingProduct, setIsEditingProduct] = useState(false);
+    const [isAddingCategory, setIsAddingCategory] = useState(false);
     
     const fileInputRef = useRef<HTMLInputElement>(null);
     const adFileInputRef = useRef<HTMLInputElement>(null);
@@ -75,12 +77,32 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser }) => {
     useEffect(() => {
         if (isOpen) {
             fetchProducts();
+            fetchCategories();
             if (currentUser) fetchMyOrders();
-            if (isAdmin) setView('admin'); // Auto-open admin view for admin
+            // ALWAYS DEFAULT TO CATALOG FOR USERS
+            if (isAdmin) {
+                setView('admin'); 
+            } else {
+                setView('catalog');
+            }
         }
     }, [isOpen, currentUser]);
 
     // --- FETCHING ---
+
+    const fetchCategories = async () => {
+        try {
+            const { data, error } = await supabase.from('categories').select('*').order('name');
+            if(error) {
+                if(error.code === '42P01') {
+                    console.warn("Categories table missing. Please run V20 update.");
+                } else {
+                    console.error("Fetch categories error:", error);
+                }
+            }
+            setCategories(data || []);
+        } catch(e) { console.error(e); }
+    }
 
     const fetchProducts = async () => {
         setIsLoading(true);
@@ -231,7 +253,10 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser }) => {
     const cartTotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
 
     const handleCheckout = async () => {
-        if (!currentUser) return alert(t('loginTitle'));
+        if (!currentUser) {
+            setShowLoginPrompt(true);
+            return;
+        }
         if (cart.length === 0) return;
 
         setIsLoading(true);
@@ -262,6 +287,40 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser }) => {
     };
 
     // --- ADMIN LOGIC ---
+
+    const handleAddCategory = async () => {
+        if (!newCategoryName.trim()) return;
+        setIsAddingCategory(true);
+        try {
+             // 1. Attempt insert
+             const { error } = await supabase.from('categories').insert({ name: newCategoryName.trim() });
+             
+             if (error) {
+                 console.error("Add Category Error:", error);
+                 if(error.code === '42P01') {
+                    alert("Error: Table 'categories' missing. Go to Database Setup and run V20 Update.");
+                 } else if(error.code === '23505') { // Duplicate key
+                     alert("Category already exists.");
+                 } else {
+                     alert("Error adding category. Please ensure you ran V20 update. " + error.message);
+                 }
+             } else {
+                 setNewCategoryName('');
+                 fetchCategories();
+             }
+        } catch (e: any) {
+             console.error("Unexpected error:", e);
+             alert("An unexpected error occurred.");
+        } finally {
+             setIsAddingCategory(false);
+        }
+    };
+
+    const handleDeleteCategory = async (id: number) => {
+        if (!confirm(t('delete') + '?')) return;
+        await supabase.from('categories').delete().eq('id', id);
+        fetchCategories();
+    }
 
     const handleSaveProduct = async () => {
         if(!newProduct.name || !newProduct.price) return;
@@ -294,7 +353,7 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser }) => {
             await fetchProducts(); // Refresh list immediately
         } catch (e: any) {
             console.error(e);
-            alert("Error saving product. Please ensure V17 update is applied.");
+            alert("Error saving product. Please ensure V17/V18 update is applied.");
         } finally {
             setIsLoading(false);
         }
@@ -401,6 +460,7 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser }) => {
                         <div className="space-y-6 p-4">
                             <div className="flex gap-4 border-b border-gray-200 dark:border-gray-700 pb-4 overflow-x-auto">
                                 <button onClick={() => setAdminTab('products')} className={`pb-2 px-2 font-bold whitespace-nowrap ${adminTab === 'products' ? 'text-primary border-b-2 border-primary' : 'text-gray-400'}`}>{t('products')}</button>
+                                <button onClick={() => setAdminTab('categories')} className={`pb-2 px-2 font-bold whitespace-nowrap ${adminTab === 'categories' ? 'text-primary border-b-2 border-primary' : 'text-gray-400'}`}>Categories</button>
                                 <button onClick={() => { setAdminTab('orders'); fetchAdminOrders(); }} className={`pb-2 px-2 font-bold whitespace-nowrap ${adminTab === 'orders' ? 'text-primary border-b-2 border-primary' : 'text-gray-400'}`}>{t('orders')}</button>
                                 <button onClick={() => { setAdminTab('ads'); fetchSystemAds(); }} className={`pb-2 px-2 font-bold whitespace-nowrap ${adminTab === 'ads' ? 'text-primary border-b-2 border-primary' : 'text-gray-400'}`}>{t('systemAds')}</button>
                             </div>
@@ -425,7 +485,7 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser }) => {
                                                 onChange={e => setNewProduct({...newProduct, category: e.target.value})}
                                                 className="p-3 bg-gray-50 dark:bg-gray-700 rounded-xl outline-none dark:text-white border border-gray-200 dark:border-gray-600"
                                             >
-                                                {CATEGORIES.filter(c => c !== 'All').map(c => <option key={c} value={c}>{c}</option>)}
+                                                {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                                                 <option value="General">General</option>
                                             </select>
                                             
@@ -468,6 +528,31 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser }) => {
                                                     <button onClick={() => handleEditProductClick(p)} className="text-blue-500 p-2 hover:bg-blue-50 rounded-full"><Edit size={18}/></button>
                                                     <button onClick={() => handleDeleteProduct(p.id)} className="text-red-500 p-2 hover:bg-red-50 rounded-full"><Trash size={18}/></button>
                                                 </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : adminTab === 'categories' ? (
+                                <div className="space-y-4">
+                                    <h3 className="font-bold text-lg dark:text-white">Category Manager</h3>
+                                    <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm flex gap-2">
+                                        <input 
+                                            value={newCategoryName}
+                                            onChange={(e) => setNewCategoryName(e.target.value)}
+                                            placeholder="New Category Name (e.g. ملابس)"
+                                            className="flex-1 p-3 bg-gray-50 dark:bg-gray-700 rounded-xl outline-none dark:text-white"
+                                            disabled={isAddingCategory}
+                                        />
+                                        <button onClick={handleAddCategory} disabled={isAddingCategory} className="bg-green-500 text-white px-6 rounded-xl font-bold flex items-center justify-center">
+                                            {isAddingCategory ? <Loader2 className="animate-spin"/> : <Plus/>}
+                                        </button>
+                                    </div>
+                                    {categories.length === 0 && <p className="text-red-500 text-sm font-bold">Categories not loading? Run V20 Update in Database Setup.</p>}
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {categories.map(c => (
+                                            <div key={c.id} className="flex justify-between items-center p-3 bg-white dark:bg-gray-800 rounded-xl border dark:border-gray-700">
+                                                <span className="font-bold dark:text-white">{c.name}</span>
+                                                <button onClick={() => handleDeleteCategory(c.id)} className="text-red-500 p-2"><Trash size={16}/></button>
                                             </div>
                                         ))}
                                     </div>
@@ -573,13 +658,19 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser }) => {
                                 
                                 {/* Categories List */}
                                 <div className="flex gap-2 overflow-x-auto mt-2 pb-1 no-scrollbar">
-                                    {CATEGORIES.map(cat => (
+                                    <button 
+                                        onClick={() => setSelectedCategory('All')}
+                                        className={`px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors ${selectedCategory === 'All' ? 'bg-black text-white dark:bg-white dark:text-black' : 'bg-white text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
+                                    >
+                                        All
+                                    </button>
+                                    {categories.map(cat => (
                                         <button 
-                                            key={cat}
-                                            onClick={() => setSelectedCategory(cat)}
-                                            className={`px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors ${selectedCategory === cat ? 'bg-black text-white dark:bg-white dark:text-black' : 'bg-white text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
+                                            key={cat.id}
+                                            onClick={() => setSelectedCategory(cat.name)}
+                                            className={`px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors ${selectedCategory === cat.name ? 'bg-black text-white dark:bg-white dark:text-black' : 'bg-white text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
                                         >
-                                            {cat}
+                                            {cat.name}
                                         </button>
                                     ))}
                                 </div>
@@ -695,15 +786,42 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser }) => {
                     )}
                 </div>
             </div>
+
+            {/* GUEST CHECKOUT MODAL */}
+            {showLoginPrompt && (
+                <div className="fixed inset-0 z-[70] bg-black/60 flex items-center justify-center p-4 animate-fade-in" onClick={() => setShowLoginPrompt(false)}>
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-sm w-full shadow-2xl text-center" onClick={e => e.stopPropagation()}>
+                        <div className="w-16 h-16 bg-orange-100 dark:bg-orange-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <LogIn size={32} className="text-orange-500"/>
+                        </div>
+                        <h3 className="text-xl font-bold dark:text-white mb-2">Please Login</h3>
+                        <p className="text-gray-500 dark:text-gray-300 mb-6">You need to have an account to place an order.</p>
+                        <div className="flex flex-col gap-2">
+                            <button 
+                                onClick={() => { setShowLoginPrompt(false); onClose(); onOpenAuth(); }}
+                                className="w-full py-3 bg-orange-500 text-white rounded-xl font-bold shadow-lg shadow-orange-500/30"
+                            >
+                                Login / Register
+                            </button>
+                            <button 
+                                onClick={() => setShowLoginPrompt(false)}
+                                className="w-full py-3 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl font-bold"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
             
             {/* FULL SCREEN PRODUCT DETAIL MODAL */}
             {selectedProductDetail && (
-                <div className="fixed inset-0 z-[60] bg-white dark:bg-gray-900 flex flex-col animate-slide-up overflow-hidden">
+                <div className="fixed inset-0 z-[60] bg-white dark:bg-gray-900 flex flex-col animate-slide-up overflow-hidden" onClick={e => e.stopPropagation()}>
                     
                     {/* Header */}
-                    <div className="absolute top-0 left-0 w-full p-4 flex justify-between items-center z-20 bg-gradient-to-b from-black/50 to-transparent">
-                         <button onClick={() => setSelectedProductDetail(null)} className="bg-black/40 text-white p-2 rounded-full"><ArrowLeft/></button>
-                         <button onClick={() => setSelectedProductDetail(null)} className="bg-black/40 text-white p-2 rounded-full"><X/></button>
+                    <div className="absolute top-0 left-0 w-full p-4 flex justify-between items-center z-20 bg-gradient-to-b from-black/50 to-transparent pointer-events-none">
+                         <button onClick={() => setSelectedProductDetail(null)} className="bg-black/40 text-white p-2 rounded-full pointer-events-auto"><ArrowLeft/></button>
+                         <button onClick={() => setSelectedProductDetail(null)} className="bg-black/40 text-white p-2 rounded-full pointer-events-auto"><X/></button>
                     </div>
 
                     {/* Scrollable Content */}
@@ -779,7 +897,7 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser }) => {
                                 
                                 {/* Add Review */}
                                 {currentUser ? (
-                                    <div className="mb-6 bg-gray-50 dark:bg-gray-900/50 p-4 rounded-xl">
+                                    <div className="mb-6 bg-gray-50 dark:bg-gray-900/50 p-4 rounded-xl" onClick={e => e.stopPropagation()}>
                                         <div className="flex gap-1 mb-2">
                                             {[1,2,3,4,5].map(star => (
                                                 <button key={star} onClick={() => setNewReview({...newReview, rating: star})}>
@@ -793,6 +911,7 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser }) => {
                                                 onChange={e => setNewReview({...newReview, comment: e.target.value})}
                                                 placeholder="Write a comment..." 
                                                 className="flex-1 bg-white dark:bg-gray-800 rounded-lg px-3 py-3 text-sm outline-none border border-gray-200 dark:border-gray-700 dark:text-white"
+                                                onClick={e => e.stopPropagation()} // Prevent Modal closing
                                             />
                                             <button onClick={handleSubmitReview} disabled={isSubmittingReview || !newReview.comment.trim()} className="bg-primary text-white px-4 rounded-lg">
                                                 {isSubmittingReview ? <Loader2 className="animate-spin" size={20}/> : <Send size={20}/>}

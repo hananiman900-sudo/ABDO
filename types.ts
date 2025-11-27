@@ -86,7 +86,7 @@ export interface SystemAnnouncement {
   title: string;
   message: string;
   image_url?: string;
-  images?: string[]; // Added support for multiple images
+  images?: string[];
   is_active: boolean;
   created_at: string;
 }
@@ -116,9 +116,9 @@ export interface ProviderNotification {
   created_at: string;
   is_read: boolean;
   type: 'BOOKING' | 'SYSTEM';
-  status: 'pending' | 'completed'; // New: Track if client arrived
-  booking_id?: number; // Link to appointment
-  client_details?: any; // virtual field for UI
+  status: 'pending' | 'completed';
+  booking_id?: number;
+  client_details?: any;
 }
 
 export interface Product {
@@ -128,20 +128,27 @@ export interface Product {
   price: number;
   image_url: string;
   category: string;
-  sizes?: string[]; // New: Available sizes
+  images?: string[]; 
+  sizes?: string[];
+  created_at: string;
+}
+
+export interface Category {
+  id: number;
+  name: string;
   created_at: string;
 }
 
 export interface CartItem extends Product {
   quantity: number;
-  selectedSize?: string; // New: User selected size
-  note?: string; // New: User note
+  selectedSize?: string;
+  note?: string;
 }
 
 export interface Order {
   id: number;
   user_id: number;
-  user_type: string; // 'CLIENT' or 'PROVIDER'
+  user_type: string;
   total_amount: number;
   status: 'pending' | 'delivered' | 'cancelled';
   items: CartItem[];

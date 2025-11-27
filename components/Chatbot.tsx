@@ -1,4 +1,5 @@
 
+
 // ... imports ...
 import React, { useState, useRef, useEffect } from 'react';
 import { Message, Role, BookingDetails, AuthenticatedUser, Announcement, ProviderRegistrationDetails, SystemAnnouncement } from '../types';
@@ -30,7 +31,7 @@ const BookingConfirmation: React.FC<{ details: BookingDetails }> = ({ details })
   );
 };
 
-// --- SYSTEM AD CARD COMPONENT (SINGLE IMAGE, NO SLIDER) ---
+// --- SYSTEM AD CARD COMPONENT (SINGLE IMAGE, NO SLIDER, INLINE) ---
 const SystemAdCard: React.FC<{ ad: SystemAnnouncement; onDismiss: () => void }> = ({ ad, onDismiss }) => {
     // Priority to image_url or first image in array, basically revert to single image view
     const displayImage = (ad.images && ad.images.length > 0) ? ad.images[0] : ad.image_url;
@@ -42,8 +43,11 @@ const SystemAdCard: React.FC<{ ad: SystemAnnouncement; onDismiss: () => void }> 
     const displayText = expanded ? ad.message : (isLongText ? ad.message.substring(0, MAX_LENGTH) + '...' : ad.message);
 
     return (
-        <div className="w-full bg-white dark:bg-gray-800 rounded-2xl shadow-lg border-2 border-primary/20 overflow-hidden mb-4 relative animate-fade-in mx-auto max-w-sm mt-4">
+        <div className="w-full bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-purple-100 dark:border-purple-900 overflow-hidden mb-4 relative animate-fade-in mx-auto max-w-sm mt-4 group">
             <button onClick={onDismiss} className="absolute top-2 right-2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1 z-20"><X size={16}/></button>
+            <div className="absolute top-2 left-2 bg-purple-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full z-20 uppercase tracking-wider">
+                Ad
+            </div>
             
             {/* Single Image */}
             {displayImage && (
@@ -54,7 +58,7 @@ const SystemAdCard: React.FC<{ ad: SystemAnnouncement; onDismiss: () => void }> 
 
             <div className="p-4">
                 <h4 className="font-bold text-lg dark:text-white mb-1">{ad.title}</h4>
-                <p className="text-sm text-gray-600 dark:text-gray-300 transition-all duration-300">
+                <p className="text-sm text-gray-600 dark:text-gray-300 transition-all duration-300 leading-relaxed">
                     {displayText}
                 </p>
                 {isLongText && (
@@ -101,6 +105,14 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
 
   // ... effects (location, persistence, announcements) ...
   useEffect(() => {
+      // PERMISSION CHECK
+      if (navigator.permissions && navigator.permissions.query) {
+         // @ts-ignore
+         navigator.permissions.query({ name: 'microphone' }).then((permissionStatus) => {
+             console.log("Mic Permission:", permissionStatus.state);
+         });
+      }
+
       if (navigator.geolocation) {
           navigator.geolocation.getCurrentPosition(
               (position) => { setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude }); },
@@ -156,6 +168,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
           mediaRecorder.onstop = async () => {
               const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
               await handleSendAudio(audioBlob);
+              // Stop tracks to release mic, but note: this causes re-prompt in some browsers next time
               stream.getTracks().forEach(track => track.stop());
           };
           mediaRecorder.start();
@@ -377,7 +390,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadin
           })}
           {isLoading && ( <div className="flex items-end gap-2"><div className="w-8 h-8 rounded-full bg-gradient-to-br from-secondary to-primary flex items-center justify-center text-white shadow-md"><Bot size={18} /></div><div className="bg-white dark:bg-gray-800 p-3 rounded-2xl rounded-tl-none shadow-sm"><div className="flex gap-1"><span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></span><span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:0.2s]"></span><span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:0.4s]"></span></div></div></div> )}
           
-          {/* SYSTEM ADS - Rendered at bottom of chat */}
+          {/* SYSTEM ADS - Rendered at bottom of chat (Inline) */}
           {systemAds.map(ad => (
               <SystemAdCard key={ad.id} ad={ad} onDismiss={() => dismissSystemAd(ad.id)} />
           ))}

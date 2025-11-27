@@ -622,7 +622,7 @@ const App: React.FC = () => {
         <AppointmentsDrawer isOpen={showAppointmentsDrawer} onClose={() => setShowAppointmentsDrawer(false)} user={currentUser} />
         <ProviderDirectory isOpen={showProviderDirectory} onClose={() => setShowProviderDirectory(false)} currentUser={currentUser} />
         <NotificationCenter isOpen={showNotifications} onClose={() => setShowNotifications(false)} currentUser={currentUser} />
-        <Store isOpen={showStore} onClose={() => setShowStore(false)} currentUser={currentUser} />
+        <Store isOpen={showStore} onClose={() => setShowStore(false)} currentUser={currentUser} onOpenAuth={() => setShowAuthDrawer(true)} />
         <DatabaseSetup isOpen={showDbSetup} onClose={() => setShowDbSetup(false)} />
       </div>
     </LocalizationProvider>
