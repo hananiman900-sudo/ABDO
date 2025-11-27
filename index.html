@@ -8,14 +8,16 @@
     <title>TangerConnect AI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
-      // These will be replaced by your actual Supabase credentials
-      window.process = {
-        env: {
-          SUPABASE_URL: 'https://lrprlzijjykvpxpyxrcn.supabase.co',
-          SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxycHJsemlqanlrdnB4cHl4cmNuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMxMjIwNDEsImV4cCI6MjA3ODY5ODA0MX0.6S8eSgprS686iobE7zrmurxIvzvC8Qmpu71rKT8FvZc',
-          API_KEY: 'AIzaSyDa4OxIrKhl6q3-AmcmjmQvw5wdkyrQYnA'
-        }
+      // CONFIGURATION FOR VERCEL DEPLOYMENT
+      // Using a custom global object to avoid 'process.env' being stripped by bundlers
+      window.TANGER_CONFIG = {
+        SUPABASE_URL: 'https://lrprlzijjykvpxpyxrcn.supabase.co',
+        SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxycHJsemlqanlrdnB4cHl4cmNuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMxMjIwNDEsImV4cCI6MjA3ODY5ODA0MX0.6S8eSgprS686iobE7zrmurxIvzvC8Qmpu71rKT8FvZc',
+        API_KEY: 'AIzaSyDa4OxIrKhl6q3-AmcmjmQvw5wdkyrQYnA'
       };
+      
+      // Backward compatibility just in case
+      window.process = { env: window.TANGER_CONFIG };
 
       tailwind.config = {
         darkMode: 'class',

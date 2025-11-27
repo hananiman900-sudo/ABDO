@@ -148,8 +148,15 @@ export const getChatResponse = async (
   userLocation?: { lat: number, lng: number }
 ): Promise<string> => {
   try {
-    const apiKey = (window as any).process?.env?.API_KEY;
-    if (!apiKey) throw new Error("API Key missing. Check index.html configuration.");
+    // Access configuration from global window object
+    // Using TANGER_CONFIG to avoid Vercel/bundlers stripping 'process.env'
+    const config = (window as any).TANGER_CONFIG || (window as any).process?.env || {};
+    const apiKey = config.API_KEY;
+
+    if (!apiKey) {
+        console.error("API Key Config Missing. Current Config:", config);
+        throw new Error("API Key missing. Check index.html configuration.");
+    }
 
     const ai = new GoogleGenAI({ apiKey });
 
