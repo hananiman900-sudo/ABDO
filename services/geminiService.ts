@@ -147,19 +147,25 @@ export const getChatResponse = async (
   announcementsText: string = "",
   userLocation?: { lat: number, lng: number }
 ): Promise<string> => {
-  try {
     // Access configuration from global window object
     // Using TANGER_CONFIG to avoid Vercel/bundlers stripping 'process.env'
     const config = (window as any).TANGER_CONFIG || (window as any).process?.env || {};
-    const apiKey = config.API_KEY;
-
-    if (!apiKey) {
-        console.error("API Key Config Missing. Current Config:", config);
-        throw new Error("API Key missing. Check index.html configuration.");
+    
+    // Support multiple keys for redundancy
+    let apiKeys: string[] = [];
+    if (config.API_KEYS && Array.isArray(config.API_KEYS)) {
+        // Filter out placeholders or empty strings
+        apiKeys = config.API_KEYS.filter((k: string) => k && k.length > 20 && !k.includes('PLACE_YOUR_KEY'));
+    } else if (config.API_KEY) {
+        apiKeys = [config.API_KEY];
     }
 
-    const ai = new GoogleGenAI({ apiKey });
+    if (apiKeys.length === 0) {
+        console.error("No valid API Keys found in config.");
+        return "System Error: No valid API Key configured in index.html";
+    }
 
+    // --- PREPARE DATA ONCE ---
     let providersListString = "Information unavailable.";
     let userLocationString = "User location not available (GPS off).";
 
@@ -263,19 +269,46 @@ export const getChatResponse = async (
 
     const contents = [...history, { role: 'user', parts: userParts }];
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: contents,
-      config: {
-        systemInstruction: systemInstruction,
-      },
-    });
-    
-    return response.text;
-  } catch (error: any) {
-    console.error("Error in generateContent:", error);
-    let detail = "";
-    if (error.message) detail = `Details: ${error.message}`;
-    return `سمح لينا، وقع شي مشكل فالاتصال بالذكاء الاصطناعي.\nSorry, I encountered an error connecting to the AI service.\n\n${detail}`;
-  }
+    // --- FAILOVER LOGIC LOOP ---
+    // Will try Key 1, then Key 2, ..., then Key 10
+    for (let i = 0; i < apiKeys.length; i++) {
+        const apiKey = apiKeys[i];
+        try {
+            const ai = new GoogleGenAI({ apiKey });
+            const response = await ai.models.generateContent({
+                model: "gemini-2.5-flash",
+                contents: contents,
+                config: {
+                    systemInstruction: systemInstruction,
+                },
+            });
+            return response.text; // Success! Return immediately.
+
+        } catch (error: any) {
+            const errString = JSON.stringify(error) + (error.message || "");
+            const isQuotaError = (
+                errString.includes('429') || 
+                errString.includes('RESOURCE_EXHAUSTED') ||
+                errString.includes('quota')
+            );
+
+            // If it's a quota error and we have more keys, continue loop
+            if (isQuotaError && i < apiKeys.length - 1) {
+                console.log(`Key ${i + 1} exhausted. Switching to backup key ${i + 2}...`);
+                continue;
+            }
+
+            // If it's a different error (e.g. invalid request) OR we are out of keys
+            console.error(`API Error on Key ${i + 1}:`, error);
+            
+            if (i === apiKeys.length - 1) {
+                if (isQuotaError) {
+                     return "⚠️ **عذراً، لقد انتهت حصة الاستخدام المجانية لجميع المفاتيح (All Keys Exhausted).**\n\nالسيرفر عليه ضغط كبير دابا. عافاك حاول غدا.";
+                }
+                return `سمح لينا، وقع شي مشكل فالاتصال بالذكاء الاصطناعي.\nSorry, I encountered an error connecting to the AI service.\n\n${error.message || ''}`;
+            }
+        }
+    }
+
+    return "Unexpected Error.";
 };
