@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef } from 'react';
 import { UserView, Language, AuthenticatedUser, AccountType } from './types';
 import Chatbot from './components/Chatbot';
@@ -7,80 +8,170 @@ import AppointmentsDrawer from './components/AppointmentsDrawer';
 import DatabaseSetup from './components/DatabaseSetup';
 import Store from './components/Store'; // Import Store
 import { LocalizationProvider, useLocalization, translations } from './hooks/useLocalization';
-import { Globe, User as UserIcon, CheckSquare, Sun, Moon, LogIn, LogOut, X, CalendarDays, Database, AlertTriangle, CheckCircle2, Menu, Users, Bell, Phone, MapPin, Search, Heart, Briefcase, Star, MessageCircle, ShoppingBag, Eye, EyeOff, Megaphone, Headset } from 'lucide-react';
+import { Globe, User as UserIcon, CheckSquare, Sun, Moon, LogIn, LogOut, X, CalendarDays, Database, AlertTriangle, CheckCircle2, Menu, Users, Bell, Phone, MapPin, Search, Heart, Briefcase, Star, MessageCircle, ShoppingBag, Eye, EyeOff, Megaphone, Headset, Instagram, Facebook, Link as LinkIcon, ArrowLeft } from 'lucide-react';
 import { supabase } from './services/supabaseClient';
 
-// ... ProviderProfileModal code (no changes) ...
+// --- GLOBAL STYLES FOR SCROLLING FIX ---
+// Added inline style block to ensure no text selection during scroll drag
+const ScrollFixStyle = () => (
+    <style>{`
+        * {
+            -webkit-tap-highlight-color: transparent;
+        }
+        .no-select {
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .scroll-container {
+            touch-action: manipulation;
+        }
+        /* Custom scrollbar hiding */
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    `}</style>
+);
+
+// ... ProviderProfileModal code (FULL SCREEN UPDATE) ...
 const ProviderProfileModal: React.FC<{ provider: any; isOpen: boolean; onClose: () => void; isFollowing: boolean; onToggleFollow: () => void }> = ({ provider, isOpen, onClose, isFollowing, onToggleFollow }) => {
     const { t } = useLocalization();
+    const [stats, setStats] = useState({ followers: 0, posts: 0 });
+
+    useEffect(() => {
+        if(provider) {
+             // Fake stats or fetch real ones
+             supabase.from('follows').select('id', { count: 'exact' }).eq('provider_id', provider.id)
+             .then(({count}) => setStats(prev => ({...prev, followers: count || 0})));
+             
+             // Count announcements as "posts"
+             supabase.from('announcements').select('id', { count: 'exact' }).eq('provider_id', provider.id)
+             .then(({count}) => setStats(prev => ({...prev, posts: count || 0})));
+        }
+    }, [provider]);
+
     if (!isOpen || !provider) return null;
 
     const services = provider.provider_services || [];
+    const social = provider.social_links || {};
 
     return (
-        <div className="fixed inset-0 bg-black/70 z-[60] flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
-            <div className="bg-white dark:bg-gray-800 w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl relative" onClick={e => e.stopPropagation()}>
-                <button onClick={onClose} className="absolute top-4 right-4 p-2 bg-black/20 hover:bg-black/40 text-white rounded-full z-10"><X size={20}/></button>
-                
-                {/* Header Image Area */}
-                <div className="h-32 bg-gradient-to-r from-primary to-secondary relative">
-                    <div className="absolute -bottom-10 left-6">
-                         <div className="w-24 h-24 rounded-2xl border-4 border-white dark:border-gray-800 bg-white dark:bg-gray-700 overflow-hidden shadow-lg">
-                            {provider.profile_image_url ? (
+        <div className="fixed inset-0 bg-white dark:bg-gray-900 z-[60] overflow-y-auto animate-fade-in flex flex-col">
+            {/* Header */}
+            <div className="sticky top-0 bg-white/90 dark:bg-gray-900/90 backdrop-blur-md z-10 border-b border-gray-100 dark:border-gray-800 px-4 py-3 flex items-center justify-between">
+                <button onClick={onClose} className="p-2 -ml-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                    <ArrowLeft size={24} className="text-black dark:text-white" />
+                </button>
+                <h2 className="font-bold text-lg dark:text-white truncate max-w-[200px]">{provider.username || provider.name}</h2>
+                <button className="p-2"><div className="w-6" /></button> {/* Spacer */}
+            </div>
+
+            <div className="p-4 pb-20">
+                {/* Profile Header (Instagram Style) */}
+                <div className="flex items-center gap-6 mb-6">
+                    <div className="w-20 h-20 md:w-24 md:h-24 rounded-full p-1 bg-gradient-to-tr from-yellow-400 via-red-500 to-purple-500">
+                        <div className="w-full h-full rounded-full border-2 border-white dark:border-gray-900 bg-gray-200 overflow-hidden">
+                             {provider.profile_image_url ? (
                                 <img src={provider.profile_image_url} className="w-full h-full object-cover" />
                             ) : (
-                                <div className="w-full h-full flex items-center justify-center bg-gray-200 dark:bg-gray-600 text-3xl font-bold text-gray-400">
+                                <div className="w-full h-full flex items-center justify-center bg-gray-100 text-2xl font-bold text-gray-400">
                                     {provider.name.charAt(0)}
                                 </div>
                             )}
+                        </div>
+                    </div>
+                    
+                    <div className="flex-1 flex justify-around text-center">
+                         <div>
+                             <div className="font-bold text-lg dark:text-white">{stats.posts}</div>
+                             <div className="text-xs text-gray-500">Posts</div>
+                         </div>
+                         <div>
+                             <div className="font-bold text-lg dark:text-white">{stats.followers}</div>
+                             <div className="text-xs text-gray-500">Followers</div>
+                         </div>
+                         <div>
+                             <div className="font-bold text-lg dark:text-white">4.9</div>
+                             <div className="text-xs text-gray-500">Rating</div>
                          </div>
                     </div>
                 </div>
 
-                <div className="pt-12 px-6 pb-6">
-                    <div className="flex justify-between items-start mb-4">
-                        <div>
-                            <h2 className="text-2xl font-bold dark:text-white leading-none">{provider.name}</h2>
-                            <p className="text-primary font-medium mt-1">{provider.service_type}</p>
-                            <p className="text-sm text-gray-500 flex items-center gap-1 mt-1"><MapPin size={14}/> {provider.location}</p>
-                        </div>
-                        <button 
-                            onClick={onToggleFollow}
-                            className={`px-5 py-2.5 rounded-full font-bold shadow-md transition-all flex items-center gap-2 ${isFollowing ? 'bg-gray-100 text-gray-600 hover:bg-gray-200' : 'bg-primary text-white hover:bg-primaryDark'}`}
-                        >
-                            {isFollowing ? <><CheckCircle2 size={16}/> {t('unfollow')}</> : <>{t('follow')}</>}
-                        </button>
+                {/* Name & Bio */}
+                <div className="mb-6">
+                    <h1 className="font-bold text-xl dark:text-white">{provider.name}</h1>
+                    <p className="text-gray-500 text-sm font-medium mb-1">{provider.service_type} • {provider.location}</p>
+                    <p className="text-sm dark:text-gray-300 leading-relaxed whitespace-pre-wrap">{provider.bio || "No bio available."}</p>
+                    
+                    {/* Social Links */}
+                    <div className="flex gap-4 mt-3">
+                        {social.instagram && (
+                            <a href={social.instagram} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-sm font-bold text-pink-600 hover:underline">
+                                <Instagram size={16}/> Instagram
+                            </a>
+                        )}
+                        {social.facebook && (
+                            <a href={social.facebook} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-sm font-bold text-blue-600 hover:underline">
+                                <Facebook size={16}/> Facebook
+                            </a>
+                        )}
+                        {social.website && (
+                            <a href={social.website} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-sm font-bold text-gray-600 dark:text-gray-300 hover:underline">
+                                <LinkIcon size={16}/> Website
+                            </a>
+                        )}
+                    </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-2 mb-8">
+                    <button 
+                        onClick={onToggleFollow}
+                        className={`flex-1 py-2 rounded-lg font-bold text-sm transition-all ${isFollowing ? 'bg-gray-100 dark:bg-gray-800 text-black dark:text-white border border-gray-200 dark:border-gray-700' : 'bg-primary text-white'}`}
+                    >
+                        {isFollowing ? 'Following' : 'Follow'}
+                    </button>
+                    <a href={`tel:${provider.phone}`} className="flex-1 py-2 bg-gray-100 dark:bg-gray-800 text-black dark:text-white rounded-lg font-bold text-sm text-center border border-gray-200 dark:border-gray-700">
+                        Call
+                    </a>
+                    <a href={`https://wa.me/${provider.phone?.replace(/^0/,'212')}`} className="flex-1 py-2 bg-gray-100 dark:bg-gray-800 text-black dark:text-white rounded-lg font-bold text-sm text-center border border-gray-200 dark:border-gray-700">
+                        WhatsApp
+                    </a>
+                </div>
+
+                {/* Content Tabs (Services/Posts) */}
+                <div className="border-t border-gray-200 dark:border-gray-800">
+                    <div className="flex justify-around mb-4">
+                        <button className="py-3 border-b-2 border-black dark:border-white w-full text-center font-bold text-sm">Services & Offers</button>
                     </div>
 
-                    {/* Bio */}
-                    {provider.bio && (
-                        <div className="mb-6 bg-gray-50 dark:bg-gray-700/50 p-4 rounded-xl">
-                            <h4 className="font-bold text-sm mb-2 text-gray-500 uppercase">{t('about')}</h4>
-                            <p className="text-gray-700 dark:text-gray-300 text-sm leading-relaxed">{provider.bio}</p>
-                        </div>
-                    )}
-
-                    {/* Services & Offers */}
-                    <div>
-                         <h4 className="font-bold text-sm mb-3 text-gray-500 uppercase flex items-center gap-2"><Star size={16} className="text-yellow-500"/> {t('servicesAndOffers')}</h4>
-                         <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                             {services.length > 0 ? services.map((s: any) => (
-                                 <div key={s.id} className="flex justify-between items-center p-3 border border-gray-100 dark:border-gray-700 rounded-xl">
-                                     <span className="font-medium dark:text-white text-sm">{s.name}</span>
-                                     <div className="text-sm">
-                                         {s.discount_price ? (
-                                             <>
-                                                <span className="line-through text-gray-400 mr-2 text-xs">{s.price} DH</span>
-                                                <span className="font-bold text-green-600">{s.discount_price} DH</span>
-                                             </>
-                                         ) : (
-                                             <span className="font-bold text-gray-700 dark:text-gray-300">{s.price} DH</span>
-                                         )}
-                                     </div>
+                     <div className="space-y-3">
+                         {services.length > 0 ? services.map((s: any) => (
+                             <div key={s.id} className="flex justify-between items-center p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700">
+                                 <div>
+                                     <span className="font-bold dark:text-white text-sm block">{s.name}</span>
                                  </div>
-                             )) : <p className="text-sm text-gray-400 italic">No services listed yet.</p>}
-                         </div>
-                    </div>
+                                 <div className="text-sm">
+                                     {s.discount_price ? (
+                                         <div className="text-right">
+                                            <span className="block line-through text-gray-400 text-xs">{s.price} DH</span>
+                                            <span className="block font-bold text-green-600">{s.discount_price} DH</span>
+                                         </div>
+                                     ) : (
+                                         <span className="font-bold text-gray-700 dark:text-gray-300">{s.price} DH</span>
+                                     )}
+                                 </div>
+                             </div>
+                         )) : (
+                             <div className="text-center py-10 text-gray-400 flex flex-col items-center">
+                                 <Briefcase size={40} className="mb-2 opacity-50"/>
+                                 <p>No services listed yet.</p>
+                             </div>
+                         )}
+                     </div>
                 </div>
             </div>
         </div>
@@ -165,7 +256,7 @@ const ProviderDirectory: React.FC<{ isOpen: boolean; onClose: () => void; curren
                     </div>
                 </div>
 
-                <div className="overflow-y-auto p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="overflow-y-auto p-4 grid grid-cols-1 md:grid-cols-2 gap-4 scroll-container">
                     {filteredProviders.map(p => (
                         <div key={p.id} onClick={() => setSelectedProvider(p)} className="p-4 bg-white border border-gray-100 dark:bg-gray-700/50 dark:border-gray-600 rounded-2xl hover:shadow-lg transition-all cursor-pointer group">
                             <div className="flex items-start gap-4">
@@ -376,11 +467,11 @@ const AuthDrawer: React.FC<{ isOpen: boolean; onClose: () => void; onAuthSuccess
         onAuthSuccess({ id: data.id, name: data.full_name, accountType: AccountType.CLIENT, phone: data.phone });
       } else {
         if (!username || !password) { setError(t('allFieldsRequired')); setIsLoading(false); return; }
-        const { data, error } = await supabase.from('providers').select('id, name, username, is_active, subscription_end_date, bio, profile_image_url, phone').eq('username', username).eq('password', password).single();
+        const { data, error } = await supabase.from('providers').select('id, name, username, is_active, subscription_end_date, bio, profile_image_url, phone, social_links').eq('username', username).eq('password', password).single();
         if (error || !data) throw error || new Error('Invalid credentials');
         localStorage.setItem('tangerconnect_user_id', data.id.toString());
         localStorage.setItem('tangerconnect_user_type', AccountType.PROVIDER);
-        onAuthSuccess({ id: data.id, name: data.name, accountType: AccountType.PROVIDER, username: data.username, isActive: data.is_active, subscriptionEndDate: data.subscription_end_date, bio: data.bio, profile_image_url: data.profile_image_url, phone: data.phone });
+        onAuthSuccess({ id: data.id, name: data.name, accountType: AccountType.PROVIDER, username: data.username, isActive: data.is_active, subscriptionEndDate: data.subscription_end_date, bio: data.bio, profile_image_url: data.profile_image_url, phone: data.phone, social_links: data.social_links });
       }
     } catch (e: any) { handleSpecificError(e); } finally { setIsLoading(false); }
   };
@@ -473,9 +564,9 @@ const App: React.FC = () => {
             if (error) throw error;
             if (data) setCurrentUser({ id: data.id, name: data.full_name, accountType: AccountType.CLIENT, phone: data.phone });
           } else if (userType === AccountType.PROVIDER) {
-            const { data, error } = await supabase.from('providers').select('id, name, username, is_active, subscription_end_date, bio, profile_image_url, phone').eq('id', parseInt(userId, 10)).single();
+            const { data, error } = await supabase.from('providers').select('id, name, username, is_active, subscription_end_date, bio, profile_image_url, phone, social_links').eq('id', parseInt(userId, 10)).single();
             if (data) {
-                setCurrentUser({ id: data.id, name: data.name, accountType: AccountType.PROVIDER, username: data.username, isActive: data.is_active, subscriptionEndDate: data.subscription_end_date, bio: data.bio, profile_image_url: data.profile_image_url, phone: data.phone });
+                setCurrentUser({ id: data.id, name: data.name, accountType: AccountType.PROVIDER, username: data.username, isActive: data.is_active, subscriptionEndDate: data.subscription_end_date, bio: data.bio, profile_image_url: data.profile_image_url, phone: data.phone, social_links: data.social_links });
                 setView(UserView.PROVIDER);
             }
           }
@@ -606,6 +697,7 @@ const App: React.FC = () => {
 
   return (
     <LocalizationProvider language={language}>
+      <ScrollFixStyle />
       <div className={`h-screen bg-surface dark:bg-dark text-dark dark:text-light transition-colors duration-300 flex flex-col ${language === Language.AR ? 'font-arabic' : 'font-sans'}`} dir={language === Language.AR ? 'rtl' : 'ltr'}>
         <Header />
         

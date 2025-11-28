@@ -1,9 +1,10 @@
 
+
 import React, { useState, useRef, useEffect } from 'react';
 import { useLocalization } from '../hooks/useLocalization';
 import { BookingDetails, FollowUp, AuthenticatedUser, ProviderService, ProviderNotification, Product } from '../types';
 import { supabase } from '../services/supabaseClient';
-import { CheckCircle, XCircle, Camera, Loader2, Upload, Send, LogOut, User, Calendar, FileText, Lock, Phone, X, RefreshCw, BarChart, History, Users, Edit, Trash, Smartphone, MessageCircle, MapPin, Briefcase, Save, Image as ImageIcon, Map, Bell, Clock, AlertTriangle, Package, Plus, ShoppingBag } from 'lucide-react';
+import { CheckCircle, XCircle, Camera, Loader2, Upload, Send, LogOut, User, Calendar, FileText, Lock, Phone, X, RefreshCw, BarChart, History, Users, Edit, Trash, Smartphone, MessageCircle, MapPin, Briefcase, Save, Image as ImageIcon, Map, Bell, Clock, AlertTriangle, Package, Plus, ShoppingBag, Instagram, Facebook, Link as LinkIcon } from 'lucide-react';
 import jsQR from 'jsqr';
 
 interface ScannedAppointment extends BookingDetails {}
@@ -362,6 +363,7 @@ const ProfileManager: React.FC<{ provider: AuthenticatedUser }> = ({ provider })
     const { t, language } = useLocalization();
     const [bio, setBio] = useState(provider.bio || '');
     const [services, setServices] = useState<ProviderService[]>([]);
+    const [socialLinks, setSocialLinks] = useState({ instagram: '', facebook: '', website: '' });
     const [newService, setNewService] = useState({ name: '', price: '', discount: '' });
     const [isLoading, setIsLoading] = useState(false);
     const [locationLoading, setLocationLoading] = useState(false);
@@ -380,6 +382,7 @@ const ProfileManager: React.FC<{ provider: AuthenticatedUser }> = ({ provider })
 
     useEffect(() => { 
         fetchServices(); 
+        setSocialLinks(provider.social_links || { instagram: '', facebook: '', website: '' });
         supabase.from('follows').select('id', { count: 'exact' }).eq('provider_id', provider.id)
         .then(({count}) => setFollowerCount(count || 0));
     }, [provider.id]);
@@ -391,7 +394,13 @@ const ProfileManager: React.FC<{ provider: AuthenticatedUser }> = ({ provider })
 
     const handleUpdateProfile = async () => {
         setIsLoading(true);
-        await supabase.from('providers').update({ bio }).eq('id', provider.id);
+        // Ensure social links are valid JSON object
+        const cleanSocial = {
+             instagram: socialLinks.instagram,
+             facebook: socialLinks.facebook,
+             website: socialLinks.website
+        };
+        await supabase.from('providers').update({ bio, social_links: cleanSocial }).eq('id', provider.id);
         setIsLoading(false);
         showSuccess(t('savedSuccessfully'));
     };
@@ -516,16 +525,33 @@ const ProfileManager: React.FC<{ provider: AuthenticatedUser }> = ({ provider })
                 </button>
             </div>
 
-            {/* Bio & Image */}
+            {/* Bio & Social Links */}
             <div className="mb-6">
                 <label className="text-xs font-bold text-gray-500 block mb-2">{t('bioLabel')}</label>
                 <textarea 
                     value={bio} 
                     onChange={e => setBio(e.target.value)} 
-                    className="w-full p-3 bg-gray-50 dark:bg-gray-700 rounded-xl dark:text-white"
+                    className="w-full p-3 bg-gray-50 dark:bg-gray-700 rounded-xl dark:text-white mb-2"
                     rows={3}
                 />
-                <div className="flex flex-wrap gap-2 mt-2">
+                
+                <div className="space-y-2 mt-4">
+                     <h5 className="font-bold text-xs text-gray-500">Social Media Links</h5>
+                     <div className="flex items-center gap-2">
+                         <Instagram size={18} className="text-pink-600" />
+                         <input placeholder="Instagram Link" value={socialLinks.instagram} onChange={e => setSocialLinks({...socialLinks, instagram: e.target.value})} className="flex-1 p-2 bg-gray-50 dark:bg-gray-700 rounded-lg text-sm dark:text-white"/>
+                     </div>
+                     <div className="flex items-center gap-2">
+                         <Facebook size={18} className="text-blue-600" />
+                         <input placeholder="Facebook Link" value={socialLinks.facebook} onChange={e => setSocialLinks({...socialLinks, facebook: e.target.value})} className="flex-1 p-2 bg-gray-50 dark:bg-gray-700 rounded-lg text-sm dark:text-white"/>
+                     </div>
+                     <div className="flex items-center gap-2">
+                         <LinkIcon size={18} className="text-gray-500" />
+                         <input placeholder="Website Link" value={socialLinks.website} onChange={e => setSocialLinks({...socialLinks, website: e.target.value})} className="flex-1 p-2 bg-gray-50 dark:bg-gray-700 rounded-lg text-sm dark:text-white"/>
+                     </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2 mt-4">
                     <button onClick={() => fileInputRef.current?.click()} disabled={imageLoading} className="text-xs px-3 py-1.5 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center gap-1 text-gray-600 dark:text-gray-300">
                         {imageLoading ? <Loader2 size={14} className="animate-spin"/> : <ImageIcon size={14}/>} {imageLoading ? t('uploading') : t('uploadProfileImage')}
                     </button>

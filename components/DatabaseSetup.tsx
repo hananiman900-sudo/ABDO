@@ -1,7 +1,8 @@
 
+
 import React from 'react';
 import { useLocalization } from '../hooks/useLocalization';
-import { X, Copy, Database, Image as ImageIcon, Users, AlertTriangle, ShieldAlert, CheckCircle, Unlock, Bell, ShoppingBag, ListPlus, UserCheck, Megaphone, ShieldCheck, Layers, Star, FolderTree, Key, Wrench } from 'lucide-react';
+import { X, Copy, Database, Image as ImageIcon, Users, AlertTriangle, ShieldAlert, CheckCircle, Unlock, Bell, ShoppingBag, ListPlus, UserCheck, Megaphone, ShieldCheck, Layers, Star, FolderTree, Key, Wrench, Share2 } from 'lucide-react';
 
 const CodeBlock: React.FC<{ title: string; code: string }> = ({ title, code }) => {
   const { t } = useLocalization();
@@ -328,6 +329,12 @@ ON CONFLICT (name) DO NOTHING;
 NOTIFY pgrst, 'reload config';
 `;
 
+const v21UpdateSQL = `-- V21: Social Links & Measurement Specs
+-- Add social_links column for Providers
+ALTER TABLE public.providers ADD COLUMN IF NOT EXISTS social_links jsonb DEFAULT '{}';
+NOTIFY pgrst, 'reload config';
+`;
+
 const createAdminSQL = `-- Create Admin User
 INSERT INTO public.providers (
   name, service_type, location, username, password, phone, is_active, subscription_end_date
@@ -349,6 +356,7 @@ ${providerServicesTableSQL}
 ${v18UpdateSQL}
 ${v19UpdateSQL}
 ${v20UpdateSQL}
+${v21UpdateSQL}
 
 -- Buckets (manual step usually, but tried here)
 INSERT INTO storage.buckets (id, name, public) VALUES ('profiles', 'profiles', true) ON CONFLICT (id) DO UPDATE SET public = true;
@@ -372,6 +380,14 @@ INSERT INTO storage.buckets (id, name, public) VALUES ('announcement-images', 'a
         </div>
         <div className="p-6 h-[calc(100vh-65px)] overflow-y-auto">
           <p className="mb-6 text-gray-700 dark:text-gray-300">{t('databaseSetupDesc')}</p>
+
+          {/* V21 Update */}
+          <div className="mb-8 p-4 border-l-4 border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 rounded-r-lg shadow-lg animate-fade-in">
+             <h3 className="text-xl font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-2 mb-4">
+                <Share2 /> V21 Update: Social Links
+             </h3>
+             <CodeBlock title="V21 Social Links" code={v21UpdateSQL.trim()} />
+          </div>
 
           {/* V20 Emergency Fix */}
           <div className="mb-8 p-4 border-l-4 border-purple-600 bg-purple-50 dark:bg-purple-900/20 rounded-r-lg shadow-lg animate-fade-in">

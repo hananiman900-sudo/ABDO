@@ -36,6 +36,11 @@ export interface AuthenticatedUser {
   longitude?: number;
   bio?: string;
   profile_image_url?: string;
+  social_links?: {
+    instagram?: string;
+    facebook?: string;
+    website?: string;
+  };
 }
 
 
