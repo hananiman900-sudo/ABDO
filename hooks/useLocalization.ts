@@ -29,6 +29,83 @@ export const translations: Translations = {
     en: 'Search',
     fr: 'Rechercher',
   },
+  // --- FITTING ROOM TRANSLATIONS ---
+  virtualFittingRoom: {
+    ar: 'غرفة القياس الافتراضية',
+    en: 'Virtual Fitting Room',
+    fr: 'Cabine d\'essayage virtuelle',
+  },
+  fittingRoomStep1: {
+    ar: 'الخطوة 1: أدخل القياسات ديالك',
+    en: 'Step 1: Enter Your Measurements',
+    fr: 'Étape 1 : Entrez vos mesures',
+  },
+  fittingRoomStep2: {
+    ar: 'الخطوة 2: كيفاش بغيتي تقيس؟',
+    en: 'Step 2: How to try on?',
+    fr: 'Étape 2 : Comment essayer ?',
+  },
+  heightCm: {
+    ar: 'الطول (سم)',
+    en: 'Height (cm)',
+    fr: 'Taille (cm)',
+  },
+  weightKg: {
+    ar: 'الوزن (كغ)',
+    en: 'Weight (kg)',
+    fr: 'Poids (kg)',
+  },
+  yourSize: {
+    ar: 'المقاس ديالك (S, M, L...)',
+    en: 'Your Size (S, M, L...)',
+    fr: 'Votre taille (S, M, L...)',
+  },
+  continue: {
+    ar: 'تابع',
+    en: 'Continue',
+    fr: 'Continuer',
+  },
+  takePhoto: {
+    ar: 'صور راسك',
+    en: 'Take Photo',
+    fr: 'Prendre une photo',
+  },
+  recordVideo: {
+    ar: 'سجل فيديو',
+    en: 'Record Video',
+    fr: 'Enregistrer une vidéo',
+  },
+  uploadImageOrVideo: {
+    ar: 'رفع صورة / فيديو',
+    en: 'Upload Image/Video',
+    fr: 'Télécharger image/vidéo',
+  },
+  tryOnInstruction: {
+    ar: 'حرك القطعة بيدك باش تقادها على الجسم ديالك.',
+    en: 'Drag the item to adjust it on your body.',
+    fr: 'Faites glisser l\'article pour l\'ajuster sur votre corps.',
+  },
+  addToCartClose: {
+    ar: 'إضافة للسلة وإغلاق',
+    en: 'Add to Cart & Close',
+    fr: 'Ajouter au panier & Fermer',
+  },
+  uploadPhotoStart: {
+    ar: 'تيليشارجي تصويرتك باش تبدا',
+    en: 'Upload your photo to start',
+    fr: 'Téléchargez votre photo pour commencer',
+  },
+  scale: {
+    ar: 'تكبير/تصغير',
+    en: 'Scale',
+    fr: 'Échelle',
+  },
+  move: {
+    ar: 'تحريك',
+    en: 'Move',
+    fr: 'Déplacer',
+  },
+  // --- END FITTING ROOM ---
   myFollowing: {
     ar: 'المتابعات ديالي',
     en: 'My Following',

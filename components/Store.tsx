@@ -1,8 +1,9 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocalization } from '../hooks/useLocalization';
 import { Product, CartItem, AuthenticatedUser, Order, SystemAnnouncement, Category } from '../types';
 import { supabase } from '../services/supabaseClient';
-import { ShoppingBag, ShoppingCart, Plus, Minus, X, CheckCircle, Loader2, Package, Search, History, Trash, Settings, List, Save, User, Phone, Edit, MessageSquare, Image as ImageIcon, ArrowLeft, Truck, Clock, Star, Send, Filter, ChevronLeft, ChevronRight, FolderPlus, LogIn, Shirt, Scissors, Maximize2, ChevronUp, ChevronDown } from 'lucide-react';
+import { ShoppingBag, ShoppingCart, Plus, Minus, X, CheckCircle, Loader2, Package, Search, History, Trash, Settings, List, Save, User, Phone, Edit, MessageSquare, Image as ImageIcon, ArrowLeft, Truck, Clock, Star, Send, Filter, ChevronLeft, ChevronRight, FolderPlus, LogIn, Shirt, Scissors, Maximize2, ChevronUp, ChevronDown, Camera, Video, Upload } from 'lucide-react';
 
 interface StoreProps {
     isOpen: boolean;
@@ -11,41 +12,50 @@ interface StoreProps {
     onOpenAuth: () => void; // Callback to open auth drawer
 }
 
-// --- VIRTUAL TRY-ON COMPONENT ---
+// --- VIRTUAL TRY-ON COMPONENT (WIZARD FLOW) ---
 const VirtualFittingRoom: React.FC<{ isOpen: boolean; onClose: () => void; initialProduct: Product; onAddToCart: (product: Product, size: string) => void }> = ({ isOpen, onClose, initialProduct, onAddToCart }) => {
-    const [userImage, setUserImage] = useState<string | null>(null);
+    const { t } = useLocalization();
+    const [step, setStep] = useState(1);
+    
+    // Step 1: Measurements
+    const [userStats, setUserStats] = useState({ height: '', weight: '', size: '' });
+    
+    // Step 2: Media
+    const [userMedia, setUserMedia] = useState<string | null>(null);
+    const [mediaType, setMediaType] = useState<'image' | 'video'>('image');
+    
+    // Step 3: Fitting Room
     const [clothingItems, setClothingItems] = useState<{product: Product, x: number, y: number, scale: number, id: number}[]>([]);
     const [activeItemId, setActiveItemId] = useState<number | null>(null);
-    const [userStats, setUserStats] = useState({ height: '', weight: '', size: '' });
+
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const canvasRef = useRef<HTMLDivElement>(null);
+    const videoRef = useRef<HTMLVideoElement>(null);
     
     useEffect(() => {
         if(isOpen && initialProduct) {
-             // Add initial product to canvas
-             setClothingItems([{ product: initialProduct, x: 50, y: 50, scale: 1, id: Date.now() }]);
+             // Reset
+             setStep(1);
+             setUserMedia(null);
+             setClothingItems([{ product: initialProduct, x: 50, y: 30, scale: 1, id: Date.now() }]);
         }
     }, [isOpen, initialProduct]);
 
-    const handleUserImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleMediaUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'video') => {
         const file = e.target.files?.[0];
         if(file) {
-            setUserImage(URL.createObjectURL(file));
+            setMediaType(type);
+            const url = URL.createObjectURL(file);
+            setUserMedia(url);
+            setStep(3);
         }
     }
 
-    // Basic drag logic (simplified for React)
-    const handleDragStart = (e: React.TouchEvent | React.MouseEvent, id: number) => {
-        setActiveItemId(id);
-    }
-
-    // Scale Controls
+    // Controls
     const updateScale = (delta: number) => {
         if(!activeItemId) return;
         setClothingItems(prev => prev.map(item => item.id === activeItemId ? {...item, scale: Math.max(0.5, item.scale + delta)} : item));
     }
     
-    // Position Controls (Arrows)
     const moveItem = (dx: number, dy: number) => {
         if(!activeItemId) return;
         setClothingItems(prev => prev.map(item => item.id === activeItemId ? {...item, x: item.x + dx, y: item.y + dy} : item));
@@ -54,91 +64,188 @@ const VirtualFittingRoom: React.FC<{ isOpen: boolean; onClose: () => void; initi
     if(!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black/90 z-[70] flex flex-col animate-fade-in text-white">
-            <div className="flex justify-between items-center p-4">
-                 <h2 className="font-bold text-xl flex items-center gap-2"><Shirt className="text-pink-500"/> Virtual Fitting Room</h2>
-                 <button onClick={onClose}><X size={24}/></button>
+        <div className="fixed inset-0 bg-black/90 z-[70] flex flex-col animate-fade-in text-white h-screen">
+            <div className="flex justify-between items-center p-4 z-20 bg-black/50 backdrop-blur-md">
+                 <h2 className="font-bold text-lg flex items-center gap-2"><Shirt className="text-pink-500"/> {t('virtualFittingRoom')}</h2>
+                 <button onClick={onClose} className="bg-gray-800 p-2 rounded-full"><X size={20}/></button>
             </div>
 
-            <div className="flex-1 relative overflow-hidden bg-gray-900 flex justify-center items-center">
-                {/* Canvas Area */}
-                <div ref={canvasRef} className="relative w-full h-full max-w-md bg-gray-800 overflow-hidden border-2 border-dashed border-gray-600 rounded-lg">
-                    {userImage ? (
-                        <img src={userImage} className="w-full h-full object-cover pointer-events-none opacity-80" alt="User" />
-                    ) : (
-                        <div className="flex flex-col items-center justify-center h-full text-gray-500">
-                             <User size={64} />
-                             <p>Upload your photo to start</p>
-                             <button onClick={() => fileInputRef.current?.click()} className="mt-4 bg-pink-500 text-white px-6 py-2 rounded-full font-bold">Upload Photo</button>
-                        </div>
-                    )}
-                    
-                    {/* Clothing Layer */}
-                    {clothingItems.map(item => (
-                        <div 
-                            key={item.id}
-                            className={`absolute transition-transform ${activeItemId === item.id ? 'ring-2 ring-pink-500' : ''}`}
-                            style={{ 
-                                top: `${item.y}%`, 
-                                left: `${item.x}%`, 
-                                transform: `translate(-50%, -50%) scale(${item.scale})`,
-                                width: '200px' // Base width
-                            }}
-                            onTouchStart={(e) => handleDragStart(e, item.id)}
-                            onMouseDown={(e) => handleDragStart(e, item.id)}
-                        >
-                            <img src={item.product.image_url} className="w-full pointer-events-none drop-shadow-2xl" />
-                        </div>
-                    ))}
-                </div>
+            <div className="flex-1 flex flex-col items-center justify-center p-4 relative overflow-hidden">
                 
-                <input type="file" ref={fileInputRef} hidden accept="image/*" onChange={handleUserImageUpload} />
-            </div>
-
-            {/* Controls */}
-            <div className="bg-gray-800 p-4 pb-8 rounded-t-3xl">
-                <div className="flex gap-2 overflow-x-auto mb-4 pb-2">
-                    {/* User Stats Inputs */}
-                    <input placeholder="Height (cm)" value={userStats.height} onChange={e => setUserStats({...userStats, height: e.target.value})} className="bg-gray-700 rounded-lg p-2 w-24 text-sm outline-none text-white"/>
-                    <input placeholder="Weight (kg)" value={userStats.weight} onChange={e => setUserStats({...userStats, weight: e.target.value})} className="bg-gray-700 rounded-lg p-2 w-24 text-sm outline-none text-white"/>
-                    <input placeholder="Your Size" value={userStats.size} onChange={e => setUserStats({...userStats, size: e.target.value})} className="bg-gray-700 rounded-lg p-2 w-24 text-sm outline-none text-white"/>
-                </div>
-
-                {/* Edit Controls */}
-                <div className="flex justify-between items-center mb-4">
-                     <div className="flex gap-4">
-                         <div className="flex flex-col items-center">
-                             <span className="text-xs text-gray-400 mb-1">Scale</span>
-                             <div className="flex gap-2">
-                                 <button onClick={() => updateScale(-0.1)} className="bg-gray-700 p-2 rounded-full"><Minus size={16}/></button>
-                                 <button onClick={() => updateScale(0.1)} className="bg-gray-700 p-2 rounded-full"><Plus size={16}/></button>
+                {/* STEP 1: MEASUREMENTS */}
+                {step === 1 && (
+                    <div className="w-full max-w-sm bg-gray-800 p-6 rounded-2xl animate-slide-up">
+                        <h3 className="text-xl font-bold mb-6 text-center">{t('fittingRoomStep1')}</h3>
+                        <div className="space-y-4">
+                             <div>
+                                 <label className="text-sm text-gray-400 block mb-1">{t('heightCm')}</label>
+                                 <input 
+                                    type="number"
+                                    value={userStats.height} 
+                                    onChange={e => setUserStats({...userStats, height: e.target.value})} 
+                                    className="w-full bg-gray-700 rounded-xl p-3 outline-none focus:ring-2 focus:ring-pink-500 text-white"
+                                    placeholder="170"
+                                 />
                              </div>
-                         </div>
-                         <div className="flex flex-col items-center">
-                             <span className="text-xs text-gray-400 mb-1">Move</span>
-                             <div className="grid grid-cols-2 gap-1">
-                                 <button onClick={() => moveItem(0, -5)} className="bg-gray-700 p-1 rounded"><ChevronUp size={14}/></button>
-                                 <button onClick={() => moveItem(0, 5)} className="bg-gray-700 p-1 rounded"><ChevronDown size={14}/></button>
-                                 <button onClick={() => moveItem(-5, 0)} className="bg-gray-700 p-1 rounded"><ChevronLeft size={14}/></button>
-                                 <button onClick={() => moveItem(5, 0)} className="bg-gray-700 p-1 rounded"><ChevronRight size={14}/></button>
+                             <div>
+                                 <label className="text-sm text-gray-400 block mb-1">{t('weightKg')}</label>
+                                 <input 
+                                    type="number"
+                                    value={userStats.weight} 
+                                    onChange={e => setUserStats({...userStats, weight: e.target.value})} 
+                                    className="w-full bg-gray-700 rounded-xl p-3 outline-none focus:ring-2 focus:ring-pink-500 text-white"
+                                    placeholder="70"
+                                 />
+                             </div>
+                             <div>
+                                 <label className="text-sm text-gray-400 block mb-1">{t('yourSize')}</label>
+                                 <div className="flex gap-2">
+                                     {['S', 'M', 'L', 'XL', 'XXL'].map(s => (
+                                         <button 
+                                            key={s} 
+                                            onClick={() => setUserStats({...userStats, size: s})}
+                                            className={`flex-1 py-2 rounded-lg font-bold border ${userStats.size === s ? 'bg-pink-500 border-pink-500' : 'bg-gray-700 border-gray-600 hover:bg-gray-600'}`}
+                                         >
+                                             {s}
+                                         </button>
+                                     ))}
+                                 </div>
+                             </div>
+                             
+                             <button 
+                                onClick={() => setStep(2)} 
+                                disabled={!userStats.height || !userStats.weight || !userStats.size}
+                                className="w-full bg-pink-500 py-3 rounded-xl font-bold mt-4 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-pink-500/30"
+                             >
+                                 {t('continue')}
+                             </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* STEP 2: CHOOSE MEDIA */}
+                {step === 2 && (
+                    <div className="w-full max-w-sm bg-gray-800 p-6 rounded-2xl animate-slide-up">
+                        <h3 className="text-xl font-bold mb-6 text-center">{t('fittingRoomStep2')}</h3>
+                        <div className="space-y-3">
+                            <label className="w-full bg-gray-700 p-4 rounded-xl flex items-center gap-4 cursor-pointer hover:bg-gray-600 transition-colors">
+                                <div className="bg-blue-500 p-3 rounded-full"><Camera size={24}/></div>
+                                <div className="text-left">
+                                    <span className="block font-bold">{t('takePhoto')}</span>
+                                </div>
+                                <input type="file" hidden accept="image/*" capture="user" onChange={(e) => handleMediaUpload(e, 'image')} />
+                            </label>
+
+                            <label className="w-full bg-gray-700 p-4 rounded-xl flex items-center gap-4 cursor-pointer hover:bg-gray-600 transition-colors">
+                                <div className="bg-red-500 p-3 rounded-full"><Video size={24}/></div>
+                                <div className="text-left">
+                                    <span className="block font-bold">{t('recordVideo')}</span>
+                                </div>
+                                <input type="file" hidden accept="video/*" capture="environment" onChange={(e) => handleMediaUpload(e, 'video')} />
+                            </label>
+
+                            <label className="w-full bg-gray-700 p-4 rounded-xl flex items-center gap-4 cursor-pointer hover:bg-gray-600 transition-colors">
+                                <div className="bg-green-500 p-3 rounded-full"><Upload size={24}/></div>
+                                <div className="text-left">
+                                    <span className="block font-bold">{t('uploadImageOrVideo')}</span>
+                                </div>
+                                <input type="file" hidden accept="image/*,video/*" onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if(file) {
+                                        const type = file.type.startsWith('video') ? 'video' : 'image';
+                                        handleMediaUpload(e, type);
+                                    }
+                                }} />
+                            </label>
+                        </div>
+                        <button onClick={() => setStep(1)} className="mt-6 text-gray-400 text-sm hover:text-white underline w-full text-center">Back</button>
+                    </div>
+                )}
+
+                {/* STEP 3: TRY-ON CANVAS */}
+                {step === 3 && (
+                     <div className="w-full h-full relative flex items-center justify-center">
+                         <div className="relative w-full max-w-md h-full max-h-[70vh] bg-black overflow-hidden rounded-lg border border-gray-700">
+                             {/* Background Media */}
+                             {mediaType === 'video' ? (
+                                 <video 
+                                    ref={videoRef} 
+                                    src={userMedia!} 
+                                    className="w-full h-full object-cover pointer-events-none" 
+                                    autoPlay 
+                                    loop 
+                                    muted 
+                                    playsInline 
+                                 />
+                             ) : (
+                                 <img src={userMedia!} className="w-full h-full object-cover pointer-events-none" alt="User" />
+                             )}
+                             
+                             {/* Clothing Overlay */}
+                             {clothingItems.map(item => (
+                                 <div 
+                                     key={item.id}
+                                     className={`absolute transition-transform ${activeItemId === item.id ? 'ring-2 ring-pink-500 ring-offset-2 ring-offset-transparent' : ''}`}
+                                     style={{ 
+                                         top: `${item.y}%`, 
+                                         left: `${item.x}%`, 
+                                         transform: `translate(-50%, -50%) scale(${item.scale})`,
+                                         width: '200px',
+                                         touchAction: 'none'
+                                     }}
+                                     onTouchStart={() => setActiveItemId(item.id)}
+                                     onMouseDown={() => setActiveItemId(item.id)}
+                                 >
+                                     <img src={item.product.image_url} className="w-full pointer-events-none drop-shadow-2xl filter contrast-110" />
+                                 </div>
+                             ))}
+
+                             <div className="absolute top-4 left-0 w-full text-center pointer-events-none">
+                                 <span className="bg-black/50 text-white px-3 py-1 rounded-full text-xs backdrop-blur-sm">
+                                     {t('tryOnInstruction')}
+                                 </span>
                              </div>
                          </div>
                      </div>
-                     <button onClick={() => activeItemId && setClothingItems(prev => prev.filter(i => i.id !== activeItemId))} className="bg-red-500/20 text-red-500 p-3 rounded-full">
-                         <Trash size={20}/>
-                     </button>
-                </div>
-
-                <button 
-                    onClick={() => {
-                        onAddToCart(initialProduct, userStats.size || 'M');
-                        onClose();
-                    }}
-                    className="w-full bg-pink-500 py-3 rounded-xl font-bold text-white shadow-lg shadow-pink-500/30"
-                >
-                    Add to Cart & Close
-                </button>
+                )}
             </div>
+
+            {/* Controls (Only visible in Step 3) */}
+            {step === 3 && (
+                <div className="bg-gray-800 p-4 pb-8 rounded-t-3xl z-30">
+                    <div className="flex justify-between items-center mb-4">
+                         <div className="flex gap-4">
+                             <div className="flex flex-col items-center">
+                                 <span className="text-[10px] text-gray-400 mb-1 uppercase tracking-wider">{t('scale')}</span>
+                                 <div className="flex gap-2">
+                                     <button onClick={() => updateScale(-0.1)} className="bg-gray-700 p-3 rounded-full active:scale-95 transition-transform"><Minus size={16}/></button>
+                                     <button onClick={() => updateScale(0.1)} className="bg-gray-700 p-3 rounded-full active:scale-95 transition-transform"><Plus size={16}/></button>
+                                 </div>
+                             </div>
+                             <div className="flex flex-col items-center">
+                                 <span className="text-[10px] text-gray-400 mb-1 uppercase tracking-wider">{t('move')}</span>
+                                 <div className="flex gap-2">
+                                     <button onClick={() => moveItem(0, -5)} className="bg-gray-700 p-3 rounded-full active:scale-95 transition-transform"><ChevronUp size={16}/></button>
+                                     <button onClick={() => moveItem(0, 5)} className="bg-gray-700 p-3 rounded-full active:scale-95 transition-transform"><ChevronDown size={16}/></button>
+                                 </div>
+                             </div>
+                         </div>
+                         <button onClick={() => setStep(2)} className="text-gray-400 p-2 text-xs flex flex-col items-center">
+                             <Camera size={20} className="mb-1"/> Retake
+                         </button>
+                    </div>
+
+                    <button 
+                        onClick={() => {
+                            onAddToCart(initialProduct, userStats.size || 'M');
+                            onClose();
+                        }}
+                        className="w-full bg-pink-500 py-3 rounded-xl font-bold text-white shadow-lg shadow-pink-500/30 active:scale-95 transition-transform flex items-center justify-center gap-2"
+                    >
+                        <ShoppingBag size={18} /> {t('addToCartClose')}
+                    </button>
+                </div>
+            )}
         </div>
     );
 }
@@ -557,7 +664,7 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth 
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center animate-fade-in" onClick={onClose}>
+        <div key={language} className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center animate-fade-in" onClick={onClose}>
             {/* Full Screen on Mobile */}
             <div className="bg-gray-100 dark:bg-gray-900 w-full h-full md:max-w-4xl md:h-[90vh] md:rounded-3xl shadow-2xl overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
                 
@@ -933,7 +1040,7 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth 
                         <div className="w-16 h-16 bg-orange-100 dark:bg-orange-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
                             <LogIn size={32} className="text-orange-500"/>
                         </div>
-                        <h3 className="text-xl font-bold dark:text-white mb-2">Please Login</h3>
+                        <h3 className="text-xl font-bold dark:text-white">Please Login</h3>
                         <p className="text-gray-500 dark:text-gray-300 mb-6">You need to have an account to place an order.</p>
                         <div className="flex flex-col gap-2">
                             <button 
@@ -1005,7 +1112,7 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth 
                                     onClick={() => setShowFittingRoom(true)}
                                     className="absolute bottom-4 right-4 bg-pink-500 text-white px-4 py-2 rounded-full font-bold flex items-center gap-2 shadow-lg hover:bg-pink-600 transition-transform hover:scale-105 pointer-events-auto"
                                 >
-                                    <Shirt size={18}/> Virtual Try-On
+                                    <Shirt size={18}/> {t('virtualFittingRoom')}
                                 </button>
                             )}
                         </div>

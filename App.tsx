@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useRef } from 'react';
 import { UserView, Language, AuthenticatedUser, AccountType } from './types';
 import Chatbot from './components/Chatbot';
@@ -56,7 +55,17 @@ const ProviderProfileModal: React.FC<{ provider: any; isOpen: boolean; onClose: 
     if (!isOpen || !provider) return null;
 
     const services = provider.provider_services || [];
-    const social = provider.social_links || {};
+    
+    // SAFE SOCIAL LINK PARSING
+    // Sometimes Supabase returns it as a string if it's text type, or object if jsonb
+    let social: any = {};
+    if (provider.social_links) {
+        if (typeof provider.social_links === 'string') {
+            try { social = JSON.parse(provider.social_links); } catch(e) {}
+        } else {
+            social = provider.social_links;
+        }
+    }
 
     return (
         <div className="fixed inset-0 bg-white dark:bg-gray-900 z-[60] overflow-y-auto animate-fade-in flex flex-col">
@@ -106,20 +115,20 @@ const ProviderProfileModal: React.FC<{ provider: any; isOpen: boolean; onClose: 
                     <p className="text-gray-500 text-sm font-medium mb-1">{provider.service_type} • {provider.location}</p>
                     <p className="text-sm dark:text-gray-300 leading-relaxed whitespace-pre-wrap">{provider.bio || "No bio available."}</p>
                     
-                    {/* Social Links */}
-                    <div className="flex gap-4 mt-3">
-                        {social.instagram && (
-                            <a href={social.instagram} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-sm font-bold text-pink-600 hover:underline">
+                    {/* Social Links - Fixed Logic */}
+                    <div className="flex gap-4 mt-3 flex-wrap">
+                        {social.instagram && social.instagram.length > 0 && (
+                            <a href={social.instagram.startsWith('http') ? social.instagram : `https://${social.instagram}`} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-sm font-bold text-pink-600 hover:underline bg-pink-50 px-3 py-1 rounded-full">
                                 <Instagram size={16}/> Instagram
                             </a>
                         )}
-                        {social.facebook && (
-                            <a href={social.facebook} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-sm font-bold text-blue-600 hover:underline">
+                        {social.facebook && social.facebook.length > 0 && (
+                            <a href={social.facebook.startsWith('http') ? social.facebook : `https://${social.facebook}`} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-sm font-bold text-blue-600 hover:underline bg-blue-50 px-3 py-1 rounded-full">
                                 <Facebook size={16}/> Facebook
                             </a>
                         )}
-                        {social.website && (
-                            <a href={social.website} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-sm font-bold text-gray-600 dark:text-gray-300 hover:underline">
+                        {social.website && social.website.length > 0 && (
+                            <a href={social.website.startsWith('http') ? social.website : `https://${social.website}`} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-sm font-bold text-gray-600 dark:text-gray-300 hover:underline bg-gray-100 px-3 py-1 rounded-full">
                                 <LinkIcon size={16}/> Website
                             </a>
                         )}
@@ -698,7 +707,7 @@ const App: React.FC = () => {
   return (
     <LocalizationProvider language={language}>
       <ScrollFixStyle />
-      <div className={`h-screen bg-surface dark:bg-dark text-dark dark:text-light transition-colors duration-300 flex flex-col ${language === Language.AR ? 'font-arabic' : 'font-sans'}`} dir={language === Language.AR ? 'rtl' : 'ltr'}>
+      <div key={language} className={`h-screen bg-surface dark:bg-dark text-dark dark:text-light transition-colors duration-300 flex flex-col ${language === Language.AR ? 'font-arabic' : 'font-sans'}`} dir={language === Language.AR ? 'rtl' : 'ltr'}>
         <Header />
         
         {/* Main Content Area - Full Width/Height on Mobile */}
