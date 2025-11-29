@@ -3,7 +3,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLocalization } from '../hooks/useLocalization';
 import { Product, CartItem, AuthenticatedUser, Order, SystemAnnouncement, Category } from '../types';
 import { supabase } from '../services/supabaseClient';
-import { ShoppingBag, ShoppingCart, Plus, Minus, X, CheckCircle, Loader2, Package, Search, History, Trash, Settings, List, Save, User, Phone, Edit, MessageSquare, Image as ImageIcon, ArrowLeft, Truck, Clock, Star, Send, Filter, ChevronLeft, ChevronRight, FolderPlus, LogIn, Shirt, Scissors, Maximize2, ChevronUp, ChevronDown, Camera, Video, Upload } from 'lucide-react';
+import { ShoppingBag, ShoppingCart, Plus, Minus, X, CheckCircle, Loader2, Package, Search, History, Trash, Settings, List, Save, User, Phone, Edit, MessageSquare, Image as ImageIcon, ArrowLeft, Truck, Clock, Star, Send, Filter, ChevronLeft, ChevronRight, FolderPlus, LogIn, Shirt, Scissors, Maximize2, ChevronUp, ChevronDown, CameraIcon, VideoIcon, Upload, Wand2, ScanFace } from 'lucide-react';
+import { GoogleGenAI } from "@google/genai";
 
 interface StoreProps {
     isOpen: boolean;
@@ -12,48 +13,181 @@ interface StoreProps {
     onOpenAuth: () => void; // Callback to open auth drawer
 }
 
-// --- VIRTUAL TRY-ON COMPONENT (WIZARD FLOW) ---
+// --- HELPER: ROTATE API KEYS ---
+const getGeminiClient = () => {
+    const config = (window as any).TANGER_CONFIG || (window as any).process?.env || {};
+    let apiKeys = config.API_KEYS || [config.API_KEY];
+    if(!Array.isArray(apiKeys)) apiKeys = [apiKeys];
+    
+    // Simple random rotation to distribute load
+    const randomKey = apiKeys[Math.floor(Math.random() * apiKeys.length)];
+    return new GoogleGenAI({ apiKey: randomKey });
+};
+
+// --- HELPER: AI BODY SCAN ---
+const analyzeBodyWithAI = async (base64Image: string): Promise<{shoulders: {x:number, y:number}, hips: {x:number, y:number}, feet: {x:number, y:number}} | null> => {
+    try {
+        const ai = getGeminiClient();
+        const model = "gemini-1.5-flash"; // Fast vision model
+        
+        const prompt = `
+            Analyze this full-body image. 
+            Identify the approximate X and Y coordinates (as percentages 0-100) for these body parts:
+            1. Shoulders (center point between shoulders)
+            2. Hips (waist/belt area)
+            3. Feet (ground level between feet)
+
+            Return ONLY raw JSON in this format:
+            {
+                "shoulders": {"x": 50, "y": 20},
+                "hips": {"x": 50, "y": 50},
+                "feet": {"x": 50, "y": 90}
+            }
+            Do not include markdown formatting.
+        `;
+
+        const response = await ai.models.generateContent({
+            model: model,
+            contents: {
+                parts: [
+                    { inlineData: { mimeType: "image/jpeg", data: base64Image } },
+                    { text: prompt }
+                ]
+            }
+        });
+
+        const text = response.text || "";
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if(jsonMatch) {
+            return JSON.parse(jsonMatch[0]);
+        }
+        return null;
+    } catch (e) {
+        console.error("AI Scan Failed:", e);
+        return null;
+    }
+};
+
+// --- VIRTUAL TRY-ON COMPONENT (SMART WIZARD FLOW) ---
 const VirtualFittingRoom: React.FC<{ isOpen: boolean; onClose: () => void; initialProduct: Product; onAddToCart: (product: Product, size: string) => void }> = ({ isOpen, onClose, initialProduct, onAddToCart }) => {
     const { t } = useLocalization();
     const [step, setStep] = useState(1);
     
     // Step 1: Measurements
-    const [userStats, setUserStats] = useState({ height: '', weight: '', size: '' });
+    const [userStats, setUserStats] = useState({ height: '', weight: '', size: 'M' });
     
     // Step 2: Media
     const [userMedia, setUserMedia] = useState<string | null>(null);
     const [mediaType, setMediaType] = useState<'image' | 'video'>('image');
     
+    // AI State
+    const [isScanning, setIsScanning] = useState(false);
+    const [bodyLandmarks, setBodyLandmarks] = useState<{shoulders: {x:number, y:number}, hips: {x:number, y:number}, feet: {x:number, y:number}} | null>(null);
+    
     // Step 3: Fitting Room
     const [clothingItems, setClothingItems] = useState<{product: Product, x: number, y: number, scale: number, id: number}[]>([]);
     const [activeItemId, setActiveItemId] = useState<number | null>(null);
 
-    const fileInputRef = useRef<HTMLInputElement>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
     
     useEffect(() => {
         if(isOpen && initialProduct) {
-             // Reset
              setStep(1);
              setUserMedia(null);
-             setClothingItems([{ product: initialProduct, x: 50, y: 30, scale: 1, id: Date.now() }]);
+             setClothingItems([]);
+             setBodyLandmarks(null);
         }
     }, [isOpen, initialProduct]);
 
-    const handleMediaUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'video') => {
+    // --- SMART POSITIONING LOGIC ---
+    const calculatePositionWithAI = (category: string, userSize: string, landmarks: any) => {
+        let x = 50; 
+        let y = 40;
+        let scale = 1.0;
+
+        const catLower = category.toLowerCase();
+
+        // If AI found landmarks, use them!
+        if (landmarks) {
+            if (catLower.includes('shoe') || catLower.includes('حذاء') || catLower.includes('صباط') || catLower.includes('sneaker')) {
+                // Feet
+                x = landmarks.feet.x;
+                y = landmarks.feet.y;
+                scale = 0.6;
+            } else if (catLower.includes('pants') || catLower.includes('jeans') || catLower.includes('سروال') || catLower.includes('bottom')) {
+                // Hips/Waist
+                x = landmarks.hips.x;
+                y = landmarks.hips.y + 10; // Slightly below waist for pants center
+                scale = 1.2;
+            } else if (catLower.includes('hat') || catLower.includes('قبعة')) {
+                // Head (Estimate above shoulders)
+                x = landmarks.shoulders.x;
+                y = landmarks.shoulders.y - 15;
+                scale = 0.5;
+            } else {
+                // Torso (Shirt, Jacket)
+                x = landmarks.shoulders.x;
+                y = landmarks.shoulders.y + 10; // Slightly below shoulders
+            }
+        } else {
+            // Fallback Heuristics
+            if (catLower.includes('shoe') || catLower.includes('حذاء')) { y = 85; scale = 0.6; }
+            else if (catLower.includes('pants') || catLower.includes('سروال')) { y = 65; scale = 1.2; }
+            else if (catLower.includes('hat') || catLower.includes('قبعة')) { y = 15; scale = 0.5; }
+            else { y = 35; }
+        }
+
+        // Scale Modifier based on Size
+        switch(userSize) {
+            case 'S': scale *= 0.85; break;
+            case 'M': scale *= 1.0; break;
+            case 'L': scale *= 1.15; break;
+            case 'XL': scale *= 1.3; break;
+            case 'XXL': scale *= 1.45; break;
+        }
+
+        return { x, y, scale };
+    };
+
+    const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'video') => {
         const file = e.target.files?.[0];
         if(file) {
             setMediaType(type);
             const url = URL.createObjectURL(file);
             setUserMedia(url);
-            setStep(3);
+            
+            // Start AI Scan
+            if (type === 'image') {
+                setIsScanning(true);
+                
+                // Convert file to base64 for Gemini
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onloadend = async () => {
+                    const base64 = (reader.result as string).split(',')[1];
+                    const landmarks = await analyzeBodyWithAI(base64);
+                    
+                    setIsScanning(false);
+                    setBodyLandmarks(landmarks);
+                    
+                    // Initialize Item
+                    const { x, y, scale } = calculatePositionWithAI(initialProduct.category || '', userStats.size, landmarks);
+                    setClothingItems([{ product: initialProduct, x, y, scale, id: Date.now() }]);
+                    setStep(3);
+                };
+            } else {
+                // Video skip AI scan for now (complex to frame grab in browser safely without heavy libs)
+                // Just use fallback
+                const { x, y, scale } = calculatePositionWithAI(initialProduct.category || '', userStats.size, null);
+                setClothingItems([{ product: initialProduct, x, y, scale, id: Date.now() }]);
+                setStep(3);
+            }
         }
     }
 
-    // Controls
     const updateScale = (delta: number) => {
         if(!activeItemId) return;
-        setClothingItems(prev => prev.map(item => item.id === activeItemId ? {...item, scale: Math.max(0.5, item.scale + delta)} : item));
+        setClothingItems(prev => prev.map(item => item.id === activeItemId ? {...item, scale: Math.max(0.2, item.scale + delta)} : item));
     }
     
     const moveItem = (dx: number, dy: number) => {
@@ -64,47 +198,71 @@ const VirtualFittingRoom: React.FC<{ isOpen: boolean; onClose: () => void; initi
     if(!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black/90 z-[70] flex flex-col animate-fade-in text-white h-screen">
-            <div className="flex justify-between items-center p-4 z-20 bg-black/50 backdrop-blur-md">
-                 <h2 className="font-bold text-lg flex items-center gap-2"><Shirt className="text-pink-500"/> {t('virtualFittingRoom')}</h2>
-                 <button onClick={onClose} className="bg-gray-800 p-2 rounded-full"><X size={20}/></button>
+        <div className="fixed inset-0 bg-black/95 z-[70] flex flex-col animate-fade-in text-white h-screen" onClick={onClose}>
+            {/* Header */}
+            <div className="flex justify-between items-center p-4 z-20 bg-gradient-to-b from-black/80 to-transparent" onClick={e => e.stopPropagation()}>
+                 <h2 className="font-bold text-lg flex items-center gap-2">
+                     <Wand2 className="text-purple-500 animate-pulse"/> 
+                     <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-600 font-extrabold">
+                        Smart Fit AI
+                     </span>
+                 </h2>
+                 <button onClick={onClose} className="bg-white/10 backdrop-blur-md p-2 rounded-full hover:bg-white/20 transition-colors"><X size={20}/></button>
             </div>
 
-            <div className="flex-1 flex flex-col items-center justify-center p-4 relative overflow-hidden">
+            <div className="flex-1 flex flex-col items-center justify-center p-4 relative overflow-hidden" onClick={e => e.stopPropagation()}>
                 
+                {/* AI LOADING OVERLAY */}
+                {isScanning && (
+                    <div className="absolute inset-0 z-50 bg-black/80 flex flex-col items-center justify-center animate-fade-in">
+                        <ScanFace size={64} className="text-purple-500 animate-pulse mb-4"/>
+                        <h3 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-600">AI Scanning Body...</h3>
+                        <p className="text-gray-400 mt-2">Detecting shoulders, waist, and feet...</p>
+                    </div>
+                )}
+
                 {/* STEP 1: MEASUREMENTS */}
                 {step === 1 && (
-                    <div className="w-full max-w-sm bg-gray-800 p-6 rounded-2xl animate-slide-up">
-                        <h3 className="text-xl font-bold mb-6 text-center">{t('fittingRoomStep1')}</h3>
-                        <div className="space-y-4">
-                             <div>
-                                 <label className="text-sm text-gray-400 block mb-1">{t('heightCm')}</label>
-                                 <input 
-                                    type="number"
-                                    value={userStats.height} 
-                                    onChange={e => setUserStats({...userStats, height: e.target.value})} 
-                                    className="w-full bg-gray-700 rounded-xl p-3 outline-none focus:ring-2 focus:ring-pink-500 text-white"
-                                    placeholder="170"
-                                 />
+                    <div className="w-full max-w-sm bg-gray-900/80 backdrop-blur-xl p-8 rounded-3xl border border-gray-700 shadow-2xl animate-slide-up" onClick={e => e.stopPropagation()}>
+                        <div className="text-center mb-8">
+                            <div className="w-16 h-16 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-4 text-purple-400">
+                                <Scissors size={32}/>
+                            </div>
+                            <h3 className="text-2xl font-bold text-white">{t('fittingRoomStep1')}</h3>
+                            <p className="text-gray-400 text-sm mt-2">For AI precision, tell us your size.</p>
+                        </div>
+
+                        <div className="space-y-5">
+                             <div className="grid grid-cols-2 gap-4">
+                                 <div>
+                                     <label className="text-xs font-bold text-gray-400 block mb-1 uppercase tracking-wider">{t('heightCm')}</label>
+                                     <input 
+                                        type="number"
+                                        value={userStats.height} 
+                                        onChange={e => setUserStats({...userStats, height: e.target.value})} 
+                                        className="w-full bg-black/50 border border-gray-700 rounded-xl p-3 outline-none focus:border-purple-500 text-white text-center font-bold text-lg"
+                                        placeholder="170"
+                                     />
+                                 </div>
+                                 <div>
+                                     <label className="text-xs font-bold text-gray-400 block mb-1 uppercase tracking-wider">{t('weightKg')}</label>
+                                     <input 
+                                        type="number"
+                                        value={userStats.weight} 
+                                        onChange={e => setUserStats({...userStats, weight: e.target.value})} 
+                                        className="w-full bg-black/50 border border-gray-700 rounded-xl p-3 outline-none focus:border-purple-500 text-white text-center font-bold text-lg"
+                                        placeholder="70"
+                                     />
+                                 </div>
                              </div>
                              <div>
-                                 <label className="text-sm text-gray-400 block mb-1">{t('weightKg')}</label>
-                                 <input 
-                                    type="number"
-                                    value={userStats.weight} 
-                                    onChange={e => setUserStats({...userStats, weight: e.target.value})} 
-                                    className="w-full bg-gray-700 rounded-xl p-3 outline-none focus:ring-2 focus:ring-pink-500 text-white"
-                                    placeholder="70"
-                                 />
-                             </div>
-                             <div>
-                                 <label className="text-sm text-gray-400 block mb-1">{t('yourSize')}</label>
+                                 <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wider">{t('yourSize')}</label>
                                  <div className="flex gap-2">
                                      {['S', 'M', 'L', 'XL', 'XXL'].map(s => (
                                          <button 
                                             key={s} 
                                             onClick={() => setUserStats({...userStats, size: s})}
-                                            className={`flex-1 py-2 rounded-lg font-bold border ${userStats.size === s ? 'bg-pink-500 border-pink-500' : 'bg-gray-700 border-gray-600 hover:bg-gray-600'}`}
+                                            className={`flex-1 py-3 rounded-xl font-bold transition-all ${userStats.size === s ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-900/50 scale-105' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
                                          >
                                              {s}
                                          </button>
@@ -115,39 +273,37 @@ const VirtualFittingRoom: React.FC<{ isOpen: boolean; onClose: () => void; initi
                              <button 
                                 onClick={() => setStep(2)} 
                                 disabled={!userStats.height || !userStats.weight || !userStats.size}
-                                className="w-full bg-pink-500 py-3 rounded-xl font-bold mt-4 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-pink-500/30"
+                                className="w-full bg-white text-black py-4 rounded-xl font-bold mt-6 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
                              >
-                                 {t('continue')}
+                                 {t('continue')} <ArrowLeft className="rotate-180" size={20}/>
                              </button>
                         </div>
                     </div>
                 )}
 
                 {/* STEP 2: CHOOSE MEDIA */}
-                {step === 2 && (
-                    <div className="w-full max-w-sm bg-gray-800 p-6 rounded-2xl animate-slide-up">
-                        <h3 className="text-xl font-bold mb-6 text-center">{t('fittingRoomStep2')}</h3>
+                {step === 2 && !isScanning && (
+                    <div className="w-full max-w-sm bg-gray-900/80 backdrop-blur-xl p-8 rounded-3xl border border-gray-700 shadow-2xl animate-slide-up" onClick={e => e.stopPropagation()}>
+                        <div className="text-center mb-8">
+                             <h3 className="text-2xl font-bold text-white mb-2">{t('fittingRoomStep2')}</h3>
+                             <p className="text-gray-400 text-sm">Upload a full-body photo for AI analysis.</p>
+                        </div>
+                        
                         <div className="space-y-3">
-                            <label className="w-full bg-gray-700 p-4 rounded-xl flex items-center gap-4 cursor-pointer hover:bg-gray-600 transition-colors">
-                                <div className="bg-blue-500 p-3 rounded-full"><Camera size={24}/></div>
-                                <div className="text-left">
-                                    <span className="block font-bold">{t('takePhoto')}</span>
+                            <label className="group w-full bg-gradient-to-r from-gray-800 to-gray-900 border border-gray-700 p-5 rounded-2xl flex items-center gap-4 cursor-pointer hover:border-purple-500 transition-all active:scale-95">
+                                <div className="bg-blue-500/20 text-blue-400 p-4 rounded-full group-hover:bg-blue-500 group-hover:text-white transition-colors"><CameraIcon size={28}/></div>
+                                <div>
+                                    <span className="block font-bold text-lg">{t('takePhoto')}</span>
+                                    <span className="text-xs text-gray-500">AI Scan Supported</span>
                                 </div>
                                 <input type="file" hidden accept="image/*" capture="user" onChange={(e) => handleMediaUpload(e, 'image')} />
                             </label>
 
-                            <label className="w-full bg-gray-700 p-4 rounded-xl flex items-center gap-4 cursor-pointer hover:bg-gray-600 transition-colors">
-                                <div className="bg-red-500 p-3 rounded-full"><Video size={24}/></div>
-                                <div className="text-left">
-                                    <span className="block font-bold">{t('recordVideo')}</span>
-                                </div>
-                                <input type="file" hidden accept="video/*" capture="environment" onChange={(e) => handleMediaUpload(e, 'video')} />
-                            </label>
-
-                            <label className="w-full bg-gray-700 p-4 rounded-xl flex items-center gap-4 cursor-pointer hover:bg-gray-600 transition-colors">
-                                <div className="bg-green-500 p-3 rounded-full"><Upload size={24}/></div>
-                                <div className="text-left">
-                                    <span className="block font-bold">{t('uploadImageOrVideo')}</span>
+                            <label className="group w-full bg-gradient-to-r from-gray-800 to-gray-900 border border-gray-700 p-5 rounded-2xl flex items-center gap-4 cursor-pointer hover:border-green-500 transition-all active:scale-95">
+                                <div className="bg-green-500/20 text-green-400 p-4 rounded-full group-hover:bg-green-500 group-hover:text-white transition-colors"><Upload size={28}/></div>
+                                <div>
+                                    <span className="block font-bold text-lg">{t('uploadImageOrVideo')}</span>
+                                    <span className="text-xs text-gray-500">Gallery Import</span>
                                 </div>
                                 <input type="file" hidden accept="image/*,video/*" onChange={(e) => {
                                     const file = e.target.files?.[0];
@@ -158,14 +314,14 @@ const VirtualFittingRoom: React.FC<{ isOpen: boolean; onClose: () => void; initi
                                 }} />
                             </label>
                         </div>
-                        <button onClick={() => setStep(1)} className="mt-6 text-gray-400 text-sm hover:text-white underline w-full text-center">Back</button>
+                        <button onClick={() => setStep(1)} className="mt-8 text-gray-500 font-bold text-sm hover:text-white w-full text-center">Back</button>
                     </div>
                 )}
 
                 {/* STEP 3: TRY-ON CANVAS */}
                 {step === 3 && (
-                     <div className="w-full h-full relative flex items-center justify-center">
-                         <div className="relative w-full max-w-md h-full max-h-[70vh] bg-black overflow-hidden rounded-lg border border-gray-700">
+                     <div className="w-full h-full relative flex items-center justify-center bg-black" onClick={e => e.stopPropagation()}>
+                         <div className="relative w-full max-w-lg h-full max-h-[80vh] overflow-hidden rounded-2xl shadow-2xl border border-gray-800">
                              {/* Background Media */}
                              {mediaType === 'video' ? (
                                  <video 
@@ -181,28 +337,33 @@ const VirtualFittingRoom: React.FC<{ isOpen: boolean; onClose: () => void; initi
                                  <img src={userMedia!} className="w-full h-full object-cover pointer-events-none" alt="User" />
                              )}
                              
-                             {/* Clothing Overlay */}
+                             {/* Clothing Overlay with BLEND MODE */}
                              {clothingItems.map(item => (
                                  <div 
                                      key={item.id}
-                                     className={`absolute transition-transform ${activeItemId === item.id ? 'ring-2 ring-pink-500 ring-offset-2 ring-offset-transparent' : ''}`}
+                                     className={`absolute transition-transform cursor-move ${activeItemId === item.id ? 'ring-2 ring-purple-500 ring-offset-2 ring-offset-transparent z-50' : 'z-40'}`}
                                      style={{ 
                                          top: `${item.y}%`, 
                                          left: `${item.x}%`, 
                                          transform: `translate(-50%, -50%) scale(${item.scale})`,
-                                         width: '200px',
+                                         width: '250px', // Base width
                                          touchAction: 'none'
                                      }}
                                      onTouchStart={() => setActiveItemId(item.id)}
                                      onMouseDown={() => setActiveItemId(item.id)}
                                  >
-                                     <img src={item.product.image_url} className="w-full pointer-events-none drop-shadow-2xl filter contrast-110" />
+                                     <img 
+                                        src={item.product.image_url} 
+                                        className="w-full pointer-events-none drop-shadow-2xl" 
+                                        style={{ mixBlendMode: 'multiply', filter: 'contrast(1.1) brightness(1.05)' }}
+                                     />
                                  </div>
                              ))}
 
-                             <div className="absolute top-4 left-0 w-full text-center pointer-events-none">
-                                 <span className="bg-black/50 text-white px-3 py-1 rounded-full text-xs backdrop-blur-sm">
-                                     {t('tryOnInstruction')}
+                             <div className="absolute top-4 left-0 w-full text-center pointer-events-none z-50">
+                                 <span className="bg-black/60 text-white px-4 py-2 rounded-full text-xs backdrop-blur-md border border-white/10 shadow-xl font-bold flex items-center justify-center gap-2 w-max mx-auto">
+                                     <Wand2 size={12} className="text-purple-400"/>
+                                     {bodyLandmarks ? "AI Locked: Perfect Fit" : "Manual Fit Mode"}
                                  </span>
                              </div>
                          </div>
@@ -212,26 +373,27 @@ const VirtualFittingRoom: React.FC<{ isOpen: boolean; onClose: () => void; initi
 
             {/* Controls (Only visible in Step 3) */}
             {step === 3 && (
-                <div className="bg-gray-800 p-4 pb-8 rounded-t-3xl z-30">
-                    <div className="flex justify-between items-center mb-4">
-                         <div className="flex gap-4">
-                             <div className="flex flex-col items-center">
-                                 <span className="text-[10px] text-gray-400 mb-1 uppercase tracking-wider">{t('scale')}</span>
-                                 <div className="flex gap-2">
-                                     <button onClick={() => updateScale(-0.1)} className="bg-gray-700 p-3 rounded-full active:scale-95 transition-transform"><Minus size={16}/></button>
-                                     <button onClick={() => updateScale(0.1)} className="bg-gray-700 p-3 rounded-full active:scale-95 transition-transform"><Plus size={16}/></button>
-                                 </div>
-                             </div>
-                             <div className="flex flex-col items-center">
-                                 <span className="text-[10px] text-gray-400 mb-1 uppercase tracking-wider">{t('move')}</span>
-                                 <div className="flex gap-2">
-                                     <button onClick={() => moveItem(0, -5)} className="bg-gray-700 p-3 rounded-full active:scale-95 transition-transform"><ChevronUp size={16}/></button>
-                                     <button onClick={() => moveItem(0, 5)} className="bg-gray-700 p-3 rounded-full active:scale-95 transition-transform"><ChevronDown size={16}/></button>
-                                 </div>
-                             </div>
+                <div className="bg-gray-900/90 backdrop-blur-md p-4 pb-8 rounded-t-3xl z-30 border-t border-gray-800" onClick={e => e.stopPropagation()}>
+                    <div className="flex justify-between items-center mb-6">
+                         {/* Scale Controls */}
+                         <div className="flex items-center gap-4 bg-black/40 p-2 rounded-full border border-white/5">
+                             <button onClick={() => updateScale(-0.1)} className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center active:scale-90 transition-transform hover:bg-gray-700 text-white"><Minus size={18}/></button>
+                             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{t('scale')}</span>
+                             <button onClick={() => updateScale(0.1)} className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center active:scale-90 transition-transform hover:bg-gray-700 text-white"><Plus size={18}/></button>
                          </div>
-                         <button onClick={() => setStep(2)} className="text-gray-400 p-2 text-xs flex flex-col items-center">
-                             <Camera size={20} className="mb-1"/> Retake
+
+                         {/* Move Controls */}
+                         <div className="flex items-center gap-2 bg-black/40 p-2 rounded-full border border-white/5">
+                             <div className="flex flex-col gap-1">
+                                <button onClick={() => moveItem(0, -5)} className="w-8 h-8 bg-gray-800 rounded-full flex items-center justify-center active:scale-90 transition-transform hover:bg-gray-700 text-white"><ChevronUp size={16}/></button>
+                                <button onClick={() => moveItem(0, 5)} className="w-8 h-8 bg-gray-800 rounded-full flex items-center justify-center active:scale-90 transition-transform hover:bg-gray-700 text-white"><ChevronDown size={16}/></button>
+                             </div>
+                             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mx-1">{t('move')}</span>
+                         </div>
+                         
+                         <button onClick={() => setStep(2)} className="flex flex-col items-center justify-center text-gray-400 hover:text-white transition-colors">
+                             <div className="bg-gray-800 p-2 rounded-full mb-1"><CameraIcon size={16}/></div>
+                             <span className="text-[10px]">Retake</span>
                          </button>
                     </div>
 
@@ -240,9 +402,9 @@ const VirtualFittingRoom: React.FC<{ isOpen: boolean; onClose: () => void; initi
                             onAddToCart(initialProduct, userStats.size || 'M');
                             onClose();
                         }}
-                        className="w-full bg-pink-500 py-3 rounded-xl font-bold text-white shadow-lg shadow-pink-500/30 active:scale-95 transition-transform flex items-center justify-center gap-2"
+                        className="w-full bg-gradient-to-r from-purple-600 to-pink-600 py-4 rounded-2xl font-bold text-white shadow-lg shadow-purple-900/40 active:scale-95 transition-transform flex items-center justify-center gap-3 text-lg"
                     >
-                        <ShoppingBag size={18} /> {t('addToCartClose')}
+                        <ShoppingBag size={24} /> {t('addToCartClose')}
                     </button>
                 </div>
             )}
@@ -624,11 +786,20 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth 
 
     const handleDeleteProduct = async (id: number) => {
         if(confirm(t('delete') + '?')) {
-            const { error } = await supabase.from('products').delete().eq('id', id);
-            if (error) {
-                alert("Error deleting product.");
-            } else {
-                fetchProducts();
+            try {
+                const { error } = await supabase.from('products').delete().eq('id', id);
+                if (error) {
+                    console.error("Delete Error:", error);
+                    alert("Error deleting product. Make sure to run V28 update in DB Setup for permissions. Error: " + error.message);
+                } else {
+                    // Update local state immediately
+                    setProducts(prev => prev.filter(p => p.id !== id));
+                    // Also refetch to be sure
+                    fetchProducts();
+                }
+            } catch (e) {
+                console.error("Delete Exception:", e);
+                alert("Unexpected error.");
             }
         }
     }

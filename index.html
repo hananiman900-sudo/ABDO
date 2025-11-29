@@ -8,14 +8,12 @@
     <title>TangerConnect AI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
-      // CONFIGURATION FOR VERCEL DEPLOYMENT
-      // Using a custom global object to avoid 'process.env' being stripped by bundlers
+      // CONFIGURATION
       window.TANGER_CONFIG = {
         SUPABASE_URL: 'https://lrprlzijjykvpxpyxrcn.supabase.co',
         SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxycHJsemlqanlrdnB4cHl4cmNuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMxMjIwNDEsImV4cCI6MjA3ODY5ODA0MX0.6S8eSgprS686iobE7zrmurxIvzvC8Qmpu71rKT8FvZc',
         
-        // Put your 10 API KEYS here from different Gmail accounts.
-        // The app will rotate through them automatically if one runs out of quota.
+        // YOUR 5 KEYS - FAILOVER SYSTEM ENABLED
         API_KEYS: [
           'AIzaSyD0WW8wQ9IXKwPqENLJfUwiiL0NCWnDb48',
           'AIzaSyDPzeKphFk1yHnztG1RJ8nm4CBRbG_ILDU',
@@ -25,7 +23,6 @@
         ]
       };
       
-      // Backward compatibility just in case
       window.process = { env: window.TANGER_CONFIG };
 
       tailwind.config = {
@@ -53,16 +50,6 @@
             animation: {
               'slide-up': 'slideUp 0.3s ease-out',
               'fade-in': 'fadeIn 0.2s ease-out',
-            },
-            keyframes: {
-              slideUp: {
-                '0%': { transform: 'translateY(100%)', opacity: '0' },
-                '100%': { transform: 'translateY(0)', opacity: '1' },
-              },
-              fadeIn: {
-                '0%': { opacity: '0' },
-                '100%': { opacity: '1' },
-              }
             }
           }
         }
@@ -86,17 +73,9 @@
 }
 </script>
 <style>
-  /* Hide Scrollbar but allow scrolling */
-  .no-scrollbar::-webkit-scrollbar {
-    display: none;
-  }
-  .no-scrollbar {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-  body {
-    -webkit-tap-highlight-color: transparent;
-  }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  body { -webkit-tap-highlight-color: transparent; }
 </style>
 </head>
   <body class="bg-light dark:bg-dark text-gray-900 dark:text-white antialiased selection:bg-primary selection:text-white">

@@ -1,10 +1,11 @@
 
 
+
 import React, { useState, useRef, useEffect } from 'react';
 import { useLocalization } from '../hooks/useLocalization';
 import { BookingDetails, FollowUp, AuthenticatedUser, ProviderService, ProviderNotification, Product } from '../types';
 import { supabase } from '../services/supabaseClient';
-import { CheckCircle, XCircle, Camera, Loader2, Upload, Send, LogOut, User, Calendar, FileText, Lock, Phone, X, RefreshCw, BarChart, History, Users, Edit, Trash, Smartphone, MessageCircle, MapPin, Briefcase, Save, Image as ImageIcon, Map, Bell, Clock, AlertTriangle, Package, Plus, ShoppingBag, Instagram, Facebook, Link as LinkIcon } from 'lucide-react';
+import { CheckCircle, XCircle, Camera, Loader2, Upload, Send, LogOut, User, Calendar, FileText, Lock, Phone, X, RefreshCw, BarChart, History, Users, Edit, Trash, Smartphone, MessageCircle, MapPin, Briefcase, Save, Image as ImageIcon, MapIcon, Bell, Clock, AlertTriangle, Package, Plus, ShoppingBag, Instagram, Facebook, Link as LinkIcon } from 'lucide-react';
 import jsQR from 'jsqr';
 
 interface ScannedAppointment extends BookingDetails {}
@@ -363,7 +364,7 @@ const ProfileManager: React.FC<{ provider: AuthenticatedUser }> = ({ provider })
     const { t, language } = useLocalization();
     const [bio, setBio] = useState(provider.bio || '');
     const [services, setServices] = useState<ProviderService[]>([]);
-    const [socialLinks, setSocialLinks] = useState({ instagram: '', facebook: '', website: '' });
+    const [socialLinks, setSocialLinks] = useState({ instagram: '', facebook: '', website: '', gps: '' });
     const [newService, setNewService] = useState({ name: '', price: '', discount: '' });
     const [isLoading, setIsLoading] = useState(false);
     const [locationLoading, setLocationLoading] = useState(false);
@@ -382,7 +383,18 @@ const ProfileManager: React.FC<{ provider: AuthenticatedUser }> = ({ provider })
 
     useEffect(() => { 
         fetchServices(); 
-        setSocialLinks(provider.social_links || { instagram: '', facebook: '', website: '' });
+        
+        let initialSocial = { instagram: '', facebook: '', website: '', gps: '' };
+        if(provider.social_links) {
+             if(typeof provider.social_links === 'string') {
+                 try { initialSocial = JSON.parse(provider.social_links); } catch(e){}
+             } else {
+                 // @ts-ignore
+                 initialSocial = provider.social_links;
+             }
+        }
+        setSocialLinks(initialSocial);
+
         supabase.from('follows').select('id', { count: 'exact' }).eq('provider_id', provider.id)
         .then(({count}) => setFollowerCount(count || 0));
     }, [provider.id]);
@@ -398,7 +410,8 @@ const ProfileManager: React.FC<{ provider: AuthenticatedUser }> = ({ provider })
         const cleanSocial = {
              instagram: socialLinks.instagram,
              facebook: socialLinks.facebook,
-             website: socialLinks.website
+             website: socialLinks.website,
+             gps: socialLinks.gps
         };
         await supabase.from('providers').update({ bio, social_links: cleanSocial }).eq('id', provider.id);
         setIsLoading(false);
@@ -544,6 +557,10 @@ const ProfileManager: React.FC<{ provider: AuthenticatedUser }> = ({ provider })
                      <div className="flex items-center gap-2">
                          <Facebook size={18} className="text-blue-600" />
                          <input placeholder="Facebook Link" value={socialLinks.facebook} onChange={e => setSocialLinks({...socialLinks, facebook: e.target.value})} className="flex-1 p-2 bg-gray-50 dark:bg-gray-700 rounded-lg text-sm dark:text-white"/>
+                     </div>
+                     <div className="flex items-center gap-2">
+                         <MapIcon size={18} className="text-green-500" />
+                         <input placeholder="GPS Link (Google Maps)" value={socialLinks.gps} onChange={e => setSocialLinks({...socialLinks, gps: e.target.value})} className="flex-1 p-2 bg-gray-50 dark:bg-gray-700 rounded-lg text-sm dark:text-white"/>
                      </div>
                      <div className="flex items-center gap-2">
                          <LinkIcon size={18} className="text-gray-500" />
