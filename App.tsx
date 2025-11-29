@@ -11,7 +11,7 @@ import { JobBoard } from './components/JobBoard';
 import { LocalizationProvider, useLocalization, translations } from './hooks/useLocalization';
 import { supabase } from './services/supabaseClient';
 import QRCodeDisplay from './components/QRCodeDisplay';
-import { Globe, User as UserIcon, CheckSquare, Sun, Moon, LogIn, LogOut, X, CalendarDays, Database, AlertTriangle, CheckCircle2, Menu, Users, Bell, Phone, MapPin, Search, Heart, Briefcase, Star, MessageCircle, ShoppingBag, Eye, EyeOff, Megaphone, Headset, Instagram, Facebook, Link as LinkIcon, ArrowLeft, UserCheck, Home, UserPlus, FileText, ListPlus, UserMinus, RefreshCw, Key, Map, Clock, ChevronRight, Plus } from 'lucide-react';
+import { Globe, User as UserIcon, CheckSquare, Sun, Moon, LogIn, LogOut, X, CalendarDays, Database, AlertTriangle, CheckCircle2, Menu, Users, Bell, Phone, MapPin, Search, Heart, Briefcase, Star, MessageCircle, ShoppingBag, Eye, EyeOff, Megaphone, Headset, Instagram, Facebook, Link as LinkIcon, ArrowLeft, UserCheck, Home, UserPlus, FileText, ListPlus, UserMinus, RefreshCw, Key, Map, Clock, ChevronRight, Plus, Loader2, Camera, Save } from 'lucide-react';
 
 const ScrollFixStyle = () => (
     <style>{`
@@ -152,7 +152,7 @@ const AuthDrawer = ({ isOpen, onClose, onAuthSuccess, onDatabaseError }: any) =>
 
                      localStorage.setItem('tangerconnect_user_id', client.id);
                      localStorage.setItem('tangerconnect_user_type', 'CLIENT');
-                     onAuthSuccess({ id: client.id, name: client.full_name, accountType: AccountType.CLIENT, phone: client.phone });
+                     onAuthSuccess({ id: client.id, name: client.full_name, accountType: AccountType.CLIENT, phone: client.phone, bio: client.bio, profile_image_url: client.profile_image_url });
 
                  } else {
                      // PROVIDER LOGIN (Username + Pass)
@@ -279,8 +279,8 @@ const AuthDrawer = ({ isOpen, onClose, onAuthSuccess, onDatabaseError }: any) =>
     );
 };
 
-// --- CLIENT PROFILE VIEW (INSTAGRAM STYLE + BOTTOM SHEET ON MOBILE) ---
-const ClientProfile = ({ isOpen, onClose, user, onLogout, onToggleTheme, isDarkMode, onOpenDbSetup }: any) => {
+// --- CLIENT PROFILE VIEW (EDITABLE) ---
+const ClientProfile = ({ isOpen, onClose, user, onLogout, onToggleTheme, isDarkMode, onOpenDbSetup, onUpdateUser }: any) => {
     const { t } = useLocalization();
     const [activeTab, setActiveTab] = useState<'APPOINTMENTS' | 'FOLLOWING'>('APPOINTMENTS');
     const [followingCount, setFollowingCount] = useState(0);
@@ -288,9 +288,17 @@ const ClientProfile = ({ isOpen, onClose, user, onLogout, onToggleTheme, isDarkM
     const [followedProviders, setFollowedProviders] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     
+    // Edit State
+    const [isEditing, setIsEditing] = useState(false);
+    const [editData, setEditData] = useState({ fullName: '', bio: '' });
+    const [imageLoading, setImageLoading] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
     useEffect(() => {
         if(isOpen && user) {
             fetchData();
+            setEditData({ fullName: user.name || '', bio: user.bio || '' });
+            setIsEditing(false);
         }
     }, [isOpen, user]);
 
@@ -318,6 +326,51 @@ const ClientProfile = ({ isOpen, onClose, user, onLogout, onToggleTheme, isDarkM
         setLoading(false);
     }
 
+    const handleSaveProfile = async () => {
+        if(!user) return;
+        setLoading(true);
+        try {
+            const { error } = await supabase.from('clients').update({
+                full_name: editData.fullName,
+                bio: editData.bio
+            }).eq('id', user.id);
+            
+            if(error) throw error;
+            
+            if(onUpdateUser) onUpdateUser({ ...user, name: editData.fullName, bio: editData.bio });
+            setIsEditing(false);
+            alert(t('savedSuccessfully'));
+        } catch(e) {
+            console.error(e);
+            alert("Error saving profile. Make sure V29 Update is run.");
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if(!file || !user) return;
+        
+        setImageLoading(true);
+        try {
+            const fileExt = file.name.split('.').pop();
+            const fileName = `client_${user.id}_${Date.now()}.${fileExt}`;
+            const { error: uploadError } = await supabase.storage.from('profiles').upload(fileName, file);
+            if (uploadError) throw uploadError;
+            
+            const { data } = supabase.storage.from('profiles').getPublicUrl(fileName);
+            
+            await supabase.from('clients').update({ profile_image_url: data.publicUrl }).eq('id', user.id);
+            
+            if(onUpdateUser) onUpdateUser({ ...user, profile_image_url: data.publicUrl });
+        } catch(e) {
+            alert(t('uploadError'));
+        } finally {
+            setImageLoading(false);
+        }
+    }
+
     // Helper for countdown
     const getTimeRemaining = (created_at: string) => {
         // Mock: Appointment is 3 days after creation
@@ -340,7 +393,7 @@ const ClientProfile = ({ isOpen, onClose, user, onLogout, onToggleTheme, isDarkM
              {/* Backdrop */}
              <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
              
-             {/* Modal Container - Bottom Sheet on Mobile, Centered on Desktop */}
+             {/* Modal Container */}
              <div className="relative w-full h-[90vh] md:h-auto md:max-h-[85vh] md:max-w-md bg-white dark:bg-gray-900 rounded-t-[2.5rem] md:rounded-3xl flex flex-col overflow-hidden shadow-2xl animate-slide-up">
                  
                  {/* Drag Handle for Mobile */}
@@ -351,13 +404,17 @@ const ClientProfile = ({ isOpen, onClose, user, onLogout, onToggleTheme, isDarkM
                  {/* Header Nav */}
                  <div className="px-5 py-3 flex items-center justify-between bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800">
                      <h2 className="text-lg font-bold dark:text-white flex items-center gap-1">
-                         {user.name} <CheckCircle2 size={16} className="text-blue-500"/>
+                         {isEditing ? t('edit') : user.name} <CheckCircle2 size={16} className="text-blue-500"/>
                      </h2>
                      <div className="flex gap-2">
-                         <button onClick={onOpenDbSetup} className="p-2 bg-gray-100 dark:bg-gray-800 rounded-full text-gray-600 dark:text-gray-300"><Database size={18}/></button>
-                         <button onClick={onToggleTheme} className="p-2 bg-gray-100 dark:bg-gray-800 rounded-full text-gray-600 dark:text-gray-300">
-                             {isDarkMode ? <Sun size={18}/> : <Moon size={18}/>}
-                         </button>
+                         {!isEditing && (
+                             <>
+                                <button onClick={onOpenDbSetup} className="p-2 bg-gray-100 dark:bg-gray-800 rounded-full text-gray-600 dark:text-gray-300"><Database size={18}/></button>
+                                <button onClick={onToggleTheme} className="p-2 bg-gray-100 dark:bg-gray-800 rounded-full text-gray-600 dark:text-gray-300">
+                                    {isDarkMode ? <Sun size={18}/> : <Moon size={18}/>}
+                                </button>
+                             </>
+                         )}
                          <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"><X size={24} className="dark:text-white"/></button>
                      </div>
                  </div>
@@ -367,17 +424,24 @@ const ClientProfile = ({ isOpen, onClose, user, onLogout, onToggleTheme, isDarkM
                      <div className="px-6 pt-6 pb-4">
                          <div className="flex items-center gap-6 mb-4">
                              {/* Avatar */}
-                             <div className="relative">
+                             <div className="relative cursor-pointer" onClick={() => isEditing && fileInputRef.current?.click()}>
                                  <div className="w-20 h-20 rounded-full p-1 bg-gradient-to-tr from-yellow-400 via-red-500 to-purple-600">
                                      <div className="w-full h-full bg-white dark:bg-gray-800 rounded-full p-0.5">
                                          <div className="w-full h-full bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center overflow-hidden">
-                                             <UserIcon size={32} className="text-gray-400"/>
+                                             {user.profile_image_url ? (
+                                                 <img src={user.profile_image_url} className="w-full h-full object-cover"/>
+                                             ) : (
+                                                 <UserIcon size={32} className="text-gray-400"/>
+                                             )}
                                          </div>
                                      </div>
                                  </div>
-                                 <div className="absolute bottom-0 right-0 bg-blue-500 text-white p-1 rounded-full border-2 border-white dark:border-gray-900">
-                                     <Plus size={12} strokeWidth={4}/>
-                                 </div>
+                                 {isEditing && (
+                                     <div className="absolute bottom-0 right-0 bg-blue-500 text-white p-1 rounded-full border-2 border-white dark:border-gray-900 z-10">
+                                         <Camera size={14} />
+                                     </div>
+                                 )}
+                                 <input type="file" hidden ref={fileInputRef} onChange={handleImageUpload} accept="image/*" />
                              </div>
 
                              {/* Stats */}
@@ -394,17 +458,54 @@ const ClientProfile = ({ isOpen, onClose, user, onLogout, onToggleTheme, isDarkM
                          </div>
 
                          {/* Bio */}
-                         <div className="mb-4">
-                             <h1 className="font-bold text-base dark:text-white">{user.name}</h1>
-                             <p className="text-sm text-gray-600 dark:text-gray-400">Client Account • TangerConnect</p>
-                             <p className="text-sm text-blue-600 dark:text-blue-400 dir-ltr">{user.phone}</p>
-                         </div>
+                         {isEditing ? (
+                             <div className="mb-4 space-y-2">
+                                 <input 
+                                    value={editData.fullName} 
+                                    onChange={e => setEditData({...editData, fullName: e.target.value})}
+                                    className="w-full bg-gray-100 dark:bg-gray-800 p-2 rounded-lg font-bold dark:text-white border-none outline-none"
+                                    placeholder="Full Name"
+                                 />
+                                 <textarea 
+                                    value={editData.bio}
+                                    onChange={e => setEditData({...editData, bio: e.target.value})}
+                                    className="w-full bg-gray-100 dark:bg-gray-800 p-2 rounded-lg text-sm dark:text-white border-none outline-none resize-none"
+                                    placeholder="Add a bio..."
+                                    rows={2}
+                                 />
+                             </div>
+                         ) : (
+                             <div className="mb-4">
+                                 <h1 className="font-bold text-base dark:text-white">{user.name}</h1>
+                                 {user.bio ? (
+                                     <p className="text-sm text-gray-800 dark:text-gray-200">{user.bio}</p>
+                                 ) : (
+                                     <p className="text-sm text-gray-600 dark:text-gray-400">Client Account • TangerConnect</p>
+                                 )}
+                                 <p className="text-sm text-blue-600 dark:text-blue-400 dir-ltr font-mono mt-1">{user.phone}</p>
+                             </div>
+                         )}
 
                          {/* Action Buttons */}
-                         <div className="flex gap-2">
-                             <button className="flex-1 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg text-sm font-bold dark:text-white">Edit Profile</button>
-                             <button onClick={onLogout} className="flex-1 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-lg text-sm font-bold">{t('logout')}</button>
-                         </div>
+                         {isEditing ? (
+                             <div className="flex gap-2">
+                                 <button onClick={handleSaveProfile} disabled={loading} className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold flex justify-center items-center gap-2">
+                                     {loading ? <Loader2 className="animate-spin" size={16}/> : <Save size={16}/>} {t('save')}
+                                 </button>
+                                 <button onClick={() => setIsEditing(false)} className="flex-1 py-2 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-lg text-sm font-bold">
+                                     {t('cancel')}
+                                 </button>
+                             </div>
+                         ) : (
+                             <div className="flex gap-2">
+                                 <button onClick={() => setIsEditing(true)} className="flex-1 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg text-sm font-bold dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                                     {t('edit')} Profile
+                                 </button>
+                                 <button onClick={onLogout} className="flex-1 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-lg text-sm font-bold hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors">
+                                     {t('logout')}
+                                 </button>
+                             </div>
+                         )}
                      </div>
 
                      {/* Tabs */}
@@ -862,6 +963,7 @@ const App: React.FC = () => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showDirectory, setShowDirectory] = useState(false);
   const [showClientProfile, setShowClientProfile] = useState(false);
+  const [showMobileFeatures, setShowMobileFeatures] = useState(false); // New Mobile Menu State
   
   // Feature Modals
   const [showStore, setShowStore] = useState(false);
@@ -898,7 +1000,9 @@ const App: React.FC = () => {
                       phone: data.phone || data.username, // Fallback
                       isActive: data.is_active,
                       subscriptionEndDate: data.subscription_end_date,
-                      social_links: data.social_links
+                      social_links: data.social_links,
+                      bio: data.bio,
+                      profile_image_url: data.profile_image_url
                   });
                   setView(type === 'PROVIDER' ? UserView.PROVIDER : UserView.CLIENT);
               }
@@ -914,6 +1018,7 @@ const App: React.FC = () => {
       setCurrentUser(null); 
       setView(UserView.CLIENT); 
       setMobileMenuOpen(false); 
+      setShowMobileFeatures(false);
   };
   
   const handleAuthSuccess = (user: AuthenticatedUser) => { 
@@ -941,59 +1046,88 @@ const App: React.FC = () => {
   // Header Component
   const Header = () => (
       <header className="fixed top-0 left-0 right-0 bg-surface/90 dark:bg-dark/90 backdrop-blur-md border-b border-gray-200/50 dark:border-gray-800/50 z-40 transition-all duration-300">
-        <div className="w-full md:max-w-6xl mx-auto px-4 h-16 flex justify-between items-center">
+        <div className="w-full md:max-w-6xl mx-auto px-4 h-16 flex justify-between items-center relative">
             
             {/* Left Side: Logo & Title */}
             <div className="flex items-center gap-2">
                 <div className="bg-gradient-to-br from-primary to-secondary p-1.5 rounded-lg shadow-lg">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
                 </div>
-                <h1 className="text-xl font-bold text-dark dark:text-white hidden sm:block tracking-tight">Tanger<span className="text-primary">Connect</span></h1>
+                <h1 className="text-xl font-bold text-dark dark:text-white tracking-tight hidden sm:block">Tanger<span className="text-primary">Connect</span></h1>
             </div>
 
             {/* Right Side: Icons & Auth */}
             <div className="flex items-center gap-2">
                  
-                 {/* Notifications */}
-                 <button onClick={() => setShowNotifications(true)} className="p-2 text-gray-500 hover:bg-gray-100 rounded-full dark:hover:bg-gray-800 relative">
+                 {/* Mobile Feature Menu Toggle (Only on Small Screens) */}
+                 <div className="md:hidden">
+                    <button 
+                        onClick={() => setShowMobileFeatures(!showMobileFeatures)} 
+                        className={`p-2 rounded-full transition-colors ${showMobileFeatures ? 'bg-primary text-white' : 'text-gray-500 hover:bg-gray-100 dark:text-gray-300'}`}
+                    >
+                        <Menu size={20}/>
+                    </button>
+                 </div>
+
+                 {/* Desktop Features (Hidden on Mobile to save space) */}
+                 <div className="hidden md:flex items-center gap-2">
+                     <button onClick={() => setShowDirectory(true)} className="p-2 text-gray-500 hover:bg-gray-100 rounded-full dark:hover:bg-gray-800 dark:text-gray-300" title="Directory"><FileText size={20}/></button>
+                     <button onClick={() => setShowRealEstate(true)} className="p-2 text-gray-500 hover:bg-orange-50 hover:text-orange-600 rounded-full dark:text-gray-300" title="Real Estate"><Home size={20}/></button>
+                     <button onClick={() => setShowJobBoard(true)} className="p-2 text-gray-500 hover:bg-blue-50 hover:text-blue-600 rounded-full dark:text-gray-300" title="Jobs"><Briefcase size={20}/></button>
+                     <button onClick={() => setShowStore(true)} className="p-2 text-gray-500 hover:bg-purple-50 hover:text-purple-600 rounded-full dark:text-gray-300" title="Store"><ShoppingBag size={20}/></button>
+                 </div>
+
+                 {/* Notifications (Always Visible) */}
+                 <button onClick={() => setShowNotifications(true)} className="p-2 text-gray-500 hover:bg-gray-100 rounded-full dark:hover:bg-gray-800 relative dark:text-gray-300">
                      <Bell size={20}/>
                  </button>
 
-                 {/* Directory (Users Listing) */}
-                 <button onClick={() => setShowDirectory(true)} className="p-2 text-gray-500 hover:bg-gray-100 rounded-full dark:hover:bg-gray-800" title="Directory">
-                     <FileText size={20}/>
-                 </button>
-
-                 {/* Feature Icons */}
-                 <button onClick={() => setShowRealEstate(true)} className="p-2 text-gray-500 hover:bg-orange-50 hover:text-orange-600 rounded-full" title="Real Estate">
-                    <Home size={20}/>
-                 </button>
-                 
-                 <button onClick={() => setShowJobBoard(true)} className="p-2 text-gray-500 hover:bg-blue-50 hover:text-blue-600 rounded-full" title="Jobs">
-                    <Briefcase size={20}/>
-                 </button>
-
-                 <button onClick={() => setShowStore(true)} className="p-2 text-gray-500 hover:bg-purple-50 hover:text-purple-600 rounded-full" title="Store">
-                    <ShoppingBag size={20}/>
-                 </button>
-
                  {/* Language Switcher */}
-                 <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5 ml-1">
+                 <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5 ml-1 hidden sm:flex">
                     <button onClick={() => setLanguage(Language.AR)} className={`px-2 py-1 rounded-md text-[10px] font-bold ${language === Language.AR ? 'bg-white dark:bg-gray-600 shadow-sm' : 'text-gray-500'}`}>AR</button>
                     <button onClick={() => setLanguage(Language.FR)} className={`px-2 py-1 rounded-md text-[10px] font-bold ${language === Language.FR ? 'bg-white dark:bg-gray-600 shadow-sm' : 'text-gray-500'}`}>FR</button>
                     <button onClick={() => setLanguage(Language.EN)} className={`px-2 py-1 rounded-md text-[10px] font-bold ${language === Language.EN ? 'bg-white dark:bg-gray-600 shadow-sm' : 'text-gray-500'}`}>EN</button>
                  </div>
 
-                 {/* Login / Profile Button */}
+                 {/* Login / Profile Button (Always Visible) */}
                  <button 
                     onClick={handleProfileClick}
-                    className={`ml-2 flex items-center gap-2 px-4 py-2 rounded-xl transition-all shadow-md active:scale-95 ${currentUser ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-primary text-white hover:bg-primaryDark'}`}
+                    className={`ml-1 flex items-center gap-2 px-4 py-2 rounded-xl transition-all shadow-md active:scale-95 whitespace-nowrap ${currentUser ? 'bg-green-50 text-green-700 border border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800' : 'bg-primary text-white hover:bg-primaryDark'}`}
                  >
                     {currentUser ? <UserCheck size={18}/> : <LogIn size={18}/>}
                     <span className="text-sm font-bold hidden sm:inline">{currentUser ? currentUser.name.split(' ')[0] : t('loginRegister')}</span>
                  </button>
             </div>
         </div>
+        
+        {/* Mobile Features Dropdown */}
+        {showMobileFeatures && (
+            <div className="absolute top-16 left-0 right-0 bg-white dark:bg-gray-800 border-b dark:border-gray-700 shadow-xl p-4 z-30 animate-slide-up md:hidden grid grid-cols-4 gap-2">
+                 <button onClick={() => { setShowDirectory(true); setShowMobileFeatures(false); }} className="flex flex-col items-center gap-1 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-white">
+                     <div className="p-2 bg-gray-100 dark:bg-gray-700 rounded-full text-gray-600 dark:text-white"><FileText size={20}/></div>
+                     <span className="text-[10px] font-bold">Directory</span>
+                 </button>
+                 <button onClick={() => { setShowRealEstate(true); setShowMobileFeatures(false); }} className="flex flex-col items-center gap-1 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-white">
+                     <div className="p-2 bg-orange-100 text-orange-600 rounded-full"><Home size={20}/></div>
+                     <span className="text-[10px] font-bold">Real Estate</span>
+                 </button>
+                 <button onClick={() => { setShowJobBoard(true); setShowMobileFeatures(false); }} className="flex flex-col items-center gap-1 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-white">
+                     <div className="p-2 bg-blue-100 text-blue-600 rounded-full"><Briefcase size={20}/></div>
+                     <span className="text-[10px] font-bold">Jobs</span>
+                 </button>
+                 <button onClick={() => { setShowStore(true); setShowMobileFeatures(false); }} className="flex flex-col items-center gap-1 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-white">
+                     <div className="p-2 bg-purple-100 text-purple-600 rounded-full"><ShoppingBag size={20}/></div>
+                     <span className="text-[10px] font-bold">Store</span>
+                 </button>
+                 
+                 {/* Mobile Language Switcher */}
+                 <div className="col-span-4 mt-2 pt-2 border-t dark:border-gray-700 flex justify-center gap-2">
+                    <button onClick={() => setLanguage(Language.AR)} className={`px-4 py-1 rounded-full text-xs font-bold ${language === Language.AR ? 'bg-black text-white' : 'bg-gray-100 text-gray-600'}`}>Arabic</button>
+                    <button onClick={() => setLanguage(Language.FR)} className={`px-4 py-1 rounded-full text-xs font-bold ${language === Language.FR ? 'bg-black text-white' : 'bg-gray-100 text-gray-600'}`}>French</button>
+                    <button onClick={() => setLanguage(Language.EN)} className={`px-4 py-1 rounded-full text-xs font-bold ${language === Language.EN ? 'bg-black text-white' : 'bg-gray-100 text-gray-600'}`}>English</button>
+                 </div>
+            </div>
+        )}
         
         {/* Mobile Menu Expanded (Provider Only) */}
         {mobileMenuOpen && currentUser && currentUser.accountType === 'PROVIDER' && (
@@ -1040,6 +1174,7 @@ const App: React.FC = () => {
             onToggleTheme={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
             isDarkMode={theme === 'dark'}
             onOpenDbSetup={() => setShowDbSetup(true)}
+            onUpdateUser={(updatedUser: AuthenticatedUser) => setCurrentUser(updatedUser)}
         />
 
         {/* Feature Modals */}

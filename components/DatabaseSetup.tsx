@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { useLocalization } from '../hooks/useLocalization';
-import { X, Copy, Database, Image as ImageIcon, Users, AlertTriangle, ShieldAlert, CheckCircle, Unlock, Bell, ShoppingBag, ListPlus, UserCheck, Megaphone, ShieldCheck, Layers, Briefcase, Lock } from 'lucide-react';
+import { X, Copy, Database, Image as ImageIcon, Users, AlertTriangle, ShieldAlert, CheckCircle, Unlock, Bell, ShoppingBag, ListPlus, UserCheck, Megaphone, ShieldCheck, Layers, Briefcase, Lock, UserCog } from 'lucide-react';
 
 const CodeBlock: React.FC<{ title: string; code: string }> = ({ title, code }) => {
   const { t } = useLocalization();
@@ -284,6 +284,13 @@ ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
 
 NOTIFY pgrst, 'reload config';`;
 
+const v29UpdateSQL = `-- V29: Client Profile Enhancement
+-- Add profile fields to clients table
+ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS bio text NULL;
+ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS profile_image_url text NULL;
+
+NOTIFY pgrst, 'reload config';`;
+
 const createAdminSQL = `-- Create Admin User
 INSERT INTO public.providers (
   name, service_type, location, username, password, phone, is_active, subscription_end_date
@@ -337,6 +344,15 @@ INSERT INTO storage.buckets (id, name, public) VALUES ('announcement-images', 'a
         </div>
         <div className="p-6 h-[calc(100vh-65px)] overflow-y-auto">
           <p className="mb-6 text-gray-700 dark:text-gray-300">{t('databaseSetupDesc')}</p>
+
+          {/* V29 Update Block */}
+          <div className="mb-8 p-4 border-l-4 border-teal-500 bg-teal-50 dark:bg-teal-900/20 rounded-r-lg shadow-lg animate-fade-in">
+             <h3 className="text-xl font-bold text-teal-600 dark:text-teal-400 flex items-center gap-2 mb-4">
+                <UserCog /> V29 Update: Client Profile Fields
+             </h3>
+             <p className="mb-2 text-sm text-gray-600 dark:text-gray-400">Run this to allow Clients to have a Bio and Profile Image.</p>
+             <CodeBlock title="V29 Client Profile" code={v29UpdateSQL.trim()} />
+          </div>
 
           {/* V28 Update Block */}
           <div className="mb-8 p-4 border-l-4 border-purple-500 bg-purple-50 dark:bg-purple-900/20 rounded-r-lg shadow-lg animate-fade-in">

@@ -42,8 +42,20 @@ export const JobBoard: React.FC<{ isOpen: boolean; onClose: () => void; currentU
 
     const fetchJobs = async () => {
         setLoading(true);
-        const { data } = await supabase.from('job_posts').select('*').order('created_at', { ascending: false });
-        setJobs(data as JobPost[] || []);
+        // Select all fields AND the count of related comments
+        const { data, error } = await supabase
+            .from('job_posts')
+            .select('*, job_comments(count)')
+            .order('created_at', { ascending: false });
+        
+        if (data) {
+            // Transform the data to flatten comments_count
+            const formattedJobs: JobPost[] = data.map((job: any) => ({
+                ...job,
+                comments_count: job.job_comments?.[0]?.count || 0
+            }));
+            setJobs(formattedJobs);
+        }
         setLoading(false);
     };
 
@@ -129,14 +141,26 @@ export const JobBoard: React.FC<{ isOpen: boolean; onClose: () => void; currentU
     const submitComment = async (jobId: number) => {
         if(!currentUser || !newComment.trim()) return;
         setCommentLoading(true);
-        await supabase.from('job_comments').insert({
+        
+        // 1. Insert
+        const { error } = await supabase.from('job_comments').insert({
             job_id: jobId,
             user_name: currentUser.name,
             comment: newComment
         });
-        setNewComment('');
-        const { data } = await supabase.from('job_comments').select('*').eq('job_id', jobId).order('created_at', { ascending: true });
-        setComments(data || []);
+
+        if(!error) {
+            setNewComment('');
+            
+            // 2. Refresh Comments List
+            const { data } = await supabase.from('job_comments').select('*').eq('job_id', jobId).order('created_at', { ascending: true });
+            setComments(data || []);
+
+            // 3. Update Job List Count Locally
+            setJobs(prev => prev.map(job => 
+                job.id === jobId ? { ...job, comments_count: (job.comments_count || 0) + 1 } : job
+            ));
+        }
         setCommentLoading(false);
     }
 
@@ -292,8 +316,9 @@ export const JobBoard: React.FC<{ isOpen: boolean; onClose: () => void; currentU
                                                          <Heart size={16} className={job.likes ? "fill-red-500 text-red-500" : ""}/> 
                                                          <span className="text-xs">{job.likes || 0}</span>
                                                      </button>
-                                                     <button onClick={() => toggleComments(job.id)} className="flex items-center gap-1 hover:text-blue-500">
+                                                     <button onClick={() => toggleComments(job.id)} className="flex items-center gap-1 hover:text-blue-500 text-gray-500">
                                                          <MessageCircle size={16}/>
+                                                         <span className="text-xs font-bold">{job.comments_count || 0}</span>
                                                      </button>
                                                 </div>
                                                 <a 
@@ -309,14 +334,15 @@ export const JobBoard: React.FC<{ isOpen: boolean; onClose: () => void; currentU
                                             {/* Inline Comments */}
                                             {activeCommentJobId === job.id && (
                                                 <div className="p-4 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 animate-fade-in">
-                                                    <div className="max-h-40 overflow-y-auto space-y-2 mb-3">
+                                                    <div className="max-h-40 overflow-y-auto space-y-2 mb-3 bg-gray-50 dark:bg-gray-900/50 p-2 rounded-lg">
                                                         {comments.map(c => (
-                                                            <div key={c.id} className="text-xs">
+                                                            <div key={c.id} className="text-xs border-b border-gray-100 dark:border-gray-700 last:border-0 pb-1">
                                                                 <span className="font-bold dark:text-white mr-2">{c.user_name}:</span>
                                                                 <span className="text-gray-600 dark:text-gray-400">{c.comment}</span>
                                                             </div>
                                                         ))}
-                                                        {comments.length === 0 && !commentLoading && <p className="text-xs text-gray-400 italic">No comments yet.</p>}
+                                                        {comments.length === 0 && !commentLoading && <p className="text-xs text-gray-400 italic text-center py-2">No comments yet. Be the first!</p>}
+                                                        {commentLoading && <div className="flex justify-center"><Loader2 size={16} className="animate-spin text-gray-400"/></div>}
                                                     </div>
                                                     <div className="flex gap-2">
                                                         <input 
@@ -324,8 +350,9 @@ export const JobBoard: React.FC<{ isOpen: boolean; onClose: () => void; currentU
                                                             onChange={e => setNewComment(e.target.value)}
                                                             placeholder={t('writeComment')}
                                                             className="flex-1 bg-gray-100 dark:bg-gray-700 rounded-lg px-3 py-2 text-xs outline-none dark:text-white"
+                                                            onKeyPress={(e) => e.key === 'Enter' && newComment.trim() && submitComment(job.id)}
                                                         />
-                                                        <button onClick={() => submitComment(job.id)} disabled={!newComment.trim()} className="bg-blue-500 text-white p-2 rounded-lg">
+                                                        <button onClick={() => submitComment(job.id)} disabled={!newComment.trim() || commentLoading} className="bg-blue-500 text-white p-2 rounded-lg">
                                                             {commentLoading ? <Loader2 size={14} className="animate-spin"/> : <Send size={14}/>}
                                                         </button>
                                                     </div>

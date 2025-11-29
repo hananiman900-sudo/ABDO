@@ -60,6 +60,7 @@ export interface JobPost {
   category?: string;
   post_type?: 'SEEKER' | 'EMPLOYER';
   image_url?: string;
+  comments_count?: number;
 }
 
 export interface JobComment {
