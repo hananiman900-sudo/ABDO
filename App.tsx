@@ -11,7 +11,7 @@ import { JobBoard } from './components/JobBoard';
 import { LocalizationProvider, useLocalization, translations } from './hooks/useLocalization';
 import { supabase } from './services/supabaseClient';
 import QRCodeDisplay from './components/QRCodeDisplay';
-import { Globe, User as UserIcon, CheckSquare, Sun, Moon, LogIn, LogOut, X, CalendarDays, Database, AlertTriangle, CheckCircle2, Menu, Users, Bell, Phone, MapPin, Search, Heart, Briefcase, Star, MessageCircle, ShoppingBag, Eye, EyeOff, Megaphone, Headset, Instagram, Facebook, Link as LinkIcon, ArrowLeft, UserCheck, Home, UserPlus, FileText, ListPlus, UserMinus, RefreshCw, Key, Map, Clock, ChevronRight, Plus, Loader2, Camera, Save } from 'lucide-react';
+import { Globe, User as UserIcon, CheckSquare, Sun, Moon, LogIn, LogOut, X, CalendarDays, Database, AlertTriangle, CheckCircle2, Menu, Users, Bell, Phone, MapPin, Search, Heart, Briefcase, Star, MessageCircle, ShoppingBag, Eye, EyeOff, Megaphone, Headset, Instagram, Facebook, Link as LinkIcon, ArrowLeft, UserCheck, Home, UserPlus, FileText, ListPlus, UserMinus, RefreshCw, Key, Map, Clock, ChevronRight, Plus, Loader2, Camera, Save, Grid } from 'lucide-react';
 
 const ScrollFixStyle = () => (
     <style>{`
@@ -57,7 +57,7 @@ const SplashScreen = ({ onFinish }: { onFinish: () => void }) => {
     return (
         <div className="fixed inset-0 bg-surface dark:bg-dark z-[100] flex flex-col items-center justify-center animate-fade-in">
             <div className="relative mb-4">
-                <div className="w-20 h-20 bg-gradient-to-br from-primary to-secondary rounded-2xl rotate-3 flex items-center justify-center shadow-glow">
+                <div className="w-20 h-20 bg-primary rounded-2xl flex items-center justify-center shadow-glow">
                    <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
                 </div>
             </div>
@@ -281,6 +281,7 @@ const AuthDrawer = ({ isOpen, onClose, onAuthSuccess, onDatabaseError }: any) =>
 
 // --- CLIENT PROFILE VIEW (EDITABLE) ---
 const ClientProfile = ({ isOpen, onClose, user, onLogout, onToggleTheme, isDarkMode, onOpenDbSetup, onUpdateUser }: any) => {
+    // ... (Keep existing implementation but ensure responsive resizing works as expected)
     const { t } = useLocalization();
     const [activeTab, setActiveTab] = useState<'APPOINTMENTS' | 'FOLLOWING'>('APPOINTMENTS');
     const [followingCount, setFollowingCount] = useState(0);
@@ -588,6 +589,7 @@ const ClientProfile = ({ isOpen, onClose, user, onLogout, onToggleTheme, isDarkM
 
 // --- NOTIFICATION CENTER ---
 const NotificationCenter = ({ isOpen, onClose, currentUser }: any) => {
+    // ... (Keep existing implementation)
     const { t } = useLocalization();
     const [items, setItems] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
@@ -669,6 +671,7 @@ const NotificationCenter = ({ isOpen, onClose, currentUser }: any) => {
 
 // --- PROVIDER DIRECTORY & PROFILE (INSTAGRAM STYLE - FULL SCREEN UPDATE) ---
 const ProviderDirectory = ({ isOpen, onClose, currentUser, onOpenAuth }: any) => {
+    // ... (Keep existing implementation)
     const { t } = useLocalization();
     const [providers, setProviders] = useState<any[]>([]);
     const [followedIds, setFollowedIds] = useState<number[]>([]);
@@ -715,7 +718,7 @@ const ProviderDirectory = ({ isOpen, onClose, currentUser, onOpenAuth }: any) =>
         setLoadingDetails(true);
         try {
             const { data: services } = await supabase.from('provider_services').select('*').eq('provider_id', providerId);
-            const { data: posts } = await supabase.from('announcements').select('*').eq('provider_id', providerId).order('created_at', {ascending: false});
+            const { data: posts } = await supabase.from('announcements').select('*').eq('provider_id', providerId).order('created_at', { ascending: false });
             const { count } = await supabase.from('follows').select('id', { count: 'exact' }).eq('provider_id', providerId);
 
             setProviderDetails({
@@ -963,13 +966,12 @@ const App: React.FC = () => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showDirectory, setShowDirectory] = useState(false);
   const [showClientProfile, setShowClientProfile] = useState(false);
-  const [showMobileFeatures, setShowMobileFeatures] = useState(false); // New Mobile Menu State
+  const [showMobileMenu, setShowMobileMenu] = useState(false); // New Overlay Menu State
   
   // Feature Modals
   const [showStore, setShowStore] = useState(false);
   const [showRealEstate, setShowRealEstate] = useState(false);
   const [showJobBoard, setShowJobBoard] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const [theme, setTheme] = useState(() => {
     if (typeof window !== 'undefined' && localStorage.theme) return localStorage.theme;
@@ -1017,8 +1019,7 @@ const App: React.FC = () => {
       localStorage.removeItem('tangerconnect_user_type'); 
       setCurrentUser(null); 
       setView(UserView.CLIENT); 
-      setMobileMenuOpen(false); 
-      setShowMobileFeatures(false);
+      setShowMobileMenu(false); 
   };
   
   const handleAuthSuccess = (user: AuthenticatedUser) => { 
@@ -1034,8 +1035,9 @@ const App: React.FC = () => {
           return;
       }
       if (currentUser.accountType === 'PROVIDER') {
-          // Provider doesn't have a "Client Profile" modal, they have the main portal
-          setMobileMenuOpen(!mobileMenuOpen); 
+          // Provider doesn't need external modal, they are already on dashboard
+          // But maybe they want to see "Settings" or "Logout"
+          setShowMobileMenu(true);
       } else {
           // Client opens specialized profile
           setShowClientProfile(true);
@@ -1045,103 +1047,145 @@ const App: React.FC = () => {
 
   // Header Component
   const Header = () => (
-      <header className="fixed top-0 left-0 right-0 bg-surface/90 dark:bg-dark/90 backdrop-blur-md border-b border-gray-200/50 dark:border-gray-800/50 z-40 transition-all duration-300">
-        <div className="w-full md:max-w-6xl mx-auto px-4 h-16 flex justify-between items-center relative">
+      <header className="fixed top-0 left-0 right-0 bg-surface/95 dark:bg-dark/95 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 z-50 h-16 transition-all duration-300">
+        <div className="w-full md:max-w-6xl mx-auto px-4 h-full flex justify-between items-center relative">
             
-            {/* Left Side: Logo & Title */}
-            <div className="flex items-center gap-2">
-                <div className="bg-gradient-to-br from-primary to-secondary p-1.5 rounded-lg shadow-lg">
+            {/* Left Side: Logo */}
+            <div className="flex items-center gap-3 cursor-pointer" onClick={() => window.location.reload()}>
+                <div className="bg-primary rounded-xl p-1.5 shadow-sm">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
                 </div>
-                <h1 className="text-xl font-bold text-dark dark:text-white tracking-tight hidden sm:block">Tanger<span className="text-primary">Connect</span></h1>
+                <h1 className="text-xl font-bold text-dark dark:text-white tracking-tight hidden xs:block">Tanger<span className="text-primary">Connect</span></h1>
             </div>
 
-            {/* Right Side: Icons & Auth */}
+            {/* Right Side: Actions */}
             <div className="flex items-center gap-2">
                  
-                 {/* Mobile Feature Menu Toggle (Only on Small Screens) */}
-                 <div className="md:hidden">
-                    <button 
-                        onClick={() => setShowMobileFeatures(!showMobileFeatures)} 
-                        className={`p-2 rounded-full transition-colors ${showMobileFeatures ? 'bg-primary text-white' : 'text-gray-500 hover:bg-gray-100 dark:text-gray-300'}`}
-                    >
-                        <Menu size={20}/>
-                    </button>
+                 {/* Desktop Menu (Hidden on Mobile) */}
+                 <div className="hidden md:flex items-center gap-2 mr-2">
+                     <button onClick={() => setShowDirectory(true)} className="px-3 py-1.5 hover:bg-gray-100 rounded-lg text-sm font-medium dark:text-gray-200">{t('providerDirectory')}</button>
+                     <button onClick={() => setShowRealEstate(true)} className="px-3 py-1.5 hover:bg-gray-100 rounded-lg text-sm font-medium dark:text-gray-200">{t('realEstateTitle')}</button>
+                     <button onClick={() => setShowJobBoard(true)} className="px-3 py-1.5 hover:bg-gray-100 rounded-lg text-sm font-medium dark:text-gray-200">{t('jobBoardTitle')}</button>
                  </div>
 
-                 {/* Desktop Features (Hidden on Mobile to save space) */}
-                 <div className="hidden md:flex items-center gap-2">
-                     <button onClick={() => setShowDirectory(true)} className="p-2 text-gray-500 hover:bg-gray-100 rounded-full dark:hover:bg-gray-800 dark:text-gray-300" title="Directory"><FileText size={20}/></button>
-                     <button onClick={() => setShowRealEstate(true)} className="p-2 text-gray-500 hover:bg-orange-50 hover:text-orange-600 rounded-full dark:text-gray-300" title="Real Estate"><Home size={20}/></button>
-                     <button onClick={() => setShowJobBoard(true)} className="p-2 text-gray-500 hover:bg-blue-50 hover:text-blue-600 rounded-full dark:text-gray-300" title="Jobs"><Briefcase size={20}/></button>
-                     <button onClick={() => setShowStore(true)} className="p-2 text-gray-500 hover:bg-purple-50 hover:text-purple-600 rounded-full dark:text-gray-300" title="Store"><ShoppingBag size={20}/></button>
-                 </div>
-
-                 {/* Notifications (Always Visible) */}
-                 <button onClick={() => setShowNotifications(true)} className="p-2 text-gray-500 hover:bg-gray-100 rounded-full dark:hover:bg-gray-800 relative dark:text-gray-300">
-                     <Bell size={20}/>
+                 {/* Notifications */}
+                 <button onClick={() => setShowNotifications(true)} className="p-2 text-gray-500 hover:bg-gray-100 rounded-full dark:hover:bg-gray-800 relative dark:text-gray-300 transition-colors">
+                     <Bell size={22}/>
+                     {/* Add red dot if unread */}
+                     <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full"></span>
                  </button>
 
-                 {/* Language Switcher */}
-                 <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5 ml-1 hidden sm:flex">
-                    <button onClick={() => setLanguage(Language.AR)} className={`px-2 py-1 rounded-md text-[10px] font-bold ${language === Language.AR ? 'bg-white dark:bg-gray-600 shadow-sm' : 'text-gray-500'}`}>AR</button>
-                    <button onClick={() => setLanguage(Language.FR)} className={`px-2 py-1 rounded-md text-[10px] font-bold ${language === Language.FR ? 'bg-white dark:bg-gray-600 shadow-sm' : 'text-gray-500'}`}>FR</button>
-                    <button onClick={() => setLanguage(Language.EN)} className={`px-2 py-1 rounded-md text-[10px] font-bold ${language === Language.EN ? 'bg-white dark:bg-gray-600 shadow-sm' : 'text-gray-500'}`}>EN</button>
-                 </div>
-
-                 {/* Login / Profile Button (Always Visible) */}
+                 {/* Mobile Menu Button */}
+                 <button 
+                    onClick={() => setShowMobileMenu(true)}
+                    className="p-2 text-dark dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors md:hidden"
+                 >
+                    <Menu size={24}/>
+                 </button>
+                 
+                 {/* Login/Profile Button (Desktop) */}
                  <button 
                     onClick={handleProfileClick}
-                    className={`ml-1 flex items-center gap-2 px-4 py-2 rounded-xl transition-all shadow-md active:scale-95 whitespace-nowrap ${currentUser ? 'bg-green-50 text-green-700 border border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800' : 'bg-primary text-white hover:bg-primaryDark'}`}
+                    className="hidden md:flex items-center gap-2 px-4 py-2 rounded-xl transition-all shadow-sm active:scale-95 bg-primary text-white hover:bg-primaryDark font-bold text-sm ml-2"
                  >
                     {currentUser ? <UserCheck size={18}/> : <LogIn size={18}/>}
-                    <span className="text-sm font-bold hidden sm:inline">{currentUser ? currentUser.name.split(' ')[0] : t('loginRegister')}</span>
+                    <span>{currentUser ? currentUser.name.split(' ')[0] : t('loginButton')}</span>
                  </button>
             </div>
         </div>
-        
-        {/* Mobile Features Dropdown */}
-        {showMobileFeatures && (
-            <div className="absolute top-16 left-0 right-0 bg-white dark:bg-gray-800 border-b dark:border-gray-700 shadow-xl p-4 z-30 animate-slide-up md:hidden grid grid-cols-4 gap-2">
-                 <button onClick={() => { setShowDirectory(true); setShowMobileFeatures(false); }} className="flex flex-col items-center gap-1 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-white">
-                     <div className="p-2 bg-gray-100 dark:bg-gray-700 rounded-full text-gray-600 dark:text-white"><FileText size={20}/></div>
-                     <span className="text-[10px] font-bold">Directory</span>
-                 </button>
-                 <button onClick={() => { setShowRealEstate(true); setShowMobileFeatures(false); }} className="flex flex-col items-center gap-1 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-white">
-                     <div className="p-2 bg-orange-100 text-orange-600 rounded-full"><Home size={20}/></div>
-                     <span className="text-[10px] font-bold">Real Estate</span>
-                 </button>
-                 <button onClick={() => { setShowJobBoard(true); setShowMobileFeatures(false); }} className="flex flex-col items-center gap-1 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-white">
-                     <div className="p-2 bg-blue-100 text-blue-600 rounded-full"><Briefcase size={20}/></div>
-                     <span className="text-[10px] font-bold">Jobs</span>
-                 </button>
-                 <button onClick={() => { setShowStore(true); setShowMobileFeatures(false); }} className="flex flex-col items-center gap-1 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-white">
-                     <div className="p-2 bg-purple-100 text-purple-600 rounded-full"><ShoppingBag size={20}/></div>
-                     <span className="text-[10px] font-bold">Store</span>
-                 </button>
-                 
-                 {/* Mobile Language Switcher */}
-                 <div className="col-span-4 mt-2 pt-2 border-t dark:border-gray-700 flex justify-center gap-2">
-                    <button onClick={() => setLanguage(Language.AR)} className={`px-4 py-1 rounded-full text-xs font-bold ${language === Language.AR ? 'bg-black text-white' : 'bg-gray-100 text-gray-600'}`}>Arabic</button>
-                    <button onClick={() => setLanguage(Language.FR)} className={`px-4 py-1 rounded-full text-xs font-bold ${language === Language.FR ? 'bg-black text-white' : 'bg-gray-100 text-gray-600'}`}>French</button>
-                    <button onClick={() => setLanguage(Language.EN)} className={`px-4 py-1 rounded-full text-xs font-bold ${language === Language.EN ? 'bg-black text-white' : 'bg-gray-100 text-gray-600'}`}>English</button>
-                 </div>
-            </div>
-        )}
-        
-        {/* Mobile Menu Expanded (Provider Only) */}
-        {mobileMenuOpen && currentUser && currentUser.accountType === 'PROVIDER' && (
-            <div className="absolute top-16 left-0 w-full bg-surface dark:bg-surfaceDark border-b border-gray-200 dark:border-gray-700 shadow-xl p-4 z-40 animate-fade-in">
-                 <div className="flex justify-center gap-4 mb-4">
-                     <button onClick={() => setShowDbSetup(true)} className="p-2 bg-gray-100 rounded-full"><Database size={20}/></button>
-                     <a href="https://wa.me/212617774846" className="p-2 bg-green-100 text-green-600 rounded-full"><Headset size={20}/></a>
-                 </div>
-
-                 <button onClick={handleLogout} className="w-full py-3 bg-red-100 text-red-600 rounded-xl font-bold flex items-center justify-center gap-2"><LogOut size={18}/> {t('logout')}</button>
-            </div>
-        )}
       </header>
   );
+
+  // Full Screen Mobile Menu Overlay
+  const MobileMenuOverlay = () => {
+      if(!showMobileMenu) return null;
+      return (
+          <div className="fixed inset-0 z-[60] bg-surface dark:bg-dark animate-fade-in flex flex-col">
+              <div className="p-4 flex justify-between items-center border-b dark:border-gray-800">
+                  <h2 className="text-2xl font-bold dark:text-white">{t('menu')}</h2>
+                  <button onClick={() => setShowMobileMenu(false)} className="p-2 bg-gray-100 dark:bg-gray-800 rounded-full"><X size={24} className="dark:text-white"/></button>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                  {/* User Section */}
+                  <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700">
+                      {currentUser ? (
+                          <div className="flex items-center gap-4">
+                              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden">
+                                  {currentUser.profile_image_url ? (
+                                      <img src={currentUser.profile_image_url} className="w-full h-full object-cover"/>
+                                  ) : (
+                                      <span className="text-2xl font-bold text-primary">{currentUser.name.charAt(0)}</span>
+                                  )}
+                              </div>
+                              <div>
+                                  <h3 className="font-bold text-lg dark:text-white">{currentUser.name}</h3>
+                                  <p className="text-sm text-gray-500">{currentUser.accountType === 'PROVIDER' ? t('provider') : t('client')}</p>
+                              </div>
+                          </div>
+                      ) : (
+                          <div className="text-center">
+                              <p className="text-gray-500 mb-4">Login to access your profile</p>
+                              <button onClick={() => { setShowAuthDrawer(true); setShowMobileMenu(false); }} className="w-full py-3 bg-primary text-white rounded-xl font-bold shadow-lg">
+                                  {t('loginRegister')}
+                              </button>
+                          </div>
+                      )}
+                  </div>
+
+                  {/* App Links */}
+                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-2">Apps</h3>
+                  <div className="grid grid-cols-2 gap-3">
+                      <button onClick={() => { setShowDirectory(true); setShowMobileMenu(false); }} className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-2xl flex flex-col items-center gap-2 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors">
+                          <FileText size={28} className="text-blue-600 dark:text-blue-400"/>
+                          <span className="font-bold text-sm dark:text-gray-200">{t('providerDirectory')}</span>
+                      </button>
+                      <button onClick={() => { setShowJobBoard(true); setShowMobileMenu(false); }} className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-2xl flex flex-col items-center gap-2 hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors">
+                          <Briefcase size={28} className="text-purple-600 dark:text-purple-400"/>
+                          <span className="font-bold text-sm dark:text-gray-200">{t('jobBoardTitle')}</span>
+                      </button>
+                      <button onClick={() => { setShowRealEstate(true); setShowMobileMenu(false); }} className="p-4 bg-orange-50 dark:bg-orange-900/20 rounded-2xl flex flex-col items-center gap-2 hover:bg-orange-100 dark:hover:bg-orange-900/40 transition-colors">
+                          <Home size={28} className="text-orange-600 dark:text-orange-400"/>
+                          <span className="font-bold text-sm dark:text-gray-200">{t('realEstateTitle')}</span>
+                      </button>
+                      <button onClick={() => { setShowStore(true); setShowMobileMenu(false); }} className="p-4 bg-green-50 dark:bg-green-900/20 rounded-2xl flex flex-col items-center gap-2 hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors">
+                          <ShoppingBag size={28} className="text-green-600 dark:text-green-400"/>
+                          <span className="font-bold text-sm dark:text-gray-200">{t('shop')}</span>
+                      </button>
+                  </div>
+
+                  {/* Settings */}
+                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mt-6 mb-2 px-2">Settings</h3>
+                  <div className="bg-gray-50 dark:bg-gray-800 rounded-2xl overflow-hidden border border-gray-100 dark:border-gray-700">
+                       <div className="p-4 flex justify-between items-center border-b dark:border-gray-700">
+                           <span className="font-bold dark:text-white flex items-center gap-2"><Globe size={18}/> Language</span>
+                           <div className="flex gap-1">
+                               <button onClick={() => setLanguage(Language.AR)} className={`px-3 py-1 rounded-lg text-xs font-bold ${language === Language.AR ? 'bg-primary text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-600'}`}>AR</button>
+                               <button onClick={() => setLanguage(Language.FR)} className={`px-3 py-1 rounded-lg text-xs font-bold ${language === Language.FR ? 'bg-primary text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-600'}`}>FR</button>
+                               <button onClick={() => setLanguage(Language.EN)} className={`px-3 py-1 rounded-lg text-xs font-bold ${language === Language.EN ? 'bg-primary text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-600'}`}>EN</button>
+                           </div>
+                       </div>
+                       <div className="p-4 flex justify-between items-center border-b dark:border-gray-700">
+                           <span className="font-bold dark:text-white flex items-center gap-2">{theme === 'dark' ? <Moon size={18}/> : <Sun size={18}/>} Theme</span>
+                           <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="px-4 py-1.5 bg-gray-200 dark:bg-gray-700 rounded-lg text-xs font-bold dark:text-white">
+                               {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+                           </button>
+                       </div>
+                       <div className="p-4 flex justify-between items-center">
+                           <span className="font-bold dark:text-white flex items-center gap-2"><Database size={18}/> Database</span>
+                           <button onClick={() => setShowDbSetup(true)} className="px-4 py-1.5 bg-gray-200 dark:bg-gray-700 rounded-lg text-xs font-bold dark:text-white">Configure</button>
+                       </div>
+                  </div>
+
+                  {currentUser && (
+                      <button onClick={handleLogout} className="w-full mt-6 py-4 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-red-100 transition-colors">
+                          <LogOut size={20}/> {t('logout')}
+                      </button>
+                  )}
+              </div>
+          </div>
+      )
+  }
 
   if (showSplash) return <SplashScreen onFinish={() => setShowSplash(false)} />;
 
@@ -1151,12 +1195,15 @@ const App: React.FC = () => {
       <div key={language} className={`h-screen bg-surface dark:bg-dark text-dark dark:text-light transition-colors duration-300 flex flex-col ${language === Language.AR ? 'font-arabic' : 'font-sans'}`} dir={language === Language.AR ? 'rtl' : 'ltr'}>
         <Header />
         
-        <main className="flex-1 pt-16 md:pt-20 pb-0 md:pb-4 w-full md:max-w-6xl md:mx-auto md:px-4 flex flex-col overflow-hidden">
-            {view === UserView.PROVIDER && currentUser?.accountType === AccountType.PROVIDER ? (
-                <ProviderPortal provider={currentUser} onLogout={handleLogout} />
-            ) : (
-                <Chatbot currentUser={currentUser} setCurrentUser={setCurrentUser} isLoadingUser={isLoadingUser} />
-            )}
+        {/* Main Content Area - Scrollable */}
+        <main className="flex-1 mt-16 w-full md:max-w-6xl md:mx-auto flex flex-col overflow-hidden relative">
+            <div className="flex-1 overflow-y-auto pb-4 w-full">
+                {view === UserView.PROVIDER && currentUser?.accountType === AccountType.PROVIDER ? (
+                    <ProviderPortal provider={currentUser} onLogout={handleLogout} />
+                ) : (
+                    <Chatbot currentUser={currentUser} setCurrentUser={setCurrentUser} isLoadingUser={isLoadingUser} />
+                )}
+            </div>
         </main>
 
         {/* Global Modals */}
@@ -1164,7 +1211,8 @@ const App: React.FC = () => {
         <AppointmentsDrawer isOpen={showAppointmentsDrawer} onClose={() => setShowAppointmentsDrawer(false)} user={currentUser} />
         <NotificationCenter isOpen={showNotifications} onClose={() => setShowNotifications(false)} currentUser={currentUser} />
         <ProviderDirectory isOpen={showDirectory} onClose={() => setShowDirectory(false)} currentUser={currentUser} onOpenAuth={() => setShowAuthDrawer(true)} />
-        
+        <MobileMenuOverlay />
+
         {/* Client Profile Modal (Updated Props) */}
         <ClientProfile 
             isOpen={showClientProfile} 

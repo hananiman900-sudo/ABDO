@@ -23,6 +23,8 @@ export const translations: Translations = {
   delete: { ar: 'مسح', en: 'Delete', fr: 'Supprimer' },
   edit: { ar: 'تعديل', en: 'Edit', fr: 'Modifier' },
   back: { ar: 'رجوع', en: 'Back', fr: 'Retour' },
+  menu: { ar: 'القائمة', en: 'Menu', fr: 'Menu' },
+  home: { ar: 'الرئيسية', en: 'Home', fr: 'Accueil' },
   
   // --- AUTH ---
   loginRegister: { ar: 'دخول / تسجيل', en: 'Login / Register', fr: 'Connexion / S\'inscrire' },
@@ -38,11 +40,17 @@ export const translations: Translations = {
   provider: { ar: 'مهني (Pro)', en: 'Provider', fr: 'Professionnel' },
   loginButton: { ar: 'دخول', en: 'Login', fr: 'Connexion' },
   registerButton: { ar: 'تسجيل', en: 'Register', fr: 'S\'inscrire' },
+  statusActive: { ar: 'حساب مفعل', en: 'Active', fr: 'Actif' },
+  statusPending: { ar: 'في الانتظار', en: 'Pending', fr: 'En attente' },
+  welcomeProvider: { ar: 'مرحباً، {name}', en: 'Welcome, {name}', fr: 'Bienvenue, {name}' },
   
   // --- PROFILE & DIRECTORY ---
   providerDirectory: { ar: 'دليل المهنيين', en: 'Provider Directory', fr: 'Annuaire Pro' },
   searchProviderPlaceholder: { ar: 'بحث عن مهني أو خدمة...', en: 'Search provider or service...', fr: 'Chercher un pro ou service...' },
   followers: { ar: 'متابعين', en: 'Followers', fr: 'Abonnés' },
+  clientsToday: { ar: 'زبناء اليوم', en: 'Clients Today', fr: 'Clients Aujourd\'hui' },
+  totalScans: { ar: 'مجموع العمليات', en: 'Total Scans', fr: 'Total Scans' },
+  activeAds: { ar: 'إعلانات نشطة', en: 'Active Ads', fr: 'Pubs Actives' },
   follow: { ar: 'متابعة', en: 'Follow', fr: 'Suivre' },
   unfollow: { ar: 'إلغاء المتابعة', en: 'Unfollow', fr: 'Ne plus suivre' },
   services: { ar: 'الخدمات', en: 'Services', fr: 'Services' },
@@ -51,6 +59,19 @@ export const translations: Translations = {
   noServices: { ar: 'لا توجد خدمات حاليا', en: 'No services listed', fr: 'Aucun service listé' },
   noPosts: { ar: 'لا توجد منشورات حاليا', en: 'No posts yet', fr: 'Aucune publication' },
   call: { ar: 'اتصال', en: 'Call', fr: 'Appeler' },
+  profileAndServices: { ar: 'الملف الشخصي والخدمات', en: 'Profile & Services', fr: 'Profil & Services' },
+  bioLabel: { ar: 'نبذة تعريفية (Bio)', en: 'Bio', fr: 'Bio' },
+  uploadProfileImage: { ar: 'تغيير الصورة', en: 'Change Photo', fr: 'Changer Photo' },
+  removeImage: { ar: 'حذف الصورة', en: 'Remove Photo', fr: 'Supprimer Photo' },
+  uploading: { ar: 'جاري الرفع...', en: 'Uploading...', fr: 'Téléchargement...' },
+  saveProfile: { ar: 'حفظ التغييرات', en: 'Save Changes', fr: 'Enregistrer' },
+  savedSuccessfully: { ar: 'تم الحفظ بنجاح', en: 'Saved successfully', fr: 'Enregistré avec succès' },
+  addService: { ar: 'إضافة خدمة جديدة', en: 'Add New Service', fr: 'Ajouter Service' },
+  serviceName: { ar: 'اسم الخدمة', en: 'Service Name', fr: 'Nom Service' },
+  discountPrice: { ar: 'تخفيض (اختياري)', en: 'Discount (Opt)', fr: 'Réduction (Opt)' },
+  setLocation: { ar: 'تحديد الموقع GPS', en: 'Set GPS Location', fr: 'Définir GPS' },
+  locationSet: { ar: 'تم تحديد الموقع', en: 'Location Set', fr: 'Localisation définie' },
+  locationError: { ar: 'فشل تحديد الموقع', en: 'Location Failed', fr: 'Échec Localisation' },
   
   // --- CLIENT PROFILE ---
   myProfile: { ar: 'ملفي الشخصي', en: 'My Profile', fr: 'Mon Profil' },
@@ -130,6 +151,9 @@ export const translations: Translations = {
   phoneExistsError: { ar: 'هذا الهاتف مسجل بالفعل', en: 'Phone already exists', fr: 'Téléphone existe déjà' },
   usernameExistsError: { ar: 'اسم المستخدم مسجل بالفعل', en: 'Username taken', fr: 'Nom d\'utilisateur pris' },
   registrationFailed: { ar: 'فشل التسجيل', en: 'Registration Failed', fr: 'Échec de l\'inscription' },
+  gpsPermissionDenied: { ar: 'تم رفض إذن الوصول للموقع', en: 'GPS permission denied', fr: 'Permission GPS refusée' },
+  gpsUnavailable: { ar: 'خدمة الموقع غير متاحة', en: 'GPS unavailable', fr: 'GPS indisponible' },
+  gpsTimeout: { ar: 'انتهت مهلة تحديد الموقع', en: 'GPS timeout', fr: 'Délai GPS dépassé' },
   
   // --- NEIGHBORHOODS ---
   neighborhoods: {
@@ -179,6 +203,22 @@ export const translations: Translations = {
   myAppointments: { ar: 'مواعيدي', en: 'My Appointments', fr: 'Mes Rendez-vous' },
   notifications: { ar: 'الإشعارات', en: 'Notifications', fr: 'Notifications' },
   noNotifications: { ar: 'لا توجد إشعارات', en: 'No notifications', fr: 'Pas de notifications' },
+  providerNotifications: { ar: 'إشعارات المزود', en: 'Provider Alerts', fr: 'Alertes Fournisseur' },
+  notificationDetails: { ar: 'تفاصيل الإشعار', en: 'Details', fr: 'Détails' },
+  clientHasArrived: { ar: 'الزبون وصل', en: 'Client Arrived', fr: 'Client Arrivé' },
+  clientPending: { ar: 'حجز جديد', en: 'New Booking', fr: 'Nouvelle Réservation' },
+  clientName: { ar: 'إسم الزبون', en: 'Client Name', fr: 'Nom Client' },
+  markAsCompleted: { ar: 'تأكيد العملية', en: 'Complete', fr: 'Terminer' },
+  scanHistory: { ar: 'سجل العمليات', en: 'Scan History', fr: 'Historique' },
+  qrScannerTitle: { ar: 'ماسح الكود (QR)', en: 'QR Scanner', fr: 'Scanner QR' },
+  scanWithCamera: { ar: 'مسح بالكاميرا', en: 'Scan Camera', fr: 'Scanner Caméra' },
+  uploadQRImage: { ar: 'رفع صورة QR', en: 'Upload QR', fr: 'Importer QR' },
+  qrNotDetected: { ar: 'لم يتم التعرف على الكود', en: 'No QR found', fr: 'Aucun QR trouvé' },
+  invalidQR: { ar: 'كود غير صالح', en: 'Invalid QR', fr: 'QR Invalide' },
+  verificationSuccess: { ar: 'تم التحقق بنجاح', en: 'Verified!', fr: 'Vérifié !' },
+  tryAgain: { ar: 'حاول مجدداً', en: 'Try Again', fr: 'Réessayer' },
+  
+  // --- DATABASE SETUP ---
   databaseSetupTitle: { ar: 'إعداد قاعدة البيانات', en: 'Database Setup', fr: 'Config Base de Données' },
   databaseSetupDesc: { ar: 'إعدادات الأدمن', en: 'Admin Settings', fr: 'Paramètres Admin' },
   createAdminUser: { ar: 'إنشاء حساب أدمن', en: 'Create Admin', fr: 'Créer Admin' },
@@ -211,11 +251,13 @@ export const translations: Translations = {
   price: { ar: 'الثمن', en: 'Price', fr: 'Prix' },
   sizes: { ar: 'المقاسات', en: 'Sizes', fr: 'Tailles' },
   productDescription: { ar: 'الوصف', en: 'Description', fr: 'Description' },
-  saveProfile: { ar: 'حفظ', en: 'Save', fr: 'Enregistrer' },
   addSystemAd: { ar: 'إضافة إعلان', en: 'Add Ad', fr: 'Ajouter Pub' },
   adTitle: { ar: 'العنوان', en: 'Title', fr: 'Titre' },
   messageLabel: { ar: 'الرسالة', en: 'Message', fr: 'Message' },
   sendButton: { ar: 'إرسال', en: 'Send', fr: 'Envoyer' },
+  sendAnnouncementTitle: { ar: 'إرسال إشعار للمتابعين', en: 'Send Alert', fr: 'Envoyer Alerte' },
+  messagePlaceholder: { ar: 'أكتب رسالة...', en: 'Type message...', fr: 'Écrire message...' },
+  myActiveAds: { ar: 'إعلاناتي النشطة', en: 'My Active Ads', fr: 'Mes Pubs Actives' },
   allFieldsRequired: { ar: 'المرجو ملء جميع الخانات', en: 'All fields required', fr: 'Champs requis' },
   uploadError: { ar: 'خطأ في الرفع', en: 'Upload Error', fr: 'Erreur Téléchargement' },
   orderPlaced: { ar: 'تم الطلب!', en: 'Order Placed!', fr: 'Commande Passée !' },
@@ -231,6 +273,13 @@ export const translations: Translations = {
   virtualFittingRoomShort: { ar: 'قياس افتراضي', en: 'Try On', fr: 'Essayer' },
   v13UpdateTitle: { ar: 'تحديث 13 (صور متعددة)', en: 'V13 Update', fr: 'Mise à jour V13' },
   v12UpdateTitle: { ar: 'تحديث 12 (إدارة المتجر)', en: 'V12 Update', fr: 'Mise à jour V12' },
+  subscriptionExpired: { ar: 'انتهى الاشتراك', en: 'Subscription Expired', fr: 'Abonnement Expiré' },
+  accountLockedDesc: { ar: 'المرجو تجديد الاشتراك لمتابعة استخدام حسابك المهني.', en: 'Please renew to continue using your provider account.', fr: 'Veuillez renouveler pour continuer.' },
+  renewNow: { ar: 'تجديد الآن', en: 'Renew Now', fr: 'Renouveler' },
+  subscriptionWarning: { ar: 'تنبيه الاشتراك', en: 'Subscription Warning', fr: 'Alerte Abonnement' },
+  daysLeft: { ar: 'بقي {days} أيام', en: '{days} days left', fr: '{days} jours restants' },
+  statistics: { ar: 'الإحصائيات', en: 'Statistics', fr: 'Statistiques' },
+  breakingNews: { ar: 'عاجل', en: 'News', fr: 'Infos' },
 };
 
 interface LocalizationContextType {

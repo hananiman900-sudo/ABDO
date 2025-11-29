@@ -1,11 +1,9 @@
 
-
-
 import React, { useState, useRef, useEffect } from 'react';
 import { useLocalization } from '../hooks/useLocalization';
 import { BookingDetails, FollowUp, AuthenticatedUser, ProviderService, ProviderNotification, Product } from '../types';
 import { supabase } from '../services/supabaseClient';
-import { CheckCircle, XCircle, Camera, Loader2, Upload, Send, LogOut, User, Calendar, FileText, Lock, Phone, X, RefreshCw, BarChart, History, Users, Edit, Trash, Smartphone, MessageCircle, MapPin, Briefcase, Save, Image as ImageIcon, MapIcon, Bell, Clock, AlertTriangle, Package, Plus, ShoppingBag, Instagram, Facebook, Link as LinkIcon } from 'lucide-react';
+import { CheckCircle, XCircle, Camera, Loader2, Upload, Send, LogOut, User, Calendar, FileText, Lock, Phone, X, RefreshCw, BarChart, History, Users, Edit, Trash, Smartphone, MessageCircle, MapPin, Briefcase, Save, Image as ImageIcon, MapIcon, Bell, Clock, AlertTriangle, Package, Plus, ShoppingBag, Instagram, Facebook, Link as LinkIcon, Settings, PenTool } from 'lucide-react';
 import jsQR from 'jsqr';
 
 interface ScannedAppointment extends BookingDetails {}
@@ -62,29 +60,6 @@ const RestrictedGuard: React.FC<{ provider: AuthenticatedUser; children: React.R
     );
 };
 
-const StatsComponent: React.FC<{ providerId: number }> = ({ providerId }) => {
-    const { t } = useLocalization();
-    const [count, setCount] = useState(0);
-    useEffect(() => {
-        const fetchStats = async () => {
-            const today = new Date().toISOString().split('T')[0];
-            const { count } = await supabase.from('scan_history').select('id', { count: 'exact' }).eq('provider_id', providerId).gte('created_at', today);
-            setCount(count || 0);
-        };
-        fetchStats();
-    }, [providerId]);
-
-    return (
-        <div className="bg-gradient-to-br from-primary to-primaryDark text-white p-6 rounded-3xl shadow-lg mb-6">
-            <h4 className="text-lg font-bold flex items-center gap-2 opacity-90"><BarChart size={20}/> {t('statistics')}</h4>
-            <div className="mt-2">
-                <span className="text-4xl font-bold">{count}</span>
-                <span className="text-sm opacity-80 ml-2">{t('clientsToday')}</span>
-            </div>
-        </div>
-    );
-};
-
 const ProviderNotifications: React.FC<{ providerId: number; refreshTrigger: number }> = ({ providerId, refreshTrigger }) => {
     const { t } = useLocalization();
     const [notifs, setNotifs] = useState<ProviderNotification[]>([]);
@@ -115,7 +90,7 @@ const ProviderNotifications: React.FC<{ providerId: number; refreshTrigger: numb
     }
 
     return (
-        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 relative max-h-96 overflow-y-auto">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 relative max-h-80 overflow-y-auto">
              <div className="absolute top-6 right-6 flex items-center gap-2">
                 {unreadCount > 0 && <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">{unreadCount}</span>}
                 <button onClick={() => fetchNotifs()} className="p-1 text-gray-400 hover:text-primary"><RefreshCw size={14}/></button>
@@ -134,27 +109,6 @@ const ProviderNotifications: React.FC<{ providerId: number; refreshTrigger: numb
                 ))}
                 {notifs.length === 0 && <p className="text-center text-gray-400 text-sm py-4">{t('noNotifications')}</p>}
             </div>
-
-            {/* Detail Modal */}
-            {selectedNotif && (
-                <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setSelectedNotif(null)}>
-                    <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl max-w-sm w-full shadow-2xl" onClick={e => e.stopPropagation()}>
-                        <h3 className="text-xl font-bold mb-4 dark:text-white">{t('notificationDetails')}</h3>
-                        <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-xl mb-4">
-                            <p className="text-gray-800 dark:text-white">{selectedNotif.message}</p>
-                            <div className="mt-3 flex items-center gap-2 text-sm">
-                                <span className={`px-2 py-1 rounded-full font-bold ${selectedNotif.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                    {selectedNotif.status === 'completed' ? t('clientHasArrived') : t('clientPending')}
-                                </span>
-                                <span className="text-gray-400">{new Date(selectedNotif.created_at).toLocaleDateString()}</span>
-                            </div>
-                        </div>
-                        <button onClick={() => setSelectedNotif(null)} className="w-full py-3 bg-gray-100 dark:bg-gray-700 rounded-xl font-bold dark:text-white hover:bg-gray-200">
-                            {t('close')}
-                        </button>
-                    </div>
-                </div>
-            )}
         </div>
     );
 };
@@ -171,7 +125,7 @@ const ScanHistory: React.FC<{ providerId: number }> = ({ providerId }) => {
     }, [providerId]);
 
     return (
-        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 relative">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 relative">
             <h4 className="font-bold mb-4 flex items-center gap-2 dark:text-white"><History size={20}/> {t('scanHistory')}</h4>
             <div className="space-y-3">
                 {history.map(h => (
@@ -207,12 +161,12 @@ const ClientList: React.FC<{ providerId: number }> = ({ providerId }) => {
     }, [providerId]);
 
     return (
-        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 h-full relative">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 h-full relative max-h-80 overflow-y-auto">
             <div className="absolute top-6 right-6 flex items-center gap-2">
                 {newCount > 0 && <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">{newCount} New</span>}
             </div>
             <h4 className="font-bold mb-4 flex items-center gap-2 dark:text-white"><Users size={20}/> {t('followers')}</h4>
-            <div className="space-y-3 max-h-80 overflow-y-auto">
+            <div className="space-y-3">
                 {clients.map((c, i) => (
                     <div key={i} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-xl">
                         <div>
@@ -264,7 +218,7 @@ const AnnouncementManager: React.FC<{ providerId: number }> = ({ providerId }) =
     }
 
     return (
-        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
             <h4 className="font-bold mb-4 flex items-center gap-2 dark:text-white"><Send size={20}/> {t('sendAnnouncementTitle')}</h4>
             <div className="flex gap-2 mb-6">
                 <input 
@@ -278,7 +232,7 @@ const AnnouncementManager: React.FC<{ providerId: number }> = ({ providerId }) =
                 </button>
             </div>
             <h5 className="text-sm font-bold mb-2 text-gray-500">{t('myActiveAds')}</h5>
-            <div className="space-y-2">
+            <div className="space-y-2 max-h-40 overflow-y-auto">
                 {ads.map(ad => (
                     <div key={ad.id} className="flex justify-between items-center p-3 border border-gray-100 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-900/30">
                         <p className="text-sm dark:text-gray-300 truncate flex-1">{ad.message}</p>
@@ -294,6 +248,7 @@ const AnnouncementManager: React.FC<{ providerId: number }> = ({ providerId }) =
 };
 
 const StoreManager: React.FC<{ provider: AuthenticatedUser }> = ({ provider }) => {
+    // ... (Keep existing implementation)
     const { t } = useLocalization();
     const [products, setProducts] = useState<Product[]>([]);
     const [newProduct, setNewProduct] = useState({ name: '', description: '', price: '', category: 'General' });
@@ -328,7 +283,7 @@ const StoreManager: React.FC<{ provider: AuthenticatedUser }> = ({ provider }) =
     }
 
     return (
-        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
             <div className="flex justify-between items-center mb-4">
                 <h4 className="font-bold flex items-center gap-2 dark:text-white"><ShoppingBag size={20}/> {t('storeManager')}</h4>
                 <span className="bg-purple-100 text-purple-600 px-2 py-1 rounded text-xs font-bold">Admin Access</span>
@@ -361,6 +316,7 @@ const StoreManager: React.FC<{ provider: AuthenticatedUser }> = ({ provider }) =
 };
 
 const ProfileManager: React.FC<{ provider: AuthenticatedUser }> = ({ provider }) => {
+    // ... (Keep existing implementation logic but improve styling)
     const { t, language } = useLocalization();
     const [bio, setBio] = useState(provider.bio || '');
     const [services, setServices] = useState<ProviderService[]>([]);
@@ -369,7 +325,6 @@ const ProfileManager: React.FC<{ provider: AuthenticatedUser }> = ({ provider })
     const [isLoading, setIsLoading] = useState(false);
     const [locationLoading, setLocationLoading] = useState(false);
     const [imageLoading, setImageLoading] = useState(false);
-    const [followerCount, setFollowerCount] = useState(0);
     const [successMsg, setSuccessMsg] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -383,7 +338,6 @@ const ProfileManager: React.FC<{ provider: AuthenticatedUser }> = ({ provider })
 
     useEffect(() => { 
         fetchServices(); 
-        
         let initialSocial = { instagram: '', facebook: '', website: '', gps: '' };
         if(provider.social_links) {
              if(typeof provider.social_links === 'string') {
@@ -394,9 +348,6 @@ const ProfileManager: React.FC<{ provider: AuthenticatedUser }> = ({ provider })
              }
         }
         setSocialLinks(initialSocial);
-
-        supabase.from('follows').select('id', { count: 'exact' }).eq('provider_id', provider.id)
-        .then(({count}) => setFollowerCount(count || 0));
     }, [provider.id]);
 
     const showSuccess = (msg: string) => {
@@ -406,7 +357,6 @@ const ProfileManager: React.FC<{ provider: AuthenticatedUser }> = ({ provider })
 
     const handleUpdateProfile = async () => {
         setIsLoading(true);
-        // Ensure social links are valid JSON object
         const cleanSocial = {
              instagram: socialLinks.instagram,
              facebook: socialLinks.facebook,
@@ -477,17 +427,9 @@ const ProfileManager: React.FC<{ provider: AuthenticatedUser }> = ({ provider })
             const fileExt = file.name.split('.').pop();
             const fileName = `${provider.id}_${Date.now()}.${fileExt}`;
             const filePath = `avatars/${fileName}`;
-            
-            // Try uploading to 'profiles' bucket first
             const { error: uploadError } = await supabase.storage.from('profiles').upload(filePath, file);
-            
-            if (uploadError) {
-                console.error("Upload error:", uploadError);
-                throw uploadError;
-            }
-
+            if (uploadError) throw uploadError;
             const { data } = supabase.storage.from('profiles').getPublicUrl(filePath);
-            
             await supabase.from('providers').update({ profile_image_url: data.publicUrl }).eq('id', provider.id);
             showSuccess(t('savedSuccessfully'));
         } catch(e: any) { 
@@ -495,7 +437,7 @@ const ProfileManager: React.FC<{ provider: AuthenticatedUser }> = ({ provider })
             alert(t('uploadError') + ` (${e.message})`);
         } finally {
             setImageLoading(false);
-            if (fileInputRef.current) fileInputRef.current.value = ''; // Reset input
+            if (fileInputRef.current) fileInputRef.current.value = '';
         }
     };
 
@@ -505,93 +447,84 @@ const ProfileManager: React.FC<{ provider: AuthenticatedUser }> = ({ provider })
     }
 
     return (
-        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 h-full relative">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 h-full relative">
             {successMsg && (
                 <div className="absolute top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-xl shadow-lg flex items-center gap-2 animate-fade-in z-10">
                     <CheckCircle size={16}/> {successMsg}
                 </div>
             )}
 
-            <h4 className="font-bold mb-4 flex items-center gap-2 dark:text-white"><Briefcase size={20}/> {t('profileAndServices')}</h4>
+            <h4 className="font-bold mb-4 flex items-center gap-2 dark:text-white"><Settings size={20}/> {t('edit')} {t('profileAndServices')}</h4>
             
-            <div className="flex items-center gap-4 mb-6 bg-gray-50 dark:bg-gray-700/50 p-4 rounded-xl">
-                 <div className="text-center">
-                     <span className="block text-2xl font-bold text-primary">{followerCount}</span>
-                     <span className="text-xs text-gray-500">{t('followers')}</span>
+            {/* Bio & Location */}
+            <div className="mb-6 space-y-4">
+                 <div>
+                    <label className="text-xs font-bold text-gray-500 block mb-2">{t('bioLabel')}</label>
+                    <textarea 
+                        value={bio} 
+                        onChange={e => setBio(e.target.value)} 
+                        className="w-full p-3 bg-gray-50 dark:bg-gray-700 rounded-xl dark:text-white outline-none focus:ring-2 focus:ring-primary/50"
+                        rows={3}
+                    />
                  </div>
-                 <div className="w-px h-10 bg-gray-200 dark:bg-gray-600"></div>
-                 <div className="flex-1">
-                     <p className="text-sm font-bold dark:text-white">{provider.name}</p>
-                     <p className="text-xs text-gray-500">{provider.service_type}</p>
+                 
+                 <div>
+                    <label className="text-xs font-bold text-gray-500 block mb-2">{t('location')}</label>
+                    <div className="flex gap-2">
+                        <select onChange={(e) => handleNeighborhoodSelect(e.target.value)} className="flex-1 p-3 bg-gray-50 dark:bg-gray-700 rounded-xl dark:text-white outline-none">
+                            <option value="">{t('selectNeighborhood')}</option>
+                            {neighborhoods.map((n, i) => <option key={i} value={n}>{n}</option>)}
+                        </select>
+                        <button onClick={handleSetLocation} disabled={locationLoading} className="px-4 bg-blue-50 text-blue-600 rounded-xl font-bold flex items-center gap-2 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400">
+                            {locationLoading ? <Loader2 className="animate-spin"/> : <MapPin/>}
+                        </button>
+                    </div>
                  </div>
-            </div>
 
-            {/* Location */}
-            <div className="mb-6 space-y-2">
-                <label className="text-xs font-bold text-gray-500">{t('location')}</label>
-                <select onChange={(e) => handleNeighborhoodSelect(e.target.value)} className="w-full p-3 bg-gray-50 dark:bg-gray-700 rounded-xl dark:text-white outline-none">
-                    <option value="">{t('selectNeighborhood')}</option>
-                    {neighborhoods.map((n, i) => <option key={i} value={n}>{n}</option>)}
-                </select>
-                <button onClick={handleSetLocation} disabled={locationLoading} className="w-full py-3 bg-blue-50 text-blue-600 rounded-xl font-bold flex justify-center gap-2 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400">
-                    {locationLoading ? <Loader2 className="animate-spin"/> : <MapPin/>} {t('setLocation')}
-                </button>
-            </div>
-
-            {/* Bio & Social Links */}
-            <div className="mb-6">
-                <label className="text-xs font-bold text-gray-500 block mb-2">{t('bioLabel')}</label>
-                <textarea 
-                    value={bio} 
-                    onChange={e => setBio(e.target.value)} 
-                    className="w-full p-3 bg-gray-50 dark:bg-gray-700 rounded-xl dark:text-white mb-2"
-                    rows={3}
-                />
-                
+                 {/* Social Links */}
                 <div className="space-y-2 mt-4">
                      <h5 className="font-bold text-xs text-gray-500">Social Media Links</h5>
-                     <div className="flex items-center gap-2">
-                         <Instagram size={18} className="text-pink-600" />
-                         <input placeholder="Instagram Link" value={socialLinks.instagram} onChange={e => setSocialLinks({...socialLinks, instagram: e.target.value})} className="flex-1 p-2 bg-gray-50 dark:bg-gray-700 rounded-lg text-sm dark:text-white"/>
-                     </div>
-                     <div className="flex items-center gap-2">
-                         <Facebook size={18} className="text-blue-600" />
-                         <input placeholder="Facebook Link" value={socialLinks.facebook} onChange={e => setSocialLinks({...socialLinks, facebook: e.target.value})} className="flex-1 p-2 bg-gray-50 dark:bg-gray-700 rounded-lg text-sm dark:text-white"/>
-                     </div>
-                     <div className="flex items-center gap-2">
-                         <MapIcon size={18} className="text-green-500" />
-                         <input placeholder="GPS Link (Google Maps)" value={socialLinks.gps} onChange={e => setSocialLinks({...socialLinks, gps: e.target.value})} className="flex-1 p-2 bg-gray-50 dark:bg-gray-700 rounded-lg text-sm dark:text-white"/>
-                     </div>
-                     <div className="flex items-center gap-2">
-                         <LinkIcon size={18} className="text-gray-500" />
-                         <input placeholder="Website Link" value={socialLinks.website} onChange={e => setSocialLinks({...socialLinks, website: e.target.value})} className="flex-1 p-2 bg-gray-50 dark:bg-gray-700 rounded-lg text-sm dark:text-white"/>
+                     <div className="grid grid-cols-1 gap-2">
+                        <div className="flex items-center gap-2">
+                            <Instagram size={18} className="text-pink-600" />
+                            <input placeholder="Instagram Link" value={socialLinks.instagram} onChange={e => setSocialLinks({...socialLinks, instagram: e.target.value})} className="flex-1 p-2 bg-gray-50 dark:bg-gray-700 rounded-lg text-sm dark:text-white"/>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Facebook size={18} className="text-blue-600" />
+                            <input placeholder="Facebook Link" value={socialLinks.facebook} onChange={e => setSocialLinks({...socialLinks, facebook: e.target.value})} className="flex-1 p-2 bg-gray-50 dark:bg-gray-700 rounded-lg text-sm dark:text-white"/>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <MapIcon size={18} className="text-green-500" />
+                            <input placeholder="GPS Link" value={socialLinks.gps} onChange={e => setSocialLinks({...socialLinks, gps: e.target.value})} className="flex-1 p-2 bg-gray-50 dark:bg-gray-700 rounded-lg text-sm dark:text-white"/>
+                        </div>
                      </div>
                 </div>
+            </div>
 
-                <div className="flex flex-wrap gap-2 mt-4">
-                    <button onClick={() => fileInputRef.current?.click()} disabled={imageLoading} className="text-xs px-3 py-1.5 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center gap-1 text-gray-600 dark:text-gray-300">
-                        {imageLoading ? <Loader2 size={14} className="animate-spin"/> : <ImageIcon size={14}/>} {imageLoading ? t('uploading') : t('uploadProfileImage')}
-                    </button>
-                    {/* ... remove and save buttons ... */}
-                    <button onClick={handleRemoveImage} className="text-xs px-3 py-1.5 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center gap-1 text-red-600 dark:text-red-400">
-                         <Trash size={14}/> {t('removeImage')}
-                    </button>
-                    <input type="file" ref={fileInputRef} hidden onChange={handleImageUpload} accept="image/*"/>
-                    
-                    <button onClick={handleUpdateProfile} disabled={isLoading} className="ml-auto px-4 py-1.5 bg-green-600 text-white rounded-lg text-sm flex items-center gap-1">
-                        {isLoading ? <Loader2 size={14} className="animate-spin"/> : <Save size={14}/>} {t('saveProfile')}
-                    </button>
-                </div>
+            {/* Image Actions */}
+            <div className="flex flex-wrap gap-2 mb-6 border-b dark:border-gray-700 pb-6">
+                <button onClick={() => fileInputRef.current?.click()} disabled={imageLoading} className="flex-1 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg flex justify-center items-center gap-2 text-gray-600 dark:text-gray-300 font-bold text-sm">
+                    {imageLoading ? <Loader2 size={16} className="animate-spin"/> : <ImageIcon size={16}/>} {t('uploadProfileImage')}
+                </button>
+                <button onClick={handleRemoveImage} className="py-2 px-4 bg-red-50 dark:bg-red-900/20 rounded-lg text-red-600 dark:text-red-400">
+                     <Trash size={16}/>
+                </button>
+                <button onClick={handleUpdateProfile} disabled={isLoading} className="flex-1 py-2 bg-primary text-white rounded-lg font-bold text-sm flex justify-center items-center gap-2">
+                    {isLoading ? <Loader2 size={16} className="animate-spin"/> : <Save size={16}/>} {t('saveProfile')}
+                </button>
+                <input type="file" ref={fileInputRef} hidden onChange={handleImageUpload} accept="image/*"/>
             </div>
 
             {/* Services */}
             <div>
-                <h5 className="font-bold text-sm mb-2 dark:text-white">{t('addService')}</h5>
-                <div className="grid grid-cols-3 gap-2 mb-2">
-                    <input placeholder={t('serviceName')} value={newService.name} onChange={e => setNewService({...newService, name: e.target.value})} className="col-span-3 p-2 bg-gray-50 dark:bg-gray-700 rounded-lg text-sm"/>
-                    <input placeholder={t('price')} type="number" value={newService.price} onChange={e => setNewService({...newService, price: e.target.value})} className="p-2 bg-gray-50 dark:bg-gray-700 rounded-lg text-sm"/>
-                    <input placeholder={t('discountPrice')} type="number" value={newService.discount} onChange={e => setNewService({...newService, discount: e.target.value})} className="p-2 bg-gray-50 dark:bg-gray-700 rounded-lg text-sm"/>
-                    <button onClick={handleAddService} className="bg-primary text-white rounded-lg flex items-center justify-center"><Send size={16}/></button>
+                <h5 className="font-bold text-sm mb-3 dark:text-white">{t('addService')}</h5>
+                <div className="flex flex-col gap-2 mb-2">
+                    <input placeholder={t('serviceName')} value={newService.name} onChange={e => setNewService({...newService, name: e.target.value})} className="w-full p-2 bg-gray-50 dark:bg-gray-700 rounded-lg text-sm outline-none dark:text-white"/>
+                    <div className="flex gap-2">
+                        <input placeholder={t('price')} type="number" value={newService.price} onChange={e => setNewService({...newService, price: e.target.value})} className="flex-1 p-2 bg-gray-50 dark:bg-gray-700 rounded-lg text-sm outline-none dark:text-white"/>
+                        <input placeholder={t('discountPrice')} type="number" value={newService.discount} onChange={e => setNewService({...newService, discount: e.target.value})} className="flex-1 p-2 bg-gray-50 dark:bg-gray-700 rounded-lg text-sm outline-none dark:text-white"/>
+                        <button onClick={handleAddService} className="bg-primary text-white p-2 rounded-lg flex items-center justify-center"><Plus size={20}/></button>
+                    </div>
                 </div>
 
                 <div className="space-y-2 mt-4 max-h-40 overflow-y-auto">
@@ -614,6 +547,7 @@ const ProfileManager: React.FC<{ provider: AuthenticatedUser }> = ({ provider })
 }
 
 const QRScannerComponent: React.FC<{ providerId: number; onScanSuccess: () => void }> = ({ providerId, onScanSuccess }) => {
+    // ... (Keep existing implementation)
     const { t } = useLocalization();
     const [scannedData, setScannedData] = useState<ScannedAppointment | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -745,9 +679,9 @@ const QRScannerComponent: React.FC<{ providerId: number; onScanSuccess: () => vo
     }
 
     return (
-        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 text-center mb-6 relative">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 text-center mb-6 relative">
              {confirmationMsg && (
-                 <div className="absolute top-0 left-0 w-full h-full bg-green-50 dark:bg-green-900/90 z-10 rounded-3xl flex items-center justify-center flex-col animate-fade-in">
+                 <div className="absolute top-0 left-0 w-full h-full bg-green-50 dark:bg-green-900/90 z-10 rounded-2xl flex items-center justify-center flex-col animate-fade-in">
                      <CheckCircle size={48} className="text-green-500 mb-2"/>
                      <h3 className="text-xl font-bold text-green-700 dark:text-white">{confirmationMsg}</h3>
                  </div>
@@ -816,35 +750,85 @@ interface ProviderPortalProps {
 const ProviderPortal: React.FC<ProviderPortalProps> = ({ provider, onLogout }) => {
     const { t } = useLocalization();
     const [refreshNotifs, setRefreshNotifs] = useState(0);
+    const [stats, setStats] = useState({ followers: 0, scans: 0, posts: 0 });
+
     const isValid = provider.isActive && provider.subscriptionEndDate && new Date(provider.subscriptionEndDate) > new Date();
     // Admin Check: Strict Phone Match
     const isAdmin = provider.phone === '0617774846';
 
+    useEffect(() => {
+        fetchStats();
+    }, [provider.id]);
+
+    const fetchStats = async () => {
+        const { count: followers } = await supabase.from('follows').select('id', { count: 'exact' }).eq('provider_id', provider.id);
+        const { count: scans } = await supabase.from('scan_history').select('id', { count: 'exact' }).eq('provider_id', provider.id);
+        const { count: posts } = await supabase.from('announcements').select('id', { count: 'exact' }).eq('provider_id', provider.id);
+        setStats({ followers: followers || 0, scans: scans || 0, posts: posts || 0 });
+    }
+
     return (
-        <div className="pb-20">
-             <div className="flex justify-between items-center mb-6">
-                 <div>
-                     <h2 className="text-2xl font-bold text-dark dark:text-white">{t('welcomeProvider', {name: provider.name})}</h2>
-                     <span className={`text-xs font-bold px-2 py-1 rounded-full ${isValid ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                         {isValid ? t('statusActive') : t('statusPending')}
-                     </span>
+        <div className="pb-32 px-4">
+             {/* Header (Instagram Style) */}
+             <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 mb-6">
+                 <div className="flex items-center gap-4 mb-6">
+                     <div className="w-20 h-20 rounded-full border-2 border-primary p-0.5 flex-shrink-0">
+                         <div className="w-full h-full rounded-full overflow-hidden bg-gray-200">
+                             {provider.profile_image_url ? (
+                                 <img src={provider.profile_image_url} className="w-full h-full object-cover"/>
+                             ) : (
+                                 <User className="w-full h-full p-4 text-gray-400"/>
+                             )}
+                         </div>
+                     </div>
+                     <div className="flex-1 flex justify-around text-center">
+                         <div>
+                             <span className="block font-bold text-xl dark:text-white">{stats.followers}</span>
+                             <span className="text-xs text-gray-500">{t('followers')}</span>
+                         </div>
+                         <div>
+                             <span className="block font-bold text-xl dark:text-white">{stats.scans}</span>
+                             <span className="text-xs text-gray-500">{t('totalScans')}</span>
+                         </div>
+                         <div>
+                             <span className="block font-bold text-xl dark:text-white">{stats.posts}</span>
+                             <span className="text-xs text-gray-500">{t('activeAds')}</span>
+                         </div>
+                     </div>
                  </div>
-                 <button onClick={onLogout} className="p-2 bg-gray-100 dark:bg-gray-700 rounded-full"><LogOut size={20} className="text-gray-600 dark:text-white"/></button>
+                 
+                 <div>
+                     <div className="flex justify-between items-start">
+                         <div>
+                             <h2 className="font-bold text-lg dark:text-white">{provider.name}</h2>
+                             <span className="text-sm text-primary font-bold">{provider.service_type}</span>
+                         </div>
+                         <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${isValid ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                             {isValid ? t('statusActive') : t('statusPending')}
+                         </span>
+                     </div>
+                     {provider.bio && <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">{provider.bio}</p>}
+                 </div>
              </div>
 
              <RestrictedGuard provider={provider}>
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 {/* Widget Grid */}
+                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                     
                      <div className="space-y-6">
-                         <StatsComponent providerId={provider.id} />
+                         <QRScannerComponent providerId={provider.id} onScanSuccess={() => { setRefreshNotifs(prev => prev + 1); fetchStats(); }} />
                          <ProviderNotifications providerId={provider.id} refreshTrigger={refreshNotifs} />
-                         <QRScannerComponent providerId={provider.id} onScanSuccess={() => setRefreshNotifs(prev => prev + 1)} />
-                         <ProfileManager provider={provider} />
                      </div>
+
                      <div className="space-y-6">
                          <AnnouncementManager providerId={provider.id} />
-                         {isAdmin && <StoreManager provider={provider} />}
-                         <ClientList providerId={provider.id} />
-                         <ScanHistory providerId={provider.id} />
+                         <ProfileManager provider={provider} />
+                     </div>
+
+                     <div className="space-y-6">
+                        {isAdmin && <StoreManager provider={provider} />}
+                        <ClientList providerId={provider.id} />
+                        <ScanHistory providerId={provider.id} />
                      </div>
                  </div>
              </RestrictedGuard>
