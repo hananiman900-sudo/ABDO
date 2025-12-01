@@ -5,6 +5,69 @@ import { AuthenticatedUser, JobPost, JobComment } from '../types';
 import { Briefcase, MapPin, Phone, Plus, X, User, Heart, MessageCircle, FileText, CheckCircle2, UserPlus, Filter, Search, Clock, Send, Image as ImageIcon, Loader2, ArrowLeft, Building2, Banknote, Calendar } from 'lucide-react';
 import { useLocalization } from '../hooks/useLocalization';
 
+// --- DRAGGABLE FAB COMPONENT ---
+const DraggableFab = ({ onClick }: { onClick: () => void }) => {
+    // Initial position: Bottom Right
+    const [position, setPosition] = useState({ x: window.innerWidth - 80, y: window.innerHeight - 100 });
+    const [isDragging, setIsDragging] = useState(false);
+    const offset = useRef({ x: 0, y: 0 });
+
+    const handleStart = (clientX: number, clientY: number) => {
+        setIsDragging(false);
+        offset.current = {
+            x: clientX - position.x,
+            y: clientY - position.y
+        };
+    };
+
+    const handleMove = (clientX: number, clientY: number) => {
+        setIsDragging(true);
+        setPosition({
+            x: clientX - offset.current.x,
+            y: clientY - offset.current.y
+        });
+    };
+
+    // Touch Handlers
+    const onTouchStart = (e: React.TouchEvent) => handleStart(e.touches[0].clientX, e.touches[0].clientY);
+    const onTouchMove = (e: React.TouchEvent) => handleMove(e.touches[0].clientX, e.touches[0].clientY);
+
+    // Mouse Handlers (for PC)
+    const onMouseDown = (e: React.MouseEvent) => {
+        handleStart(e.clientX, e.clientY);
+        const moveHandler = (moveEvent: MouseEvent) => {
+            handleMove(moveEvent.clientX, moveEvent.clientY);
+        };
+        const upHandler = () => {
+            document.removeEventListener('mousemove', moveHandler);
+            document.removeEventListener('mouseup', upHandler);
+        };
+        document.addEventListener('mousemove', moveHandler);
+        document.addEventListener('mouseup', upHandler);
+    };
+
+    return (
+        <button 
+            style={{ 
+                position: 'fixed', 
+                left: `${position.x}px`, 
+                top: `${position.y}px`, 
+                touchAction: 'none' 
+            }}
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onMouseDown={onMouseDown}
+            onClick={(e) => {
+                if(!isDragging) onClick();
+            }}
+            className="w-16 h-16 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full shadow-2xl flex items-center justify-center text-white z-[60] hover:scale-105 active:scale-95 transition-transform"
+        >
+            <Plus size={32}/>
+        </button>
+    );
+};
+
+
 export const JobBoard: React.FC<{ isOpen: boolean; onClose: () => void; currentUser: AuthenticatedUser | null }> = ({ isOpen, onClose, currentUser }) => {
     const { t, language } = useLocalization();
     const [activeTab, setActiveTab] = useState<'OFFERS' | 'TALENT'>('OFFERS');
@@ -363,13 +426,8 @@ export const JobBoard: React.FC<{ isOpen: boolean; onClose: () => void; currentU
                                 </div>
                             )}
 
-                            {/* Floating Action Button (FAB) */}
-                            <button 
-                                onClick={handleStartPost}
-                                className="absolute bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full shadow-xl flex items-center justify-center text-white hover:scale-105 transition-transform z-30"
-                            >
-                                <Plus size={28}/>
-                            </button>
+                            {/* DRAGGABLE FAB BUTTON */}
+                            <DraggableFab onClick={handleStartPost} />
                         </>
                     ) : (
                         /* VIEW 3: CREATE POST FORM */
