@@ -1,3 +1,4 @@
+
 import { GoogleGenAI } from "@google/genai";
 import { Language } from "../types";
 import { supabase } from "./supabaseClient";
@@ -28,8 +29,10 @@ export const getChatResponse = async (
     // 1. Get Keys from Window Config
     const config = (window as any).TANGER_CONFIG || (window as any).process?.env || {};
     let apiKeys: string[] = [];
-    if (config.API_KEYS && Array.isArray(config.API_KEYS)) {
-        apiKeys = config.API_KEYS.filter((k: string) => k && k.length > 20);
+    
+    // Ensure we get the array of keys
+    if (config.API_KEYS && Array.isArray(config.API_KEYS) && config.API_KEYS.length > 0) {
+        apiKeys = config.API_KEYS.filter((k: string) => k && k.length > 10);
     } else if (config.API_KEY) {
         apiKeys = [config.API_KEY];
     }
@@ -61,12 +64,13 @@ export const getChatResponse = async (
     const contents = [...history, { role: 'user', parts: userParts }];
 
     // 3. FAIL-SAFE ROTATION LOOP
-    // Iterate through all keys. Return immediately on success. Catch errors and continue.
+    // Iterate through all keys. Return immediately on success. Catch errors and continue to next key.
     for (let i = 0; i < apiKeys.length; i++) {
         const apiKey = apiKeys[i];
         
         try {
-            // console.log(`Attempting Gemini Request with Key Index: ${i}`);
+            // console.log(`Attempting Gemini Request with Key Index: ${i + 1}/${apiKeys.length}`);
+            
             const ai = new GoogleGenAI({ apiKey });
             const response = await ai.models.generateContent({
                 model: "gemini-2.5-flash",
@@ -74,19 +78,21 @@ export const getChatResponse = async (
                 config: { systemInstruction },
             });
             
-            // Success!
+            // If we get here, it worked! Return immediately.
             return response.text; 
 
         } catch (error: any) {
-            console.warn(`Key #${i} Failed:`, error.message || error);
-            // If this was the last key, and it failed, then we are out of options.
+            console.warn(`Key #${i + 1} Failed:`, error.message || error);
+            
+            // If this was the last key, and it failed, then we are truly out of options.
             if (i === apiKeys.length - 1) {
-                console.error("All API keys exhausted.");
+                console.error("All 5 API keys exhausted.");
                 return language === 'ar' 
                     ? "⚠️ عذراً، نواجه ضغطاً كبيراً على السيرفرات حالياً. المرجو المحاولة بعد دقيقة." 
                     : "⚠️ Server busy (Rate Limit). Please try again in a moment.";
             }
-            // Otherwise, loop continues to next key...
+            
+            // If not the last key, loop continues to next 'i' automatically.
         }
     }
 
