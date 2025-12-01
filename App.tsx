@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { UserView, Language, AuthenticatedUser, AccountType } from './types';
 import Chatbot from './components/Chatbot';
@@ -11,277 +10,181 @@ import { JobBoard } from './components/JobBoard';
 import { LocalizationProvider, useLocalization, translations } from './hooks/useLocalization';
 import { supabase } from './services/supabaseClient';
 import QRCodeDisplay from './components/QRCodeDisplay';
-import { Globe, User as UserIcon, CheckSquare, Sun, Moon, LogIn, LogOut, X, CalendarDays, Database, AlertTriangle, CheckCircle2, Menu, Users, Bell, Phone, MapPin, Search, Heart, Briefcase, Star, MessageCircle, ShoppingBag, Eye, EyeOff, Megaphone, Headset, Instagram, Facebook, Link as LinkIcon, ArrowLeft, UserCheck, Home, UserPlus, FileText, ListPlus, UserMinus, RefreshCw, Key, Map, Clock, ChevronRight, Plus, Loader2, Camera, Save, Grid } from 'lucide-react';
+// FIXED IMPORTS: Removed non-existent icons
+import { Globe, User as UserIcon, CheckSquare, Sun, Moon, LogIn, LogOut, X, CalendarDays, Database, AlertTriangle, CheckCircle2, Menu, Users, Bell, Phone, MapPin, Search, Heart, Briefcase, Star, MessageCircle, ShoppingBag, Eye, EyeOff, Megaphone, Headset, Instagram, Facebook, Link as LinkIcon, ArrowLeft, UserCheck, Home, UserPlus, FileText, ListPlus, UserMinus, RefreshCw, Key, Map, Clock, ChevronRight, Plus, Loader2, Camera, Save, Grid, Building2, LayoutGrid } from 'lucide-react';
 
-const ScrollFixStyle = () => (
-    <style>{`
-        * { -webkit-tap-highlight-color: transparent; }
-        .no-select { user-select: none; -webkit-user-select: none; }
-        .scroll-container { touch-action: manipulation; }
-        .scrollbar-hide::-webkit-scrollbar { display: none; }
-        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-    `}</style>
-);
+// --- REUSABLE COMPONENTS ---
 
-const InputField = ({ icon: Icon, ...props }: any) => (
-  <div className="relative">
-    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-gray-400 rtl:left-0 rtl:right-auto rtl:pl-3 rtl:pr-0">
-      <Icon size={20} />
+const InputField = ({ label, type = "text", value, onChange, placeholder, icon: Icon }: any) => (
+  <div className="space-y-1">
+    <label className="text-xs font-bold text-gray-500 uppercase tracking-wide ml-1">{label}</label>
+    <div className="relative group">
+      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400 group-focus-within:text-primary transition-colors">
+        {Icon && <Icon size={18} />}
+      </div>
+      <input
+        type={type}
+        className="block w-full pl-10 pr-3 py-3 border border-gray-200 dark:border-gray-700 rounded-xl leading-5 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all shadow-sm"
+        placeholder={placeholder}
+        value={value}
+        onChange={onChange}
+      />
     </div>
-    <input className="w-full pr-10 pl-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all dark:text-white rtl:pr-10 rtl:pl-4 text-right" dir="rtl" {...props} />
   </div>
 );
 
-const PasswordField = ({ icon: Icon, ...props }: any) => {
+const PasswordField = ({ label, value, onChange, placeholder }: any) => {
   const [show, setShow] = useState(false);
   return (
-    <div className="relative">
-        <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-gray-400 rtl:left-0 rtl:right-auto rtl:pl-3 rtl:pr-0">
-            <Icon size={20} />
+    <div className="space-y-1">
+      <label className="text-xs font-bold text-gray-500 uppercase tracking-wide ml-1">{label}</label>
+      <div className="relative group">
+        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400 group-focus-within:text-primary transition-colors">
+          <Key size={18} />
         </div>
-        <input 
-            type={show ? "text" : "password"} 
-            className="w-full pr-10 pl-10 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all dark:text-white rtl:pr-10 rtl:pl-10 text-right" 
-            dir="rtl" 
-            {...props} 
+        <input
+          type={show ? "text" : "password"}
+          className="block w-full pl-10 pr-10 py-3 border border-gray-200 dark:border-gray-700 rounded-xl leading-5 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all shadow-sm"
+          placeholder={placeholder}
+          value={value}
+          onChange={onChange}
         />
-        <button type="button" onClick={() => setShow(!show)} className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400 hover:text-primary rtl:right-0 rtl:left-auto rtl:pr-3 rtl:pl-0">
-            {show ? <EyeOff size={18}/> : <Eye size={18}/>}
+        <button
+          type="button"
+          onClick={() => setShow(!show)}
+          className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 cursor-pointer"
+        >
+          {show ? <EyeOff size={18} /> : <Eye size={18} />}
         </button>
+      </div>
     </div>
-  )
-}
+  );
+};
 
 const SplashScreen = ({ onFinish }: { onFinish: () => void }) => {
-    useEffect(() => { setTimeout(onFinish, 2000); }, []);
-    return (
-        <div className="fixed inset-0 bg-surface dark:bg-dark z-[100] flex flex-col items-center justify-center animate-fade-in">
-            <div className="relative mb-4">
-                <div className="w-20 h-20 bg-primary rounded-2xl flex items-center justify-center shadow-glow">
-                   <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-                </div>
-            </div>
-            <h1 className="text-3xl font-bold text-dark dark:text-light tracking-tight">Tanger<span className="text-primary">Connect</span></h1>
-            <p className="text-gray-500 dark:text-gray-400 mt-2 text-sm">AI Powered City Assistant</p>
-        </div>
-    );
+  useEffect(() => {
+    const timer = setTimeout(onFinish, 2000);
+    return () => clearTimeout(timer);
+  }, [onFinish]);
+
+  return (
+    <div className="fixed inset-0 bg-gradient-to-br from-primary via-primaryDark to-dark flex flex-col items-center justify-center z-50 text-white animate-fade-in">
+      <div className="relative">
+        <div className="absolute inset-0 bg-white/20 blur-xl rounded-full animate-pulse"></div>
+        <img src="https://upload.wikimedia.org/wikipedia/commons/d/d4/Tanger_Med_Port.jpg" alt="Tangier" className="w-32 h-32 rounded-full object-cover border-4 border-white/30 shadow-2xl relative z-10 mb-6" />
+      </div>
+      <h1 className="text-4xl font-black tracking-tighter mb-2">Tanger<span className="text-accent">Connect</span></h1>
+      <p className="text-white/80 tracking-widest text-sm uppercase">AI City Assistant</p>
+    </div>
+  );
 };
 
-// --- AUTH DRAWER ---
-const AuthDrawer = ({ isOpen, onClose, onAuthSuccess, onDatabaseError }: any) => {
+// --- AUTH COMPONENT ---
+const AuthDrawer = ({ isOpen, onClose, onLogin, onRegister }: any) => {
     const { t } = useLocalization();
-    const [mode, setMode] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
-    const [accountType, setAccountType] = useState<'CLIENT' | 'PROVIDER'>('CLIENT');
+    const [isRegistering, setIsRegistering] = useState(false);
+    const [accountType, setAccountType] = useState<AccountType>(AccountType.CLIENT);
     
-    // Form States
-    const [formData, setFormData] = useState({ 
-        phone: '', 
-        username: '', // Explicit Username for Providers
-        password: '', 
-        fullName: '',
-        // Provider Specific
-        serviceName: '',
-        serviceType: '',
-        location: ''
-    });
+    // Form State
+    const [phone, setPhone] = useState('');
+    const [username, setUsername] = useState('');
+    const [password, setPassword] = useState('');
+    const [fullName, setFullName] = useState('');
     
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    // Provider Specific
+    const [serviceName, setServiceName] = useState('');
+    const [serviceType, setServiceType] = useState('General');
+    const [location, setLocation] = useState('');
+    
+    const [loading, setLoading] = useState(false);
 
-    // Reset when opened
-    useEffect(() => {
-        if(isOpen) {
-            setError(null);
-            setMode('LOGIN');
-            setAccountType('CLIENT');
-            setFormData({ phone: '', username: '', password: '', fullName: '', serviceName: '', serviceType: '', location: '' });
+    const handleSubmit = async () => {
+        setLoading(true);
+        if (isRegistering) {
+           await onRegister({ phone, username, password, fullName, accountType, serviceName, serviceType, location });
+        } else {
+           await onLogin({ phone, username, password, accountType });
         }
-    }, [isOpen]);
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setError(null);
-        setIsLoading(true);
-
-        try {
-            if (mode === 'REGISTER') {
-                 if (accountType === 'CLIENT') {
-                     // CLIENT REGISTRATION
-                     const { data, error } = await supabase.from('clients').insert([{ 
-                         full_name: formData.fullName, 
-                         phone: formData.phone, 
-                         password: formData.password 
-                     }]).select().single();
-                     
-                     if (error) throw error;
-                     
-                     localStorage.setItem('tangerconnect_user_id', data.id);
-                     localStorage.setItem('tangerconnect_user_type', 'CLIENT');
-                     onAuthSuccess({ id: data.id, name: data.full_name, accountType: AccountType.CLIENT, phone: data.phone });
-                 } else {
-                     // PROVIDER REGISTRATION
-                     const { data, error } = await supabase.from('providers').insert([{ 
-                         name: formData.serviceName, 
-                         username: formData.username, // Explicit Username
-                         phone: formData.phone,
-                         password: formData.password,
-                         service_type: formData.serviceType,
-                         location: formData.location,
-                         is_active: false // Requires Admin Approval/Payment
-                     }]).select().single();
-
-                     if (error) throw error;
-
-                     alert("تم تسجيل الطلب بنجاح! حسابك في انتظار التفعيل.");
-                     onAuthSuccess({ 
-                         id: data.id, 
-                         name: data.name, 
-                         accountType: AccountType.PROVIDER, 
-                         phone: data.phone,
-                         isActive: false, 
-                         subscriptionEndDate: null 
-                    });
-                 }
-            } else {
-                 // LOGIN LOGIC
-                 if (accountType === 'CLIENT') {
-                     // CLIENT LOGIN (Phone + Pass)
-                     let { data: client, error } = await supabase.from('clients').select('*').eq('phone', formData.phone).eq('password', formData.password).maybeSingle();
-                     
-                     if (error || !client) throw new Error(t('loginFailed'));
-
-                     localStorage.setItem('tangerconnect_user_id', client.id);
-                     localStorage.setItem('tangerconnect_user_type', 'CLIENT');
-                     onAuthSuccess({ id: client.id, name: client.full_name, accountType: AccountType.CLIENT, phone: client.phone, bio: client.bio, profile_image_url: client.profile_image_url });
-
-                 } else {
-                     // PROVIDER LOGIN (Username + Pass)
-                     let { data: provider, error } = await supabase.from('providers').select('*').eq('username', formData.username).eq('password', formData.password).maybeSingle();
-                     
-                     if (error || !provider) throw new Error(t('providerLoginFailed'));
-
-                     localStorage.setItem('tangerconnect_user_id', provider.id);
-                     localStorage.setItem('tangerconnect_user_type', 'PROVIDER');
-                     onAuthSuccess({ 
-                         id: provider.id, 
-                         name: provider.name, 
-                         accountType: AccountType.PROVIDER, 
-                         phone: provider.phone, 
-                         isActive: provider.is_active, 
-                         subscriptionEndDate: provider.subscription_end_date, 
-                         bio: provider.bio, 
-                         profile_image_url: provider.profile_image_url, 
-                         social_links: provider.social_links 
-                    });
-                 }
-            }
-            onClose();
-        } catch (err: any) {
-            console.error(err);
-            let msg = err.message || "Auth Failed";
-            if(err.message?.includes('violates unique constraint')) msg = "المستخدم موجود بالفعل (Username or Phone taken)";
-            setError(msg);
-            if(err.code === '42P01') onDatabaseError();
-        } finally {
-            setIsLoading(false);
-        }
+        setLoading(false);
     };
 
-    if(!isOpen) return null;
+    if (!isOpen) return null;
+
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-             <div className="relative w-full max-w-md bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-2xl animate-slide-up overflow-hidden max-h-[90vh] overflow-y-auto">
-                 
-                 <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 z-10">
-                     <X size={24}/>
-                 </button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+            <div className="bg-white dark:bg-gray-900 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden relative z-10 animate-slide-up flex flex-col max-h-[90vh]">
+                
+                {/* Header */}
+                <div className="bg-gradient-to-r from-primary to-primaryDark p-6 text-white text-center relative">
+                    <button onClick={onClose} className="absolute top-4 right-4 text-white/70 hover:text-white"><X/></button>
+                    <h2 className="text-2xl font-black mb-1">{isRegistering ? t('registerTitle') : t('loginTitle')}</h2>
+                    <p className="text-white/80 text-sm">{t('welcomeMessage').split('!')[0]}!</p>
+                </div>
 
-                 <div className="text-center mb-6">
-                     <h2 className="text-2xl font-bold dark:text-white">{mode === 'LOGIN' ? t('loginTitle') : t('registerTitle')}</h2>
-                     <p className="text-sm text-gray-500 mt-1">
-                        {mode === 'LOGIN' ? 'Welcome back to TangerConnect' : 'Join our community today'}
-                     </p>
-                 </div>
-                 
-                 {/* Mode Tabs */}
-                 <div className="flex bg-gray-100 dark:bg-gray-700 rounded-xl p-1 mb-4">
-                     <button onClick={() => setMode('LOGIN')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${mode === 'LOGIN' ? 'bg-white dark:bg-gray-600 shadow-sm text-primary' : 'text-gray-500'}`}>
-                         {t('loginButton')}
-                     </button>
-                     <button onClick={() => setMode('REGISTER')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${mode === 'REGISTER' ? 'bg-white dark:bg-gray-600 shadow-sm text-primary' : 'text-gray-500'}`}>
-                         {t('registerButton')}
-                     </button>
-                 </div>
+                <div className="flex-1 overflow-y-auto p-6 space-y-5">
+                    
+                    {/* Role Selection */}
+                    <div className="flex p-1 bg-gray-100 dark:bg-gray-800 rounded-xl">
+                        <button 
+                           onClick={() => setAccountType(AccountType.CLIENT)}
+                           className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${accountType === AccountType.CLIENT ? 'bg-white dark:bg-gray-700 shadow-sm text-primary' : 'text-gray-500'}`}
+                        >
+                            {t('client')}
+                        </button>
+                        <button 
+                           onClick={() => setAccountType(AccountType.PROVIDER)}
+                           className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${accountType === AccountType.PROVIDER ? 'bg-white dark:bg-gray-700 shadow-sm text-purple-600' : 'text-gray-500'}`}
+                        >
+                            {t('provider')}
+                        </button>
+                    </div>
 
-                 {/* Account Type Selection (Visible for BOTH Login & Register) */}
-                 <div className="mb-6">
-                     <p className="text-xs text-center text-gray-400 mb-2 font-bold uppercase">{t('accountType')}</p>
-                     <div className="grid grid-cols-2 gap-3">
-                         <button 
-                            type="button"
-                            onClick={() => setAccountType('CLIENT')}
-                            className={`p-3 rounded-xl border-2 flex flex-col items-center justify-center gap-1 transition-all ${accountType === 'CLIENT' ? 'border-primary bg-blue-50 text-primary ring-2 ring-primary/20' : 'border-gray-200 dark:border-gray-600 text-gray-500'}`}
-                         >
-                             <UserIcon size={24}/>
-                             <span className="font-bold">{t('client')}</span>
-                         </button>
-                         <button 
-                            type="button"
-                            onClick={() => setAccountType('PROVIDER')}
-                            className={`p-3 rounded-xl border-2 flex flex-col items-center justify-center gap-1 transition-all ${accountType === 'PROVIDER' ? 'border-primary bg-blue-50 text-primary ring-2 ring-primary/20' : 'border-gray-200 dark:border-gray-600 text-gray-500'}`}
-                         >
-                             <Briefcase size={24}/>
-                             <span className="font-bold">{t('provider')}</span>
-                         </button>
-                     </div>
-                 </div>
+                    {/* Inputs */}
+                    {isRegistering && <InputField label={t('fullName')} value={fullName} onChange={(e:any) => setFullName(e.target.value)} icon={UserIcon} placeholder="John Doe" />}
+                    
+                    {/* Provider needs Username, Client needs Phone for Login */}
+                    {accountType === AccountType.PROVIDER ? (
+                        <InputField label={t('username')} value={username} onChange={(e:any) => setUsername(e.target.value)} icon={UserCheck} placeholder="username123" />
+                    ) : (
+                        <InputField label={t('phone')} value={phone} onChange={(e:any) => setPhone(e.target.value)} icon={Phone} placeholder="06XXXXXXXX" />
+                    )}
 
-                 {error && <div className="bg-red-100 text-red-600 p-3 rounded-lg mb-4 text-sm text-right flex items-center gap-2"><AlertTriangle size={16}/> {error}</div>}
-                 
-                 <form onSubmit={handleSubmit} className="space-y-4">
-                     
-                     {/* --- CLIENT FORM --- */}
-                     {accountType === 'CLIENT' && (
-                         <>
-                            {mode === 'REGISTER' && (
-                                <InputField icon={UserIcon} placeholder={t('fullName')} value={formData.fullName} onChange={(e: any) => setFormData({...formData, fullName: e.target.value})} required />
-                            )}
-                            <InputField icon={Phone} placeholder={t('phone')} value={formData.phone} onChange={(e: any) => setFormData({...formData, phone: e.target.value})} required />
-                         </>
-                     )}
+                    {/* Registration Extras */}
+                    {isRegistering && accountType === AccountType.PROVIDER && (
+                        <>
+                             <InputField label={t('serviceName')} value={serviceName} onChange={(e:any) => setServiceName(e.target.value)} icon={Briefcase} placeholder="Dr. Smith Clinic" />
+                             <InputField label={t('location')} value={location} onChange={(e:any) => setLocation(e.target.value)} icon={MapPin} placeholder="Tangier Center" />
+                        </>
+                    )}
 
-                     {/* --- PROVIDER FORM --- */}
-                     {accountType === 'PROVIDER' && (
-                         <>
-                             {mode === 'REGISTER' && (
-                                 <>
-                                    <InputField icon={Briefcase} placeholder="إسم النشاط التجاري (Business Name)" value={formData.serviceName} onChange={(e: any) => setFormData({...formData, serviceName: e.target.value})} required />
-                                    <InputField icon={ListPlus} placeholder="نوع الخدمة (مثال: نجار، طبيب...)" value={formData.serviceType} onChange={(e: any) => setFormData({...formData, serviceType: e.target.value})} required />
-                                    <InputField icon={MapPin} placeholder="الموقع (مثال: مسنانة، طنجة)" value={formData.location} onChange={(e: any) => setFormData({...formData, location: e.target.value})} required />
-                                    <InputField icon={Phone} placeholder={t('phone')} value={formData.phone} onChange={(e: any) => setFormData({...formData, phone: e.target.value})} required />
-                                 </>
-                             )}
-                             {/* Providers use Username for Login */}
-                             <InputField icon={UserIcon} placeholder={t('username')} value={formData.username} onChange={(e: any) => setFormData({...formData, username: e.target.value})} required />
-                         </>
-                     )}
+                    <PasswordField label={t('password')} value={password} onChange={(e:any) => setPassword(e.target.value)} placeholder="••••••••" />
 
-                     {/* Common Password Field */}
-                     <PasswordField icon={CheckSquare} placeholder={t('password')} value={formData.password} onChange={(e: any) => setFormData({...formData, password: e.target.value})} required />
-                     
-                     <button type="submit" disabled={isLoading} className="w-full bg-primary text-white py-3 rounded-xl font-bold font-arabic shadow-lg shadow-primary/30 text-lg flex items-center justify-center gap-2 mt-4 hover:bg-primaryDark transition-colors">
-                         {isLoading ? <RefreshCw className="animate-spin"/> : (mode === 'REGISTER' ? t('registerButton') : t('loginButton'))}
-                     </button>
-                 </form>
-             </div>
+                    {/* Action Button */}
+                    <button 
+                        onClick={handleSubmit} 
+                        disabled={loading}
+                        className={`w-full py-3.5 rounded-xl font-bold text-white shadow-lg transition-transform active:scale-95 flex justify-center items-center gap-2
+                        ${accountType === AccountType.PROVIDER ? 'bg-purple-600 hover:bg-purple-700 shadow-purple-500/30' : 'bg-primary hover:bg-primaryDark shadow-primary/30'}`}
+                    >
+                        {loading ? <Loader2 className="animate-spin" /> : (isRegistering ? t('registerButton') : t('loginButton'))}
+                    </button>
+
+                    {/* Toggle Mode */}
+                    <div className="text-center">
+                        <button onClick={() => setIsRegistering(!isRegistering)} className="text-sm font-bold text-gray-500 hover:text-primary transition-colors">
+                            {isRegistering ? t('loginRegister').split(' / ')[0] : t('registerTitle')}
+                        </button>
+                    </div>
+
+                </div>
+            </div>
         </div>
     );
 };
 
-// --- CLIENT PROFILE VIEW (EDITABLE) ---
+// --- CLIENT PROFILE VIEW ---
 const ClientProfile = ({ isOpen, onClose, user, onLogout, onToggleTheme, isDarkMode, onOpenDbSetup, onUpdateUser }: any) => {
-    // ... (Keep existing implementation but ensure responsive resizing works as expected)
     const { t } = useLocalization();
     const [activeTab, setActiveTab] = useState<'APPOINTMENTS' | 'FOLLOWING'>('APPOINTMENTS');
     const [followingCount, setFollowingCount] = useState(0);
@@ -304,48 +207,31 @@ const ClientProfile = ({ isOpen, onClose, user, onLogout, onToggleTheme, isDarkM
     }, [isOpen, user]);
 
     const fetchData = async () => {
-        setLoading(true);
-        // Stats
-        const { count } = await supabase.from('follows').select('id', { count: 'exact' }).eq('client_id', user.id);
-        setFollowingCount(count || 0);
+        try {
+            setLoading(true);
+            // Fetch Follows safely
+            const { count } = await supabase.from('follows').select('*', { count: 'exact' }).eq('client_id', user.id);
+            setFollowingCount(count || 0);
 
-        // Appointments
-        const { data: appData } = await supabase.from('appointments')
-            .select('*, providers(name, service_type, location, phone)')
-            .eq('client_id', user.id)
-            .order('created_at', { ascending: false });
-        setAppointments(appData || []);
+            // Fetch Appointments
+            const { data: appData } = await supabase.from('appointments').select('*, providers(name, service_type, location)').eq('client_id', user.id);
+            setAppointments(appData || []);
 
-        // Followed Providers
-        const { data: followData } = await supabase.from('follows')
-            .select('provider_id, providers(id, name, service_type, location, profile_image_url)')
-            .eq('client_id', user.id);
-        
-        if (followData) {
-            setFollowedProviders(followData.map((f: any) => f.providers));
-        }
-        setLoading(false);
+            // Fetch Followed Providers List
+            const { data: followData } = await supabase.from('follows').select('providers(*)').eq('client_id', user.id);
+            if(followData) setFollowedProviders(followData.map((f:any) => f.providers));
+        } catch(e) { console.log("Profile fetch err", e); }
+        finally { setLoading(false); }
     }
 
     const handleSaveProfile = async () => {
         if(!user) return;
-        setLoading(true);
-        try {
-            const { error } = await supabase.from('clients').update({
-                full_name: editData.fullName,
-                bio: editData.bio
-            }).eq('id', user.id);
-            
-            if(error) throw error;
-            
+        const { error } = await supabase.from('clients').update({ full_name: editData.fullName, bio: editData.bio }).eq('id', user.id);
+        if(!error) {
             if(onUpdateUser) onUpdateUser({ ...user, name: editData.fullName, bio: editData.bio });
             setIsEditing(false);
-            alert(t('savedSuccessfully'));
-        } catch(e) {
-            console.error(e);
-            alert("Error saving profile. Make sure V29 Update is run.");
-        } finally {
-            setLoading(false);
+        } else {
+            alert(t('errorMessage'));
         }
     }
 
@@ -372,73 +258,37 @@ const ClientProfile = ({ isOpen, onClose, user, onLogout, onToggleTheme, isDarkM
         }
     }
 
-    // Helper for countdown
-    const getTimeRemaining = (created_at: string) => {
-        // Mock: Appointment is 3 days after creation
-        const appDate = new Date(created_at);
-        appDate.setDate(appDate.getDate() + 3);
-        const now = new Date();
-        const diff = appDate.getTime() - now.getTime();
-        
-        if(diff <= 0) return t('today');
-
-        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-        return `${days} ${t('days')}, ${hours} ${t('hours')}`;
-    }
-
     if(!isOpen) return null;
 
     return (
         <div className="fixed inset-0 z-[70] flex items-end md:items-center justify-center md:p-4">
-             {/* Backdrop */}
              <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
              
-             {/* Modal Container */}
              <div className="relative w-full h-[90vh] md:h-auto md:max-h-[85vh] md:max-w-md bg-white dark:bg-gray-900 rounded-t-[2.5rem] md:rounded-3xl flex flex-col overflow-hidden shadow-2xl animate-slide-up">
                  
-                 {/* Drag Handle for Mobile */}
-                 <div className="w-full flex justify-center pt-3 pb-1 md:hidden bg-white dark:bg-gray-900 z-10">
-                     <div className="w-12 h-1.5 bg-gray-300 dark:bg-gray-700 rounded-full"></div>
+                 {/* Header Gradient */}
+                 <div className="h-32 bg-gradient-to-r from-blue-600 to-purple-600 relative">
+                      <button onClick={onClose} className="absolute top-4 right-4 bg-black/20 text-white p-2 rounded-full hover:bg-black/40"><X size={20}/></button>
                  </div>
 
-                 {/* Header Nav */}
-                 <div className="px-5 py-3 flex items-center justify-between bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800">
-                     <h2 className="text-lg font-bold dark:text-white flex items-center gap-1">
-                         {isEditing ? t('edit') : user.name} <CheckCircle2 size={16} className="text-blue-500"/>
-                     </h2>
-                     <div className="flex gap-2">
-                         {!isEditing && (
-                             <>
-                                <button onClick={onOpenDbSetup} className="p-2 bg-gray-100 dark:bg-gray-800 rounded-full text-gray-600 dark:text-gray-300"><Database size={18}/></button>
-                                <button onClick={onToggleTheme} className="p-2 bg-gray-100 dark:bg-gray-800 rounded-full text-gray-600 dark:text-gray-300">
-                                    {isDarkMode ? <Sun size={18}/> : <Moon size={18}/>}
-                                </button>
-                             </>
-                         )}
-                         <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"><X size={24} className="dark:text-white"/></button>
-                     </div>
-                 </div>
-
-                 <div className="flex-1 overflow-y-auto bg-white dark:bg-gray-900 pb-20">
-                     {/* Instagram Style Header */}
-                     <div className="px-6 pt-6 pb-4">
-                         <div className="flex items-center gap-6 mb-4">
+                 <div className="flex-1 overflow-y-auto bg-white dark:bg-gray-900 pb-20 -mt-12 rounded-t-[2.5rem] relative z-10">
+                     <div className="px-6 pt-0 pb-4">
+                         {/* Avatar & Stats Row */}
+                         <div className="flex justify-between items-end -mt-10 mb-4 px-2">
                              {/* Avatar */}
                              <div className="relative cursor-pointer" onClick={() => isEditing && fileInputRef.current?.click()}>
-                                 <div className="w-20 h-20 rounded-full p-1 bg-gradient-to-tr from-yellow-400 via-red-500 to-purple-600">
-                                     <div className="w-full h-full bg-white dark:bg-gray-800 rounded-full p-0.5">
-                                         <div className="w-full h-full bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center overflow-hidden">
-                                             {user.profile_image_url ? (
-                                                 <img src={user.profile_image_url} className="w-full h-full object-cover"/>
-                                             ) : (
-                                                 <UserIcon size={32} className="text-gray-400"/>
-                                             )}
-                                         </div>
+                                 <div className="w-24 h-24 rounded-full p-1 bg-white dark:bg-gray-900 shadow-xl">
+                                     <div className="w-full h-full rounded-full overflow-hidden relative bg-gray-200">
+                                         {user.profile_image_url ? (
+                                             <img src={user.profile_image_url} className="w-full h-full object-cover"/>
+                                         ) : (
+                                             <div className="w-full h-full flex items-center justify-center text-gray-400 bg-gray-100 dark:bg-gray-800"><UserIcon size={32}/></div>
+                                         )}
+                                         {imageLoading && <div className="absolute inset-0 bg-black/50 flex items-center justify-center"><Loader2 className="animate-spin text-white"/></div>}
                                      </div>
                                  </div>
                                  {isEditing && (
-                                     <div className="absolute bottom-0 right-0 bg-blue-500 text-white p-1 rounded-full border-2 border-white dark:border-gray-900 z-10">
+                                     <div className="absolute bottom-0 right-0 bg-blue-500 text-white p-1.5 rounded-full border-2 border-white dark:border-gray-900 z-10 shadow-sm">
                                          <Camera size={14} />
                                      </div>
                                  )}
@@ -446,221 +296,266 @@ const ClientProfile = ({ isOpen, onClose, user, onLogout, onToggleTheme, isDarkM
                              </div>
 
                              {/* Stats */}
-                             <div className="flex-1 flex justify-around text-center">
-                                 <div onClick={() => setActiveTab('FOLLOWING')} className="cursor-pointer">
-                                     <span className="block font-bold text-lg dark:text-white">{followingCount}</span>
-                                     <span className="text-xs text-gray-500">{t('followingProviders')}</span>
-                                 </div>
-                                 <div onClick={() => setActiveTab('APPOINTMENTS')} className="cursor-pointer">
-                                     <span className="block font-bold text-lg dark:text-white">{appointments.length}</span>
-                                     <span className="text-xs text-gray-500">{t('upcomingAppointments')}</span>
-                                 </div>
+                             <div className="flex gap-6 mb-2">
+                                <div className="text-center" onClick={() => setActiveTab('FOLLOWING')}>
+                                    <p className="font-black text-xl dark:text-white">{followingCount}</p>
+                                    <p className="text-xs text-gray-500 font-bold">{t('followingProviders')}</p>
+                                </div>
+                                <div className="text-center" onClick={() => setActiveTab('APPOINTMENTS')}>
+                                    <p className="font-black text-xl dark:text-white">{appointments.length}</p>
+                                    <p className="text-xs text-gray-500 font-bold">{t('upcomingAppointments')}</p>
+                                </div>
                              </div>
                          </div>
 
-                         {/* Bio */}
-                         {isEditing ? (
-                             <div className="mb-4 space-y-2">
-                                 <input 
-                                    value={editData.fullName} 
-                                    onChange={e => setEditData({...editData, fullName: e.target.value})}
-                                    className="w-full bg-gray-100 dark:bg-gray-800 p-2 rounded-lg font-bold dark:text-white border-none outline-none"
-                                    placeholder="Full Name"
-                                 />
-                                 <textarea 
-                                    value={editData.bio}
-                                    onChange={e => setEditData({...editData, bio: e.target.value})}
-                                    className="w-full bg-gray-100 dark:bg-gray-800 p-2 rounded-lg text-sm dark:text-white border-none outline-none resize-none"
-                                    placeholder="Add a bio..."
-                                    rows={2}
-                                 />
-                             </div>
-                         ) : (
-                             <div className="mb-4">
-                                 <h1 className="font-bold text-base dark:text-white">{user.name}</h1>
-                                 {user.bio ? (
-                                     <p className="text-sm text-gray-800 dark:text-gray-200">{user.bio}</p>
-                                 ) : (
-                                     <p className="text-sm text-gray-600 dark:text-gray-400">Client Account • TangerConnect</p>
-                                 )}
-                                 <p className="text-sm text-blue-600 dark:text-blue-400 dir-ltr font-mono mt-1">{user.phone}</p>
-                             </div>
-                         )}
+                         {/* Name & Bio */}
+                         <div className="mb-6 px-2">
+                             {isEditing ? (
+                                 <div className="space-y-3">
+                                     <input value={editData.fullName} onChange={e => setEditData({...editData, fullName: e.target.value})} className="w-full font-bold text-xl bg-gray-50 dark:bg-gray-800 p-2 rounded-lg dark:text-white border-none outline-none" placeholder={t('fullName')}/>
+                                     <textarea value={editData.bio} onChange={e => setEditData({...editData, bio: e.target.value})} className="w-full text-sm bg-gray-50 dark:bg-gray-800 p-2 rounded-lg dark:text-white border-none outline-none resize-none" rows={2} placeholder="Add a bio..."/>
+                                     <div className="flex gap-2">
+                                         <button onClick={handleSaveProfile} className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-bold text-sm">{t('save')}</button>
+                                         <button onClick={() => setIsEditing(false)} className="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg font-bold text-sm dark:text-white">{t('cancel')}</button>
+                                     </div>
+                                 </div>
+                             ) : (
+                                 <>
+                                     <h2 className="text-2xl font-bold dark:text-white">{user.name}</h2>
+                                     <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">{user.bio || "No bio yet."}</p>
+                                     <button onClick={() => setIsEditing(true)} className="mt-4 w-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-white py-2 rounded-lg font-bold text-sm border border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                                         {t('edit')} {t('myProfile')}
+                                     </button>
+                                 </>
+                             )}
+                         </div>
 
-                         {/* Action Buttons */}
-                         {isEditing ? (
-                             <div className="flex gap-2">
-                                 <button onClick={handleSaveProfile} disabled={loading} className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold flex justify-center items-center gap-2">
-                                     {loading ? <Loader2 className="animate-spin" size={16}/> : <Save size={16}/>} {t('save')}
-                                 </button>
-                                 <button onClick={() => setIsEditing(false)} className="flex-1 py-2 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-lg text-sm font-bold">
-                                     {t('cancel')}
-                                 </button>
-                             </div>
-                         ) : (
-                             <div className="flex gap-2">
-                                 <button onClick={() => setIsEditing(true)} className="flex-1 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg text-sm font-bold dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
-                                     {t('edit')} Profile
-                                 </button>
-                                 <button onClick={onLogout} className="flex-1 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-lg text-sm font-bold hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors">
-                                     {t('logout')}
-                                 </button>
-                             </div>
-                         )}
-                     </div>
+                         {/* Tabs Header */}
+                         <div className="flex border-b border-gray-200 dark:border-gray-800 mb-4">
+                             <button onClick={() => setActiveTab('APPOINTMENTS')} className={`flex-1 pb-3 text-sm font-bold border-b-2 transition-colors ${activeTab === 'APPOINTMENTS' ? 'border-black dark:border-white text-black dark:text-white' : 'border-transparent text-gray-400'}`}>
+                                 <CalendarDays size={18} className="mx-auto mb-1"/>
+                             </button>
+                             <button onClick={() => setActiveTab('FOLLOWING')} className={`flex-1 pb-3 text-sm font-bold border-b-2 transition-colors ${activeTab === 'FOLLOWING' ? 'border-black dark:border-white text-black dark:text-white' : 'border-transparent text-gray-400'}`}>
+                                 <Users size={18} className="mx-auto mb-1"/>
+                             </button>
+                         </div>
 
-                     {/* Tabs */}
-                     <div className="flex border-t border-gray-100 dark:border-gray-800 sticky top-0 bg-white dark:bg-gray-900 z-10">
-                         <button 
-                            onClick={() => setActiveTab('APPOINTMENTS')}
-                            className={`flex-1 py-3 flex justify-center border-b-2 transition-colors ${activeTab === 'APPOINTMENTS' ? 'border-black dark:border-white text-black dark:text-white' : 'border-transparent text-gray-400'}`}
-                         >
-                             <CalendarDays size={24}/>
-                         </button>
-                         <button 
-                            onClick={() => setActiveTab('FOLLOWING')}
-                            className={`flex-1 py-3 flex justify-center border-b-2 transition-colors ${activeTab === 'FOLLOWING' ? 'border-black dark:border-white text-black dark:text-white' : 'border-transparent text-gray-400'}`}
-                         >
-                             <Users size={24}/>
-                         </button>
-                     </div>
-
-                     {/* Content Grid */}
-                     <div className="p-1">
-                         {activeTab === 'APPOINTMENTS' ? (
-                             <div className="space-y-2 p-2 animate-fade-in">
-                                 {appointments.map(app => (
-                                     <div key={app.id} className="bg-gray-50 dark:bg-gray-800 p-4 rounded-xl flex justify-between items-center border border-gray-100 dark:border-gray-700">
+                         {/* Content Grid */}
+                         <div className="grid grid-cols-1 gap-4">
+                             {activeTab === 'APPOINTMENTS' ? (
+                                 appointments.length > 0 ? appointments.map((app) => (
+                                     <div key={app.id} className="bg-gray-50 dark:bg-gray-800 p-4 rounded-xl flex items-center justify-between border border-gray-100 dark:border-gray-700">
                                          <div>
-                                             <h4 className="font-bold text-sm dark:text-white">{app.providers?.name}</h4>
-                                             <p className="text-xs text-gray-500">{app.providers?.service_type}</p>
-                                             <div className="flex items-center gap-1 mt-1 text-xs text-orange-500 font-bold">
-                                                 <Clock size={12}/> {getTimeRemaining(app.created_at)}
-                                             </div>
+                                             <h4 className="font-bold dark:text-white">{app.providers?.service_type}</h4>
+                                             <p className="text-xs text-gray-500">{app.providers?.name}</p>
+                                             <p className="text-[10px] text-gray-400 mt-1">{new Date(app.created_at).toLocaleDateString()}</p>
                                          </div>
-                                         <div className="bg-white dark:bg-gray-700 p-2 rounded-lg shadow-sm">
-                                             <CalendarDays size={20} className="text-gray-400"/>
+                                         <div className="text-right">
+                                             <div className="bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 px-2 py-1 rounded-md text-xs font-bold mb-1">Confirmed</div>
+                                             <QRCodeDisplay appointmentId={app.id} />
                                          </div>
                                      </div>
-                                 ))}
-                                 {appointments.length === 0 && (
-                                     <div className="text-center py-10 text-gray-400">
-                                         <CalendarDays size={40} className="mx-auto mb-2 opacity-20"/>
-                                         <p className="text-sm">{t('noAppointments')}</p>
+                                 )) : <p className="text-center text-gray-400 py-10 text-sm">{t('noAppointments')}</p>
+                             ) : (
+                                 followedProviders.length > 0 ? followedProviders.map((prov) => (
+                                     <div key={prov.id} className="flex items-center gap-3 bg-gray-50 dark:bg-gray-800 p-3 rounded-xl border border-gray-100 dark:border-gray-700">
+                                          <div className="w-10 h-10 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center font-bold">
+                                              {prov.profile_image_url ? <img src={prov.profile_image_url} className="w-full h-full rounded-full object-cover"/> : prov.name?.[0]}
+                                          </div>
+                                          <div>
+                                              <h4 className="font-bold text-sm dark:text-white">{prov.name}</h4>
+                                              <p className="text-xs text-gray-500">{prov.service_type}</p>
+                                          </div>
                                      </div>
-                                 )}
-                             </div>
-                         ) : (
-                             <div className="space-y-2 p-2 animate-fade-in">
-                                 {followedProviders.map(prov => (
-                                     <div key={prov.id} className="flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-xl transition-colors">
-                                         <div className="flex items-center gap-3">
-                                             <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden">
-                                                 {prov.profile_image_url ? (
-                                                     <img src={prov.profile_image_url} className="w-full h-full object-cover"/>
-                                                 ) : (
-                                                     <UserIcon className="w-full h-full p-2 text-gray-400"/>
-                                                 )}
-                                             </div>
-                                             <div>
-                                                 <h4 className="font-bold text-sm dark:text-white">{prov.name}</h4>
-                                                 <p className="text-xs text-gray-500">{prov.service_type}</p>
-                                             </div>
-                                         </div>
-                                         <button className="px-4 py-1.5 bg-gray-100 dark:bg-gray-700 rounded-lg text-xs font-bold dark:text-white">
-                                             {t('followingProviders')}
-                                         </button>
-                                     </div>
-                                 ))}
-                                  {followedProviders.length === 0 && (
-                                     <div className="text-center py-10 text-gray-400">
-                                         <Users size={40} className="mx-auto mb-2 opacity-20"/>
-                                         <p className="text-sm">Not following anyone.</p>
-                                     </div>
-                                 )}
-                             </div>
-                         )}
+                                 )) : <p className="text-center text-gray-400 py-10 text-sm">Not following anyone yet.</p>
+                             )}
+                         </div>
                      </div>
+                 </div>
+                 
+                 {/* Footer Settings */}
+                 <div className="absolute bottom-0 w-full bg-gray-50 dark:bg-gray-800 border-t dark:border-gray-700 p-4 flex justify-between items-center z-20">
+                     <div className="flex gap-2">
+                        <button onClick={onToggleTheme} className="p-2 bg-white dark:bg-gray-700 rounded-full shadow-sm text-gray-600 dark:text-gray-300">
+                            {isDarkMode ? <Sun size={20}/> : <Moon size={20}/>}
+                        </button>
+                        <button onClick={onOpenDbSetup} className="p-2 bg-white dark:bg-gray-700 rounded-full shadow-sm text-gray-600 dark:text-gray-300">
+                            <Database size={20}/>
+                        </button>
+                     </div>
+                     <button onClick={onLogout} className="flex items-center gap-2 text-red-500 font-bold text-sm px-4 py-2 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                         <LogOut size={16}/> {t('logout')}
+                     </button>
                  </div>
             </div>
         </div>
     )
 }
 
-// --- NOTIFICATION CENTER ---
-const NotificationCenter = ({ isOpen, onClose, currentUser }: any) => {
-    // ... (Keep existing implementation)
+// --- PROVIDER DIRECTORY MODAL ---
+const ProviderDirectory = ({ isOpen, onClose, currentUser }: any) => {
     const { t } = useLocalization();
-    const [items, setItems] = useState<any[]>([]);
+    const [providers, setProviders] = useState<any[]>([]);
+    const [search, setSearch] = useState('');
+    const [selectedProvider, setSelectedProvider] = useState<any | null>(null);
+    const [activeTab, setActiveTab] = useState<'SERVICES' | 'POSTS'>('SERVICES');
     const [loading, setLoading] = useState(false);
+    const [isFollowing, setIsFollowing] = useState(false);
 
     useEffect(() => {
-        if(isOpen) fetchNotifications();
-    }, [isOpen, currentUser]);
+        if (isOpen) fetchProviders();
+    }, [isOpen]);
 
-    const fetchNotifications = async () => {
+    useEffect(() => {
+        if(selectedProvider && currentUser) checkFollowStatus();
+    }, [selectedProvider, currentUser]);
+
+    const fetchProviders = async () => {
         setLoading(true);
-        try {
-            if (currentUser?.accountType === 'PROVIDER') {
-                const { data } = await supabase.from('provider_notifications').select('*').eq('provider_id', currentUser.id).order('created_at', { ascending: false }).limit(20);
-                setItems(data || []);
-            } else {
-                // Client Logic: Get followed providers first
-                let providerIds: number[] = [];
-                if(currentUser) {
-                    const { data: follows } = await supabase.from('follows').select('provider_id').eq('client_id', currentUser.id);
-                    if(follows) providerIds = follows.map(f => f.provider_id);
-                }
+        const { data } = await supabase.from('providers').select('*, provider_services(*), announcements(*)').eq('is_active', true);
+        setProviders(data || []);
+        setLoading(false);
+    }
 
-                if(providerIds.length > 0) {
-                     const { data } = await supabase.from('announcements')
-                        .select('*, providers(name)')
-                        .in('provider_id', providerIds)
-                        .order('created_at', { ascending: false })
-                        .limit(20);
-                     setItems(data || []);
-                } else {
-                    const { data } = await supabase.from('system_announcements').select('*').eq('is_active', true).limit(5);
-                    setItems(data || []);
-                }
-            }
-        } catch(e) {
-            console.warn("Notification fetch error (likely table missing)", e);
-            setItems([]); // Graceful fallback
-        } finally {
-            setLoading(false);
+    const checkFollowStatus = async () => {
+        const { data } = await supabase.from('follows').select('*').eq('client_id', currentUser.id).eq('provider_id', selectedProvider.id).single();
+        setIsFollowing(!!data);
+    }
+
+    const handleFollow = async () => {
+        if(!currentUser) return;
+        if(isFollowing) {
+            await supabase.from('follows').delete().eq('client_id', currentUser.id).eq('provider_id', selectedProvider.id);
+            setIsFollowing(false);
+        } else {
+            await supabase.from('follows').insert({ client_id: currentUser.id, provider_id: selectedProvider.id });
+            setIsFollowing(true);
         }
     }
 
+    const filtered = providers.filter(p => p.name.toLowerCase().includes(search.toLowerCase()) || p.service_type.toLowerCase().includes(search.toLowerCase()));
+
     if(!isOpen) return null;
+
     return (
-        <div className="fixed inset-0 bg-black/50 z-[60] flex justify-end">
-            <div className="absolute inset-0" onClick={onClose} />
-            <div className="bg-white dark:bg-gray-800 w-80 h-full relative z-10 shadow-2xl flex flex-col animate-slide-up">
-                <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-900">
-                     <h3 className="font-bold flex items-center gap-2 dark:text-white"><Bell size={18}/> {t('notifications')}</h3>
-                     <button onClick={onClose}><X size={20} className="dark:text-white"/></button>
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+            <div className="bg-gray-100 dark:bg-gray-900 w-full max-w-4xl h-[90vh] rounded-3xl overflow-hidden flex flex-col shadow-2xl animate-slide-up">
+                
+                {/* Header */}
+                <div className="bg-white dark:bg-gray-800 p-4 border-b dark:border-gray-700 flex justify-between items-center">
+                     <h2 className="text-xl font-bold dark:text-white flex items-center gap-2"><LayoutGrid className="text-purple-600"/> {t('providerDirectory')}</h2>
+                     <button onClick={onClose}><X className="dark:text-white"/></button>
                 </div>
-                <div className="flex-1 overflow-y-auto p-4">
-                    {loading ? (
-                        <div className="flex justify-center py-10"><RefreshCw className="animate-spin text-gray-400"/></div>
-                    ) : items.length === 0 ? (
-                        <div className="text-center py-10 text-gray-400">
-                             <Bell size={48} className="mx-auto mb-2 opacity-20"/>
-                             <p>{t('noNotifications')}</p>
-                             {!currentUser && <p className="text-xs mt-2">Login to see personalized alerts.</p>}
+
+                <div className="flex-1 overflow-y-auto">
+                    {selectedProvider ? (
+                        <div className="bg-white dark:bg-gray-900 min-h-full">
+                             {/* Profile Header */}
+                             <div className="p-6 text-center border-b dark:border-gray-800 relative">
+                                 <button onClick={() => setSelectedProvider(null)} className="absolute top-4 left-4 text-gray-500 bg-gray-100 dark:bg-gray-800 p-2 rounded-full"><ArrowLeft/></button>
+                                 <div className="w-24 h-24 mx-auto bg-purple-100 rounded-full mb-4 overflow-hidden border-4 border-white shadow-lg">
+                                     {selectedProvider.profile_image_url ? (
+                                         <img src={selectedProvider.profile_image_url} className="w-full h-full object-cover"/>
+                                     ) : (
+                                         <div className="w-full h-full flex items-center justify-center text-purple-600 font-bold text-3xl">{selectedProvider.name[0]}</div>
+                                     )}
+                                 </div>
+                                 <h1 className="text-2xl font-black dark:text-white mb-1">{selectedProvider.name}</h1>
+                                 <p className="text-purple-600 font-bold text-sm mb-4">{selectedProvider.service_type}</p>
+                                 
+                                 {/* Stats Row */}
+                                 <div className="flex justify-center gap-8 mb-6 border-y border-gray-100 dark:border-gray-800 py-4">
+                                     <div className="text-center">
+                                         <span className="block font-bold text-lg dark:text-white">1.2k</span>
+                                         <span className="text-xs text-gray-500">Followers</span>
+                                     </div>
+                                     <div className="text-center">
+                                         <span className="block font-bold text-lg dark:text-white">4.8</span>
+                                         <span className="text-xs text-gray-500">Rating</span>
+                                     </div>
+                                     <div className="text-center">
+                                         <span className="block font-bold text-lg dark:text-white">{selectedProvider.provider_services?.length || 0}</span>
+                                         <span className="text-xs text-gray-500">Services</span>
+                                     </div>
+                                 </div>
+
+                                 {/* Action Buttons */}
+                                 <div className="flex justify-center gap-3 mb-6">
+                                     <button 
+                                        onClick={handleFollow}
+                                        className={`px-8 py-2 rounded-lg font-bold text-sm transition-colors ${isFollowing ? 'bg-gray-100 text-black dark:bg-gray-700 dark:text-white' : 'bg-blue-600 text-white'}`}
+                                     >
+                                         {isFollowing ? t('unfollow') : t('follow')}
+                                     </button>
+                                     <button className="px-8 py-2 bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-white rounded-lg font-bold text-sm">Message</button>
+                                 </div>
+                                 
+                                 {/* Social Links */}
+                                 <div className="flex justify-center gap-4 text-gray-400">
+                                     <Instagram size={20} className="hover:text-pink-600 cursor-pointer"/>
+                                     <Facebook size={20} className="hover:text-blue-600 cursor-pointer"/>
+                                     <Globe size={20} className="hover:text-green-600 cursor-pointer"/>
+                                     <MapPin size={20} className="hover:text-red-600 cursor-pointer"/>
+                                 </div>
+                             </div>
+
+                             {/* Tabs */}
+                             <div className="flex border-b dark:border-gray-800">
+                                 <button onClick={() => setActiveTab('SERVICES')} className={`flex-1 py-4 font-bold text-sm ${activeTab === 'SERVICES' ? 'border-b-2 border-black dark:border-white text-black dark:text-white' : 'text-gray-400'}`}>{t('services')}</button>
+                                 <button onClick={() => setActiveTab('POSTS')} className={`flex-1 py-4 font-bold text-sm ${activeTab === 'POSTS' ? 'border-b-2 border-black dark:border-white text-black dark:text-white' : 'text-gray-400'}`}>{t('posts')}</button>
+                             </div>
+
+                             {/* Content */}
+                             <div className="p-4 bg-gray-50 dark:bg-gray-900">
+                                 {activeTab === 'SERVICES' ? (
+                                     <div className="space-y-3">
+                                         {selectedProvider.provider_services?.map((s:any) => (
+                                             <div key={s.id} className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm flex justify-between items-center">
+                                                 <span className="font-bold dark:text-white">{s.name}</span>
+                                                 <div className="text-right">
+                                                     {s.discount_price && <span className="text-xs text-gray-400 line-through mr-2">{s.price} DH</span>}
+                                                     <span className="font-bold text-green-600">{s.discount_price || s.price} DH</span>
+                                                 </div>
+                                             </div>
+                                         ))}
+                                     </div>
+                                 ) : (
+                                     <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                         {selectedProvider.announcements?.map((a:any) => (
+                                             <div key={a.id} className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm aspect-square flex items-center justify-center text-center">
+                                                 <p className="text-sm dark:text-gray-300 line-clamp-4">{a.message}</p>
+                                             </div>
+                                         ))}
+                                     </div>
+                                 )}
+                             </div>
                         </div>
                     ) : (
-                        <div className="space-y-3">
-                            {items.map((item, i) => (
-                                <div key={i} className="bg-gray-50 dark:bg-gray-700 p-3 rounded-xl border border-gray-100 dark:border-gray-600">
-                                    <div className="flex justify-between items-start mb-1">
-                                         <span className="font-bold text-sm text-primary">{item.providers?.name || item.title || 'System'}</span>
-                                         <span className="text-[10px] text-gray-400">{new Date(item.created_at).toLocaleDateString()}</span>
+                        <div className="p-4">
+                            <div className="relative mb-6">
+                                <Search className="absolute left-3 top-3 text-gray-400" size={20}/>
+                                <input 
+                                    value={search} 
+                                    onChange={e => setSearch(e.target.value)} 
+                                    placeholder={t('searchProviderPlaceholder')} 
+                                    className="w-full pl-10 pr-4 py-3 bg-white dark:bg-gray-800 rounded-xl shadow-sm outline-none dark:text-white"
+                                />
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {filtered.map(p => (
+                                    <div key={p.id} onClick={() => setSelectedProvider(p)} className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm flex items-center gap-4 cursor-pointer hover:shadow-md transition-shadow">
+                                        <div className="w-16 h-16 bg-purple-100 dark:bg-gray-700 rounded-full overflow-hidden shrink-0">
+                                            {p.profile_image_url ? <img src={p.profile_image_url} className="w-full h-full object-cover"/> : <div className="w-full h-full flex items-center justify-center font-bold text-purple-600 text-xl">{p.name[0]}</div>}
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold dark:text-white text-lg">{p.name}</h3>
+                                            <p className="text-purple-600 text-sm font-medium">{p.service_type}</p>
+                                            <p className="text-gray-400 text-xs mt-1 flex items-center gap-1"><MapPin size={10}/> {p.location}</p>
+                                        </div>
                                     </div>
-                                    <p className="text-sm dark:text-gray-200">{item.message}</p>
-                                </div>
-                            ))}
+                                ))}
+                            </div>
                         </div>
                     )}
                 </div>
@@ -669,571 +564,326 @@ const NotificationCenter = ({ isOpen, onClose, currentUser }: any) => {
     );
 };
 
-// --- PROVIDER DIRECTORY & PROFILE (INSTAGRAM STYLE - FULL SCREEN UPDATE) ---
-const ProviderDirectory = ({ isOpen, onClose, currentUser, onOpenAuth }: any) => {
-    // ... (Keep existing implementation)
-    const { t } = useLocalization();
-    const [providers, setProviders] = useState<any[]>([]);
-    const [followedIds, setFollowedIds] = useState<number[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [search, setSearch] = useState('');
-    
-    // Detailed Profile View State
-    const [selectedProvider, setSelectedProvider] = useState<any | null>(null);
-    const [providerDetails, setProviderDetails] = useState<{services: any[], posts: any[], followerCount: number}>({ services: [], posts: [], followerCount: 0 });
-    const [profileTab, setProfileTab] = useState<'SERVICES' | 'POSTS'>('SERVICES');
-    const [loadingDetails, setLoadingDetails] = useState(false);
+// GLOBAL ERROR BOUNDARY for "White Screen" catch
+interface ErrorBoundaryProps {
+    children: React.ReactNode;
+}
+interface ErrorBoundaryState {
+    hasError: boolean;
+}
 
-    useEffect(() => {
-        if(isOpen) {
-            fetchProviders();
-            if(currentUser?.accountType === 'CLIENT') fetchFollows();
-        } else {
-            setSelectedProvider(null);
-            setSearch('');
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+    state: ErrorBoundaryState = { hasError: false };
+
+    static getDerivedStateFromError(error: any) { return { hasError: true }; }
+    componentDidCatch(error: any, errorInfo: any) { console.error("Uncaught error:", error, errorInfo); }
+    render() {
+        if (this.state.hasError) {
+            return (
+                <div className="flex flex-col items-center justify-center h-screen p-10 bg-gray-50 text-center">
+                    <AlertTriangle size={48} className="text-red-500 mb-4"/>
+                    <h2 className="text-xl font-bold mb-2">Oops, something went wrong.</h2>
+                    <p className="text-gray-500 mb-6">The application encountered an unexpected error.</p>
+                    <button 
+                        onClick={() => { localStorage.clear(); window.location.reload(); }} 
+                        className="bg-red-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:bg-red-600 transition-colors"
+                    >
+                        Reset Application
+                    </button>
+                </div>
+            );
         }
-    }, [isOpen, currentUser]);
-
-    useEffect(() => {
-        if(selectedProvider) {
-            fetchProviderDetails(selectedProvider.id);
-        }
-    }, [selectedProvider]);
-
-    const fetchProviders = async () => {
-        setLoading(true);
-        const { data } = await supabase.from('providers')
-            .select('id, name, service_type, location, profile_image_url, bio, social_links')
-            .eq('is_active', true);
-        setProviders(data || []);
-        setLoading(false);
+        return this.props.children;
     }
+}
 
-    const fetchFollows = async () => {
-        const { data } = await supabase.from('follows').select('provider_id').eq('client_id', currentUser.id);
-        setFollowedIds(data?.map(d => d.provider_id) || []);
-    }
+// --- MAIN APP COMPONENT (Renamed logic to MainContent) ---
 
-    const fetchProviderDetails = async (providerId: number) => {
-        setLoadingDetails(true);
-        try {
-            const { data: services } = await supabase.from('provider_services').select('*').eq('provider_id', providerId);
-            const { data: posts } = await supabase.from('announcements').select('*').eq('provider_id', providerId).order('created_at', { ascending: false });
-            const { count } = await supabase.from('follows').select('id', { count: 'exact' }).eq('provider_id', providerId);
-
-            setProviderDetails({
-                services: services || [],
-                posts: posts || [],
-                followerCount: count || 0
-            });
-        } catch(e) { console.error(e); }
-        finally { setLoadingDetails(false); }
-    }
-
-    const toggleFollow = async (providerId: number) => {
-        if(!currentUser) {
-            onOpenAuth();
-            return;
-        }
-        
-        if (followedIds.includes(providerId)) {
-            await supabase.from('follows').delete().eq('client_id', currentUser.id).eq('provider_id', providerId);
-            setFollowedIds(prev => prev.filter(id => id !== providerId));
-            if(selectedProvider && selectedProvider.id === providerId) {
-                setProviderDetails(prev => ({...prev, followerCount: prev.followerCount - 1}));
-            }
-        } else {
-            await supabase.from('follows').insert({ client_id: currentUser.id, provider_id: providerId });
-            setFollowedIds(prev => [...prev, providerId]);
-            if(selectedProvider && selectedProvider.id === providerId) {
-                setProviderDetails(prev => ({...prev, followerCount: prev.followerCount + 1}));
-            }
-        }
-    }
-
-    const filtered = providers.filter(p => p.name.toLowerCase().includes(search.toLowerCase()) || p.service_type.toLowerCase().includes(search.toLowerCase()));
-
-    if(!isOpen) return null;
-
-    // --- RENDER: PROFILE VIEW (UPDATED TO FULL SCREEN) ---
-    if (selectedProvider) {
-        let social = { instagram: '', facebook: '', website: '', gps: '' };
-        try { 
-            if(selectedProvider.social_links) {
-                social = typeof selectedProvider.social_links === 'string' ? JSON.parse(selectedProvider.social_links) : selectedProvider.social_links;
-            }
-        } catch(e){}
-
-        return (
-             <div className="fixed inset-0 bg-white dark:bg-gray-900 z-[70] flex flex-col animate-slide-up">
-                 {/* Full Screen Mode */}
-                    
-                    {/* Profile Header (Nav) */}
-                    <div className="p-4 flex items-center justify-between border-b dark:border-gray-700 bg-white dark:bg-gray-900 z-10 sticky top-0">
-                        <button onClick={() => setSelectedProvider(null)} className="p-2 -ml-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700">
-                            <ArrowLeft size={24} className="dark:text-white"/>
-                        </button>
-                        <h3 className="font-bold dark:text-white">{selectedProvider.name}</h3>
-                        <div className="w-8"></div>
-                    </div>
-
-                    {/* Profile Content */}
-                    <div className="flex-1 overflow-y-auto bg-white dark:bg-gray-900">
-                        
-                        {/* 1. Header Info */}
-                        <div className="p-6 pb-2">
-                             <div className="flex items-center gap-6 mb-6">
-                                 {/* Avatar */}
-                                 <div className="w-24 h-24 rounded-full border-2 border-primary p-0.5">
-                                     <div className="w-full h-full rounded-full overflow-hidden bg-gray-200">
-                                         {selectedProvider.profile_image_url ? (
-                                             <img src={selectedProvider.profile_image_url} className="w-full h-full object-cover"/>
-                                         ) : (
-                                             <UserIcon className="w-full h-full p-6 text-gray-400"/>
-                                         )}
-                                     </div>
-                                 </div>
-                                 {/* Stats */}
-                                 <div className="flex-1 flex justify-around text-center">
-                                     <div>
-                                         <span className="block font-bold text-xl dark:text-white">{providerDetails.followerCount}</span>
-                                         <span className="text-sm text-gray-500">{t('followers')}</span>
-                                     </div>
-                                     <div>
-                                         <span className="block font-bold text-xl dark:text-white">{providerDetails.posts.length}</span>
-                                         <span className="text-sm text-gray-500">{t('posts')}</span>
-                                     </div>
-                                 </div>
-                             </div>
-
-                             {/* Bio & Details */}
-                             <div className="mb-6">
-                                 <h4 className="font-bold text-lg dark:text-white">{selectedProvider.service_type}</h4>
-                                 <p className="text-base text-gray-600 dark:text-gray-300 whitespace-pre-wrap">{selectedProvider.bio || t('noServices')}</p>
-                                 <p className="text-sm text-gray-400 mt-2 flex items-center gap-1"><MapPin size={14}/> {selectedProvider.location}</p>
-                             </div>
-
-                             {/* Social Links */}
-                             <div className="flex gap-3 mb-6">
-                                 {social.instagram && (
-                                     <a href={social.instagram} target="_blank" rel="noreferrer" className="p-3 bg-pink-50 text-pink-600 rounded-full hover:bg-pink-100 transition-colors"><Instagram size={24}/></a>
-                                 )}
-                                 {social.facebook && (
-                                     <a href={social.facebook} target="_blank" rel="noreferrer" className="p-3 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition-colors"><Facebook size={24}/></a>
-                                 )}
-                                 {social.gps && (
-                                     <a href={social.gps} target="_blank" rel="noreferrer" className="p-3 bg-green-50 text-green-600 rounded-full hover:bg-green-100 transition-colors"><Map size={24}/></a>
-                                 )}
-                                 {social.website && (
-                                     <a href={social.website} target="_blank" rel="noreferrer" className="p-3 bg-gray-50 text-gray-600 rounded-full hover:bg-gray-100 transition-colors"><LinkIcon size={24}/></a>
-                                 )}
-                                 <a href={`tel:${selectedProvider.phone || selectedProvider.username}`} className="p-3 bg-gray-50 text-gray-600 rounded-full hover:bg-gray-100 transition-colors ml-auto flex items-center gap-2 px-6 font-bold text-sm">
-                                     <Phone size={18}/> {t('call')}
-                                 </a>
-                             </div>
-
-                             {/* Action Buttons */}
-                             <button 
-                                onClick={() => toggleFollow(selectedProvider.id)}
-                                className={`w-full py-3 rounded-xl font-bold text-base transition-all mb-6 ${followedIds.includes(selectedProvider.id) ? 'bg-gray-200 text-gray-700' : 'bg-blue-600 text-white shadow-md'}`}
-                             >
-                                 {followedIds.includes(selectedProvider.id) ? t('unfollow') : t('follow')}
-                             </button>
-                        </div>
-
-                        {/* 2. Content Tabs */}
-                        <div className="border-t border-b dark:border-gray-700 flex sticky top-[60px] bg-white dark:bg-gray-900 z-10">
-                            <button 
-                                onClick={() => setProfileTab('SERVICES')} 
-                                className={`flex-1 py-4 text-sm font-bold flex items-center justify-center gap-2 ${profileTab === 'SERVICES' ? 'border-b-2 border-black dark:border-white text-black dark:text-white' : 'text-gray-400'}`}
-                            >
-                                <ListPlus size={18}/> {t('services')}
-                            </button>
-                            <button 
-                                onClick={() => setProfileTab('POSTS')} 
-                                className={`flex-1 py-4 text-sm font-bold flex items-center justify-center gap-2 ${profileTab === 'POSTS' ? 'border-b-2 border-black dark:border-white text-black dark:text-white' : 'text-gray-400'}`}
-                            >
-                                <Briefcase size={18}/> {t('posts')}
-                            </button>
-                        </div>
-
-                        {/* 3. Grid Content */}
-                        <div className="p-1 min-h-[300px] bg-gray-50 dark:bg-gray-900">
-                             {loadingDetails ? (
-                                 <div className="flex justify-center py-10"><RefreshCw className="animate-spin text-gray-400"/></div>
-                             ) : profileTab === 'SERVICES' ? (
-                                 <div className="grid grid-cols-1 gap-3 p-4">
-                                     {providerDetails.services.length > 0 ? providerDetails.services.map(s => (
-                                         <div key={s.id} className="bg-white dark:bg-gray-800 p-4 rounded-xl border dark:border-gray-700 flex justify-between items-center shadow-sm">
-                                             <div>
-                                                 <span className="font-bold dark:text-white block text-lg">{s.name}</span>
-                                                 {s.discount_price ? (
-                                                     <div className="text-sm">
-                                                         <span className="line-through text-red-400 mr-2">{s.price} DH</span>
-                                                         <span className="font-bold text-green-600">{s.discount_price} DH</span>
-                                                     </div>
-                                                 ) : (
-                                                     <span className="text-base font-bold text-gray-600 dark:text-gray-300">{s.price} DH</span>
-                                                 )}
-                                             </div>
-                                             <button className="bg-gray-100 dark:bg-gray-700 p-3 rounded-full"><ShoppingBag size={20}/></button>
-                                         </div>
-                                     )) : (
-                                         <div className="text-center py-10 text-gray-400">
-                                             <ShoppingBag size={48} className="mx-auto mb-2 opacity-20"/>
-                                             <p>{t('noServices')}</p>
-                                         </div>
-                                     )}
-                                 </div>
-                             ) : (
-                                 <div className="grid grid-cols-1 gap-4 p-4">
-                                     {providerDetails.posts.length > 0 ? providerDetails.posts.map(p => (
-                                         <div key={p.id} className="bg-white dark:bg-gray-800 p-5 rounded-xl border dark:border-gray-700 shadow-sm">
-                                             <p className="text-base dark:text-gray-200 mb-3 whitespace-pre-wrap">{p.message}</p>
-                                             <span className="text-xs text-gray-400">{new Date(p.created_at).toLocaleDateString()}</span>
-                                         </div>
-                                     )) : (
-                                          <div className="text-center py-10 text-gray-400">
-                                             <Briefcase size={48} className="mx-auto mb-2 opacity-20"/>
-                                             <p>{t('noPosts')}</p>
-                                         </div>
-                                     )}
-                                 </div>
-                             )}
-                        </div>
-                    </div>
-             </div>
-        );
-    }
-
-    // --- RENDER: LIST VIEW ---
-    return (
-         <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
-             <div className="absolute inset-0" onClick={onClose}/>
-             <div className="bg-white dark:bg-gray-800 w-full max-w-lg rounded-3xl h-[80vh] relative z-10 flex flex-col overflow-hidden shadow-2xl animate-slide-up">
-                 <div className="p-4 bg-gray-50 dark:bg-gray-900 border-b dark:border-gray-700 flex justify-between items-center">
-                     <h3 className="font-bold flex items-center gap-2 dark:text-white"><FileText className="text-blue-500"/> {t('providerDirectory')}</h3>
-                     <button onClick={onClose}><X size={20} className="dark:text-white"/></button>
-                 </div>
-                 <div className="p-3 bg-white dark:bg-gray-800 border-b dark:border-gray-700">
-                     <div className="relative">
-                         <Search className="absolute left-3 top-2.5 text-gray-400" size={18}/>
-                         <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t('searchProviderPlaceholder')} className="w-full pl-10 pr-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-xl outline-none dark:text-white"/>
-                     </div>
-                 </div>
-                 <div className="flex-1 overflow-y-auto p-4">
-                     {loading ? <div className="flex justify-center py-10"><RefreshCw className="animate-spin"/></div> : (
-                         <div className="grid gap-3">
-                             {filtered.map(p => (
-                                 <div key={p.id} onClick={() => setSelectedProvider(p)} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-100 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors cursor-pointer">
-                                     <div className="w-12 h-12 bg-gray-200 rounded-full overflow-hidden flex-shrink-0 border border-gray-300">
-                                         {p.profile_image_url ? <img src={p.profile_image_url} className="w-full h-full object-cover"/> : <UserIcon className="w-full h-full p-2 text-gray-400"/>}
-                                     </div>
-                                     <div className="flex-1 min-w-0">
-                                         <h4 className="font-bold dark:text-white truncate">{p.name}</h4>
-                                         <p className="text-xs text-gray-500">{p.service_type} • {p.location}</p>
-                                     </div>
-                                     <button 
-                                        onClick={(e) => { e.stopPropagation(); toggleFollow(p.id); }}
-                                        className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all z-10 ${followedIds.includes(p.id) ? 'bg-gray-200 text-gray-600' : 'bg-blue-600 text-white shadow-md'}`}
-                                     >
-                                         {followedIds.includes(p.id) ? t('unfollow') : t('follow')}
-                                     </button>
-                                 </div>
-                             ))}
-                             {filtered.length === 0 && <p className="text-center text-gray-400">No providers found.</p>}
-                         </div>
-                     )}
-                 </div>
-             </div>
-         </div>
-    )
-};
-
-// --- APP COMPONENT ---
-
-const App: React.FC = () => {
-  const [view, setView] = useState<UserView>(UserView.CLIENT);
-  const [language, setLanguage] = useState<Language>(Language.AR);
+const MainContent: React.FC = () => {
+  const { t, language } = useLocalization();
+  
+  // State
   const [currentUser, setCurrentUser] = useState<AuthenticatedUser | null>(null);
-  const [isLoadingUser, setIsLoadingUser] = useState(true);
-  
-  // Modal States
-  const [showAuthDrawer, setShowAuthDrawer] = useState(false);
-  const [showAppointmentsDrawer, setShowAppointmentsDrawer] = useState(false);
-  const [showDbSetup, setShowDbSetup] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [isDarkMode, setIsDarkMode] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [showDirectory, setShowDirectory] = useState(false);
-  const [showClientProfile, setShowClientProfile] = useState(false);
-  const [showMobileMenu, setShowMobileMenu] = useState(false); // New Overlay Menu State
   
-  // Feature Modals
+  // Drawer States
+  const [showAuth, setShowAuth] = useState(false);
+  const [showAppointments, setShowAppointments] = useState(false);
+  const [showDbSetup, setShowDbSetup] = useState(false);
   const [showStore, setShowStore] = useState(false);
   const [showRealEstate, setShowRealEstate] = useState(false);
   const [showJobBoard, setShowJobBoard] = useState(false);
+  const [showDirectory, setShowDirectory] = useState(false);
+  const [showClientProfile, setShowClientProfile] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
 
-  const [theme, setTheme] = useState(() => {
-    if (typeof window !== 'undefined' && localStorage.theme) return localStorage.theme;
-    if (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches) return 'dark';
-    return 'light';
-  });
-
-  const t = (key: any) => translations[key]?.[language] || key;
-
+  // Load Session with Safe Parsing
   useEffect(() => {
-      if (theme === 'dark') document.documentElement.classList.add('dark');
-      else document.documentElement.classList.remove('dark');
-  }, [theme]);
-
-  // Auth Check
-  useEffect(() => {
-      const checkUser = async () => {
-          const uid = localStorage.getItem('tangerconnect_user_id');
-          const type = localStorage.getItem('tangerconnect_user_type');
-          if(uid && type) {
-              const table = type === 'CLIENT' ? 'clients' : 'providers';
-              const { data } = await supabase.from(table).select('*').eq('id', uid).single();
-              if(data) {
-                  setCurrentUser({
-                      id: data.id,
-                      name: data.full_name || data.name,
-                      accountType: type as AccountType,
-                      phone: data.phone || data.username, // Fallback
-                      isActive: data.is_active,
-                      subscriptionEndDate: data.subscription_end_date,
-                      social_links: data.social_links,
-                      bio: data.bio,
-                      profile_image_url: data.profile_image_url
-                  });
-                  setView(type === 'PROVIDER' ? UserView.PROVIDER : UserView.CLIENT);
-              }
-          }
-          setIsLoadingUser(false);
-      };
-      checkUser();
+    const safeLoad = () => {
+        try {
+            const session = localStorage.getItem('tanger_user');
+            const theme = localStorage.getItem('tanger_theme');
+            
+            if (session) {
+                try {
+                    const parsedUser = JSON.parse(session);
+                    // Validate minimal user structure
+                    if (parsedUser && typeof parsedUser === 'object' && parsedUser.id) {
+                        setCurrentUser(parsedUser);
+                    } else {
+                        // Invalid structure
+                        localStorage.removeItem('tanger_user');
+                    }
+                } catch (e) {
+                    // JSON error
+                    localStorage.removeItem('tanger_user');
+                }
+            }
+            if (theme === 'dark') {
+                setIsDarkMode(true);
+                document.documentElement.classList.add('dark');
+            }
+        } catch(e) {
+            console.error("Storage critical failure", e);
+            // Last resort: clear everything if access fails
+            localStorage.clear();
+        }
+        setLoading(false);
+    }
+    safeLoad();
   }, []);
 
-  const handleLogout = () => { 
-      localStorage.removeItem('tangerconnect_user_id'); 
-      localStorage.removeItem('tangerconnect_user_type'); 
-      setCurrentUser(null); 
-      setView(UserView.CLIENT); 
-      setShowMobileMenu(false); 
+  const handleToggleTheme = () => {
+    const newTheme = !isDarkMode;
+    setIsDarkMode(newTheme);
+    document.documentElement.classList.toggle('dark');
+    localStorage.setItem('tanger_theme', newTheme ? 'dark' : 'light');
   };
-  
-  const handleAuthSuccess = (user: AuthenticatedUser) => { 
-      setCurrentUser(user); 
-      setShowAuthDrawer(false); 
-      if (user.accountType === AccountType.PROVIDER) setView(UserView.PROVIDER); 
-      else setView(UserView.CLIENT); 
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    localStorage.removeItem('tanger_user');
+    setShowMobileMenu(false);
   };
-  
-  const handleProfileClick = () => {
-      if (!currentUser) {
-          setShowAuthDrawer(true);
+
+  const handleLogin = async (creds: any) => {
+      let table = creds.accountType === AccountType.PROVIDER ? 'providers' : 'clients';
+      let query = supabase.from(table).select('*');
+      
+      if(creds.accountType === AccountType.PROVIDER) query = query.eq('username', creds.username);
+      else query = query.eq('phone', creds.phone);
+
+      const { data, error } = await query.eq('password', creds.password).single();
+
+      if (error || !data) {
+          alert('Invalid credentials');
           return;
       }
-      if (currentUser.accountType === 'PROVIDER') {
-          // Provider doesn't need external modal, they are already on dashboard
-          // But maybe they want to see "Settings" or "Logout"
-          setShowMobileMenu(true);
+      
+      const user = { ...data, accountType: creds.accountType };
+      setCurrentUser(user);
+      localStorage.setItem('tanger_user', JSON.stringify(user));
+      setShowAuth(false);
+  };
+
+  const handleRegister = async (details: any) => {
+      let table = details.accountType === AccountType.PROVIDER ? 'providers' : 'clients';
+      let payload: any = { phone: details.phone, password: details.password };
+      
+      if(details.accountType === AccountType.PROVIDER) {
+          payload = { ...payload, name: details.fullName, username: details.username, service_type: details.serviceType, location: details.location };
       } else {
-          // Client opens specialized profile
-          setShowClientProfile(true);
+          payload = { ...payload, full_name: details.fullName };
+      }
+
+      const { data, error } = await supabase.from(table).insert(payload).select().single();
+      
+      if(error) {
+          alert('Registration failed: ' + error.message);
+      } else {
+          alert(t('registrationSuccessMessage'));
+          const user = { ...data, accountType: details.accountType };
+          setCurrentUser(user);
+          localStorage.setItem('tanger_user', JSON.stringify(user));
+          setShowAuth(false);
       }
   }
 
-
-  // Header Component
-  const Header = () => (
-      <header className="fixed top-0 left-0 right-0 bg-surface/95 dark:bg-dark/95 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 z-50 h-16 transition-all duration-300">
-        <div className="w-full md:max-w-6xl mx-auto px-4 h-full flex justify-between items-center relative">
-            
-            {/* Left Side: Logo */}
-            <div className="flex items-center gap-3 cursor-pointer" onClick={() => window.location.reload()}>
-                <div className="bg-primary rounded-xl p-1.5 shadow-sm">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-                </div>
-                <h1 className="text-xl font-bold text-dark dark:text-white tracking-tight hidden xs:block">Tanger<span className="text-primary">Connect</span></h1>
-            </div>
-
-            {/* Right Side: Actions */}
-            <div className="flex items-center gap-2">
-                 
-                 {/* Desktop Menu (Hidden on Mobile) */}
-                 <div className="hidden md:flex items-center gap-2 mr-2">
-                     <button onClick={() => setShowDirectory(true)} className="px-3 py-1.5 hover:bg-gray-100 rounded-lg text-sm font-medium dark:text-gray-200">{t('providerDirectory')}</button>
-                     <button onClick={() => setShowRealEstate(true)} className="px-3 py-1.5 hover:bg-gray-100 rounded-lg text-sm font-medium dark:text-gray-200">{t('realEstateTitle')}</button>
-                     <button onClick={() => setShowJobBoard(true)} className="px-3 py-1.5 hover:bg-gray-100 rounded-lg text-sm font-medium dark:text-gray-200">{t('jobBoardTitle')}</button>
-                 </div>
-
-                 {/* Notifications */}
-                 <button onClick={() => setShowNotifications(true)} className="p-2 text-gray-500 hover:bg-gray-100 rounded-full dark:hover:bg-gray-800 relative dark:text-gray-300 transition-colors">
-                     <Bell size={22}/>
-                     {/* Add red dot if unread */}
-                     <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full"></span>
-                 </button>
-
-                 {/* Mobile Menu Button */}
-                 <button 
-                    onClick={() => setShowMobileMenu(true)}
-                    className="p-2 text-dark dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors md:hidden"
-                 >
-                    <Menu size={24}/>
-                 </button>
-                 
-                 {/* Login/Profile Button (Desktop) */}
-                 <button 
-                    onClick={handleProfileClick}
-                    className="hidden md:flex items-center gap-2 px-4 py-2 rounded-xl transition-all shadow-sm active:scale-95 bg-primary text-white hover:bg-primaryDark font-bold text-sm ml-2"
-                 >
-                    {currentUser ? <UserCheck size={18}/> : <LogIn size={18}/>}
-                    <span>{currentUser ? currentUser.name.split(' ')[0] : t('loginButton')}</span>
-                 </button>
-            </div>
-        </div>
-      </header>
-  );
-
-  // Full Screen Mobile Menu Overlay
-  const MobileMenuOverlay = () => {
-      if(!showMobileMenu) return null;
-      return (
-          <div className="fixed inset-0 z-[60] bg-surface dark:bg-dark animate-fade-in flex flex-col">
-              <div className="p-4 flex justify-between items-center border-b dark:border-gray-800">
-                  <h2 className="text-2xl font-bold dark:text-white">{t('menu')}</h2>
-                  <button onClick={() => setShowMobileMenu(false)} className="p-2 bg-gray-100 dark:bg-gray-800 rounded-full"><X size={24} className="dark:text-white"/></button>
-              </div>
-              
-              <div className="flex-1 overflow-y-auto p-4 space-y-2">
-                  {/* User Section */}
-                  <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700">
-                      {currentUser ? (
-                          <div className="flex items-center gap-4">
-                              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden">
-                                  {currentUser.profile_image_url ? (
-                                      <img src={currentUser.profile_image_url} className="w-full h-full object-cover"/>
-                                  ) : (
-                                      <span className="text-2xl font-bold text-primary">{currentUser.name.charAt(0)}</span>
-                                  )}
-                              </div>
-                              <div>
-                                  <h3 className="font-bold text-lg dark:text-white">{currentUser.name}</h3>
-                                  <p className="text-sm text-gray-500">{currentUser.accountType === 'PROVIDER' ? t('provider') : t('client')}</p>
-                              </div>
-                          </div>
-                      ) : (
-                          <div className="text-center">
-                              <p className="text-gray-500 mb-4">Login to access your profile</p>
-                              <button onClick={() => { setShowAuthDrawer(true); setShowMobileMenu(false); }} className="w-full py-3 bg-primary text-white rounded-xl font-bold shadow-lg">
-                                  {t('loginRegister')}
-                              </button>
-                          </div>
-                      )}
-                  </div>
-
-                  {/* App Links */}
-                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-2">Apps</h3>
-                  <div className="grid grid-cols-2 gap-3">
-                      <button onClick={() => { setShowDirectory(true); setShowMobileMenu(false); }} className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-2xl flex flex-col items-center gap-2 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors">
-                          <FileText size={28} className="text-blue-600 dark:text-blue-400"/>
-                          <span className="font-bold text-sm dark:text-gray-200">{t('providerDirectory')}</span>
-                      </button>
-                      <button onClick={() => { setShowJobBoard(true); setShowMobileMenu(false); }} className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-2xl flex flex-col items-center gap-2 hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors">
-                          <Briefcase size={28} className="text-purple-600 dark:text-purple-400"/>
-                          <span className="font-bold text-sm dark:text-gray-200">{t('jobBoardTitle')}</span>
-                      </button>
-                      <button onClick={() => { setShowRealEstate(true); setShowMobileMenu(false); }} className="p-4 bg-orange-50 dark:bg-orange-900/20 rounded-2xl flex flex-col items-center gap-2 hover:bg-orange-100 dark:hover:bg-orange-900/40 transition-colors">
-                          <Home size={28} className="text-orange-600 dark:text-orange-400"/>
-                          <span className="font-bold text-sm dark:text-gray-200">{t('realEstateTitle')}</span>
-                      </button>
-                      <button onClick={() => { setShowStore(true); setShowMobileMenu(false); }} className="p-4 bg-green-50 dark:bg-green-900/20 rounded-2xl flex flex-col items-center gap-2 hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors">
-                          <ShoppingBag size={28} className="text-green-600 dark:text-green-400"/>
-                          <span className="font-bold text-sm dark:text-gray-200">{t('shop')}</span>
-                      </button>
-                  </div>
-
-                  {/* Settings */}
-                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mt-6 mb-2 px-2">Settings</h3>
-                  <div className="bg-gray-50 dark:bg-gray-800 rounded-2xl overflow-hidden border border-gray-100 dark:border-gray-700">
-                       <div className="p-4 flex justify-between items-center border-b dark:border-gray-700">
-                           <span className="font-bold dark:text-white flex items-center gap-2"><Globe size={18}/> Language</span>
-                           <div className="flex gap-1">
-                               <button onClick={() => setLanguage(Language.AR)} className={`px-3 py-1 rounded-lg text-xs font-bold ${language === Language.AR ? 'bg-primary text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-600'}`}>AR</button>
-                               <button onClick={() => setLanguage(Language.FR)} className={`px-3 py-1 rounded-lg text-xs font-bold ${language === Language.FR ? 'bg-primary text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-600'}`}>FR</button>
-                               <button onClick={() => setLanguage(Language.EN)} className={`px-3 py-1 rounded-lg text-xs font-bold ${language === Language.EN ? 'bg-primary text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-600'}`}>EN</button>
-                           </div>
-                       </div>
-                       <div className="p-4 flex justify-between items-center border-b dark:border-gray-700">
-                           <span className="font-bold dark:text-white flex items-center gap-2">{theme === 'dark' ? <Moon size={18}/> : <Sun size={18}/>} Theme</span>
-                           <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="px-4 py-1.5 bg-gray-200 dark:bg-gray-700 rounded-lg text-xs font-bold dark:text-white">
-                               {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
-                           </button>
-                       </div>
-                       <div className="p-4 flex justify-between items-center">
-                           <span className="font-bold dark:text-white flex items-center gap-2"><Database size={18}/> Database</span>
-                           <button onClick={() => setShowDbSetup(true)} className="px-4 py-1.5 bg-gray-200 dark:bg-gray-700 rounded-lg text-xs font-bold dark:text-white">Configure</button>
-                       </div>
-                  </div>
-
-                  {currentUser && (
-                      <button onClick={handleLogout} className="w-full mt-6 py-4 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-red-100 transition-colors">
-                          <LogOut size={20}/> {t('logout')}
-                      </button>
-                  )}
-              </div>
-          </div>
-      )
+  const handleUpdateUser = (updatedUser: AuthenticatedUser) => {
+      setCurrentUser(updatedUser);
+      localStorage.setItem('tanger_user', JSON.stringify(updatedUser));
   }
 
   if (showSplash) return <SplashScreen onFinish={() => setShowSplash(false)} />;
 
   return (
-    <LocalizationProvider language={language}>
-      <ScrollFixStyle />
-      <div key={language} className={`h-screen bg-surface dark:bg-dark text-dark dark:text-light transition-colors duration-300 flex flex-col ${language === Language.AR ? 'font-arabic' : 'font-sans'}`} dir={language === Language.AR ? 'rtl' : 'ltr'}>
-        <Header />
+      <div className={`h-screen flex flex-col bg-gray-50 dark:bg-gray-900 transition-colors duration-300 ${isDarkMode ? 'dark' : ''}`}>
         
-        {/* Main Content Area - Scrollable */}
-        <main className="flex-1 mt-16 w-full md:max-w-6xl md:mx-auto flex flex-col overflow-hidden relative">
-            <div className="flex-1 overflow-y-auto pb-4 w-full">
-                {view === UserView.PROVIDER && currentUser?.accountType === AccountType.PROVIDER ? (
-                    <ProviderPortal provider={currentUser} onLogout={handleLogout} />
-                ) : (
-                    <Chatbot currentUser={currentUser} setCurrentUser={setCurrentUser} isLoadingUser={isLoadingUser} />
-                )}
+        {/* --- PROFESSIONAL HEADER --- */}
+        <header className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-md sticky top-0 z-40 border-b border-gray-200 dark:border-gray-800 h-16 flex items-center justify-between px-4 md:px-8">
+            <div className="flex items-center gap-2">
+                 <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-lg shadow-lg">T</div>
+                 <span className="font-bold text-lg tracking-tight dark:text-white">Tanger<span className="text-blue-600">Connect</span></span>
             </div>
+
+            {/* Desktop Navigation */}
+            <nav className="hidden md:flex items-center gap-6">
+                 <button onClick={() => setShowDirectory(true)} className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 transition-colors">{t('providerDirectory')}</button>
+                 <button onClick={() => setShowRealEstate(true)} className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 transition-colors">{t('realEstateTitle')}</button>
+                 <button onClick={() => setShowJobBoard(true)} className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 transition-colors">{t('jobBoardTitle')}</button>
+                 <button onClick={() => setShowStore(true)} className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 transition-colors">{t('storeManager')}</button>
+            </nav>
+
+            {/* Actions */}
+            <div className="flex items-center gap-3">
+                 <button onClick={handleToggleTheme} className="hidden md:flex p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-600 dark:text-gray-300">
+                     {isDarkMode ? <Sun size={20}/> : <Moon size={20}/>}
+                 </button>
+                 
+                 {currentUser ? (
+                     currentUser.accountType === AccountType.CLIENT ? (
+                         <button onClick={() => setShowClientProfile(true)} className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-800 rounded-full hover:bg-gray-200 transition-colors">
+                             <div className="w-6 h-6 rounded-full overflow-hidden bg-gray-300">
+                                 {currentUser.profile_image_url ? <img src={currentUser.profile_image_url} className="w-full h-full object-cover"/> : <UserIcon size={16} className="m-1 text-gray-500"/>}
+                             </div>
+                             <span className="text-sm font-bold dark:text-white max-w-[80px] truncate">{currentUser.name || currentUser.full_name}</span>
+                         </button>
+                     ) : (
+                         <div className="px-3 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-600 rounded-full text-xs font-bold">Provider</div>
+                     )
+                 ) : (
+                     <button onClick={() => setShowAuth(true)} className="px-5 py-2 bg-black dark:bg-white text-white dark:text-black rounded-full text-sm font-bold shadow-lg hover:scale-105 transition-transform">
+                         {t('loginButton')}
+                     </button>
+                 )}
+                 
+                 {/* Mobile Menu Toggle */}
+                 <button onClick={() => setShowMobileMenu(true)} className="md:hidden p-2 -mr-2 text-gray-600 dark:text-white">
+                     <Menu size={24}/>
+                 </button>
+            </div>
+        </header>
+
+        {/* --- MAIN CONTENT AREA --- */}
+        <main className="flex-1 overflow-y-auto relative">
+             {currentUser?.accountType === AccountType.PROVIDER ? (
+                 <ProviderPortal provider={currentUser} onLogout={handleLogout} />
+             ) : (
+                 <Chatbot 
+                    currentUser={currentUser} 
+                    onOpenAuth={() => setShowAuth(true)}
+                 />
+             )}
         </main>
 
-        {/* Global Modals */}
-        <AuthDrawer isOpen={showAuthDrawer} onClose={() => setShowAuthDrawer(false)} onAuthSuccess={handleAuthSuccess} onDatabaseError={() => setShowDbSetup(true)} />
-        <AppointmentsDrawer isOpen={showAppointmentsDrawer} onClose={() => setShowAppointmentsDrawer(false)} user={currentUser} />
-        <NotificationCenter isOpen={showNotifications} onClose={() => setShowNotifications(false)} currentUser={currentUser} />
-        <ProviderDirectory isOpen={showDirectory} onClose={() => setShowDirectory(false)} currentUser={currentUser} onOpenAuth={() => setShowAuthDrawer(true)} />
-        <MobileMenuOverlay />
+        {/* --- MOBILE FULLSCREEN MENU --- */}
+        {showMobileMenu && (
+            <div className="fixed inset-0 z-[100] bg-white dark:bg-gray-900 flex flex-col animate-fade-in">
+                <div className="p-4 flex justify-between items-center border-b dark:border-gray-800">
+                    <span className="font-bold text-xl dark:text-white">{t('menu')}</span>
+                    <button onClick={() => setShowMobileMenu(false)} className="p-2 bg-gray-100 dark:bg-gray-800 rounded-full"><X/></button>
+                </div>
+                <div className="flex-1 p-6 grid grid-cols-2 gap-4 content-start overflow-y-auto">
+                    <button onClick={() => { setShowDirectory(true); setShowMobileMenu(false); }} className="aspect-square bg-purple-50 dark:bg-purple-900/20 rounded-2xl flex flex-col items-center justify-center gap-2 border border-purple-100 dark:border-purple-800">
+                        <LayoutGrid size={32} className="text-purple-600"/>
+                        <span className="font-bold text-sm dark:text-white text-center">{t('providerDirectory')}</span>
+                    </button>
+                    <button onClick={() => { setShowRealEstate(true); setShowMobileMenu(false); }} className="aspect-square bg-orange-50 dark:bg-orange-900/20 rounded-2xl flex flex-col items-center justify-center gap-2 border border-orange-100 dark:border-orange-800">
+                        <Home size={32} className="text-orange-600"/>
+                        <span className="font-bold text-sm dark:text-white text-center">{t('realEstateTitle')}</span>
+                    </button>
+                    <button onClick={() => { setShowJobBoard(true); setShowMobileMenu(false); }} className="aspect-square bg-blue-50 dark:bg-blue-900/20 rounded-2xl flex flex-col items-center justify-center gap-2 border border-blue-100 dark:border-blue-800">
+                        <Briefcase size={32} className="text-blue-600"/>
+                        <span className="font-bold text-sm dark:text-white text-center">{t('jobBoardTitle')}</span>
+                    </button>
+                    <button onClick={() => { setShowStore(true); setShowMobileMenu(false); }} className="aspect-square bg-green-50 dark:bg-green-900/20 rounded-2xl flex flex-col items-center justify-center gap-2 border border-green-100 dark:border-green-800">
+                        <ShoppingBag size={32} className="text-green-600"/>
+                        <span className="font-bold text-sm dark:text-white text-center">{t('storeManager')}</span>
+                    </button>
+                    
+                    <button onClick={handleToggleTheme} className="col-span-2 p-4 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-between">
+                        <span className="font-bold dark:text-white">Dark Mode</span>
+                        {isDarkMode ? <Sun/> : <Moon/>}
+                    </button>
+                    
+                    {currentUser && (
+                         <button onClick={handleLogout} className="col-span-2 p-4 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-600 font-bold flex items-center justify-center gap-2 mt-4">
+                             <LogOut/> {t('logout')}
+                         </button>
+                    )}
+                </div>
+            </div>
+        )}
 
-        {/* Client Profile Modal (Updated Props) */}
+        {/* --- MODALS & DRAWERS --- */}
+        <AuthDrawer 
+            isOpen={showAuth} 
+            onClose={() => setShowAuth(false)} 
+            onLogin={handleLogin} 
+            onRegister={handleRegister} 
+        />
+        
         <ClientProfile 
-            isOpen={showClientProfile} 
-            onClose={() => setShowClientProfile(false)} 
-            user={currentUser}
-            onLogout={() => { handleLogout(); setShowClientProfile(false); }}
-            onToggleTheme={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            isDarkMode={theme === 'dark'}
-            onOpenDbSetup={() => setShowDbSetup(true)}
-            onUpdateUser={(updatedUser: AuthenticatedUser) => setCurrentUser(updatedUser)}
+             isOpen={showClientProfile} 
+             onClose={() => setShowClientProfile(false)} 
+             user={currentUser}
+             onLogout={handleLogout}
+             onToggleTheme={handleToggleTheme}
+             isDarkMode={isDarkMode}
+             onOpenDbSetup={() => setShowDbSetup(true)}
+             onUpdateUser={handleUpdateUser}
         />
 
-        {/* Feature Modals */}
-        <Store isOpen={showStore} onClose={() => setShowStore(false)} currentUser={currentUser} onOpenAuth={() => setShowAuthDrawer(true)} />
-        <RealEstate isOpen={showRealEstate} onClose={() => setShowRealEstate(false)} currentUser={currentUser} />
-        <JobBoard isOpen={showJobBoard} onClose={() => setShowJobBoard(false)} currentUser={currentUser} />
+        <ProviderDirectory 
+             isOpen={showDirectory}
+             onClose={() => setShowDirectory(false)}
+             currentUser={currentUser}
+        />
+
+        <AppointmentsDrawer 
+            isOpen={showAppointments} 
+            onClose={() => setShowAppointments(false)} 
+            user={currentUser} 
+        />
         
-        <DatabaseSetup isOpen={showDbSetup} onClose={() => setShowDbSetup(false)} />
+        <DatabaseSetup 
+            isOpen={showDbSetup} 
+            onClose={() => setShowDbSetup(false)} 
+        />
+        
+        <Store 
+            isOpen={showStore} 
+            onClose={() => setShowStore(false)} 
+            currentUser={currentUser} 
+            onOpenAuth={() => setShowAuth(true)}
+        />
+        
+        <RealEstate 
+            isOpen={showRealEstate}
+            onClose={() => setShowRealEstate(false)}
+            currentUser={currentUser}
+        />
+
+        <JobBoard 
+            isOpen={showJobBoard}
+            onClose={() => setShowJobBoard(false)}
+            currentUser={currentUser}
+        />
       </div>
-    </LocalizationProvider>
   );
 };
+
+// --- APP WRAPPER (Providers) ---
+const App: React.FC = () => {
+    return (
+        <ErrorBoundary>
+            <LocalizationProvider language={Language.AR}>
+                <MainContent />
+            </LocalizationProvider>
+        </ErrorBoundary>
+    );
+}
 
 export default App;

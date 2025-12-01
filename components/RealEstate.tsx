@@ -48,13 +48,14 @@ export const RealEstate: React.FC<{ isOpen: boolean; onClose: () => void; curren
         else { setIsPosting(false); fetchProperties(); }
     };
 
-    // Calculate Neighborhood Counts
+    // Calculate Neighborhood Counts - SAFE CHECK
+    const safeProps = properties || [];
     const neighborhoodCounts = neighborhoods.reduce((acc, curr) => {
-        acc[curr] = properties.filter(p => p.location.includes(curr)).length;
+        acc[curr] = safeProps.filter(p => p.location.includes(curr)).length;
         return acc;
     }, {} as Record<string, number>);
 
-    const filteredProperties = properties.filter(p => {
+    const filteredProperties = safeProps.filter(p => {
         const matchesType = filter === 'all' || p.type === filter;
         const matchesLocation = locationFilter === '' || p.location.includes(locationFilter);
         const minPrice = priceRange.min ? parseFloat(priceRange.min) : 0;
@@ -122,7 +123,7 @@ export const RealEstate: React.FC<{ isOpen: boolean; onClose: () => void; curren
                                             onClick={() => setLocationFilter('')}
                                             className={`px-3 py-1 rounded-lg text-xs font-bold whitespace-nowrap border ${locationFilter === '' ? 'bg-black text-white dark:bg-white dark:text-black border-transparent' : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-600'}`}
                                          >
-                                             {t('allNeighborhoods')} ({properties.length})
+                                             {t('allNeighborhoods')} ({safeProps.length})
                                          </button>
                                          {neighborhoods.map(n => (
                                              <button 

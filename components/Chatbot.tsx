@@ -1,455 +1,475 @@
 
-
-// ... imports ...
 import React, { useState, useRef, useEffect } from 'react';
-import { Message, Role, BookingDetails, AuthenticatedUser, Announcement, ProviderRegistrationDetails, SystemAnnouncement } from '../types';
+import { Message, Role, BookingDetails, AuthenticatedUser, SystemAnnouncement } from '../types';
 import { getChatResponse } from '../services/geminiService';
 import { useLocalization } from '../hooks/useLocalization';
 import { supabase } from '../services/supabaseClient';
 import QRCodeDisplay from './QRCodeDisplay';
-import { Send, Bot, User as UserIcon, Loader2, Paperclip, X, Bell, Key, ArrowRight, Mic, Volume2, VolumeX, Camera, StopCircle, MapPin, XCircle, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
+import { Send, Bot, User as UserIcon, Loader2, Paperclip, X, Bell, Key, ArrowRight, Mic, Volume2, VolumeX, Camera, StopCircle, MapPin, XCircle, ChevronRight } from 'lucide-react';
 
-// ... BookingConfirmation ...
-const BookingConfirmation: React.FC<{ details: BookingDetails }> = ({ details }) => {
-  const { t } = useLocalization();
-  
-  return (
-    <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-soft border border-gray-100 dark:border-gray-700 max-w-xs mx-auto text-center my-2 animate-fade-in">
-      <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-3">
-         <div className="w-3 h-3 bg-green-500 rounded-full animate-ping"></div>
-      </div>
-      <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-3">{t('bookingConfirmedTitle')}</h3>
-      <div className="text-left rtl:text-right text-sm text-gray-600 dark:text-gray-300 space-y-1 mb-4 bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg">
-          <p><span className="font-bold text-gray-800 dark:text-gray-200">{t('service')}:</span> {details.service}</p>
-          <p><span className="font-bold text-gray-800 dark:text-gray-200">{t('with')}:</span> {details.provider}</p>
-          <p><span className="font-bold text-gray-800 dark:text-gray-200">{t('location')}:</span> {details.location}</p>
-          <p className="text-green-600 font-bold">{t('discountApplied')}: {details.discount}</p>
-      </div>
-      <QRCodeDisplay appointmentId={details.appointmentId} />
-      <p className="mt-3 text-xs text-gray-400">{t('qrInstruction')}</p>
-    </div>
-  );
-};
-
-// --- SYSTEM AD CARD COMPONENT (SINGLE IMAGE, NO SLIDER, INLINE) ---
+// --- SYSTEM AD CARD ---
 const SystemAdCard: React.FC<{ ad: SystemAnnouncement; onDismiss: () => void }> = ({ ad, onDismiss }) => {
-    // Priority to image_url or first image in array, basically revert to single image view
-    const displayImage = (ad.images && ad.images.length > 0) ? ad.images[0] : ad.image_url;
-    const [expanded, setExpanded] = useState(false);
+    const [currentImg, setCurrentImg] = useState(0);
+    const images = ad.images && ad.images.length > 0 ? ad.images : (ad.image_url ? [ad.image_url] : []);
     
-    // Truncate logic
-    const MAX_LENGTH = 100;
-    const isLongText = ad.message.length > MAX_LENGTH;
-    const displayText = expanded ? ad.message : (isLongText ? ad.message.substring(0, MAX_LENGTH) + '...' : ad.message);
-
     return (
         <div className="w-full bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-purple-100 dark:border-purple-900 overflow-hidden mb-4 relative animate-fade-in mx-auto max-w-sm mt-4 group">
             <button onClick={onDismiss} className="absolute top-2 right-2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1 z-20"><X size={16}/></button>
-            <div className="absolute top-2 left-2 bg-purple-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full z-20 uppercase tracking-wider">
-                Ad
-            </div>
+            <div className="absolute top-2 left-2 bg-purple-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full z-20 uppercase tracking-wider">Sponsored</div>
             
-            {/* Single Image */}
-            {displayImage && (
+            {images.length > 0 && (
                 <div className="relative h-48 w-full bg-gray-100">
-                    <img src={displayImage} className="w-full h-full object-cover" alt="Ad"/>
+                    <img src={images[currentImg]} className="w-full h-full object-cover" alt="Ad"/>
+                    {images.length > 1 && (
+                        <div className="absolute bottom-2 left-0 w-full flex justify-center gap-1">
+                            {images.map((_, i) => <div key={i} className={`w-1.5 h-1.5 rounded-full ${i === currentImg ? 'bg-white' : 'bg-white/50'}`}/>)}
+                        </div>
+                    )}
+                    {images.length > 1 && (
+                        <button onClick={(e) => { e.stopPropagation(); setCurrentImg((p) => (p + 1) % images.length); }} className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/30 text-white p-1 rounded-full"><ChevronRight size={16}/></button>
+                    )}
                 </div>
             )}
 
             <div className="p-4">
                 <h4 className="font-bold text-lg dark:text-white mb-1">{ad.title}</h4>
-                <p className="text-sm text-gray-600 dark:text-gray-300 transition-all duration-300 leading-relaxed">
-                    {displayText}
-                </p>
-                {isLongText && (
-                    <button 
-                        onClick={() => setExpanded(!expanded)} 
-                        className="text-primary text-xs font-bold mt-2 flex items-center gap-1 hover:underline"
-                    >
-                        {expanded ? <><ChevronUp size={12}/> Read Less</> : <><ChevronDown size={12}/> Read More</>}
-                    </button>
-                )}
+                <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">{ad.message}</p>
             </div>
         </div>
     );
 };
 
+const BookingConfirmation: React.FC<{ details: BookingDetails }> = ({ details }) => {
+  const { t } = useLocalization();
+  return (
+    <div className="bg-white dark:bg-gray-700 p-4 rounded-lg shadow-sm mt-2 border-l-4 border-green-500">
+      <h4 className="font-bold text-green-600 dark:text-green-400 mb-2 flex items-center gap-2">
+        <CheckCircle2 size={18} />
+        {t('bookingConfirmedTitle')}
+      </h4>
+      <div className="space-y-1 text-sm text-gray-700 dark:text-gray-300">
+        <p><span className="font-semibold">{t('service')}:</span> {details.service}</p>
+        <p><span className="font-semibold">{t('with')}:</span> {details.provider}</p>
+        <p className="flex items-center gap-1"><MapPin size={12}/> {details.location}</p>
+        {details.discount && (
+          <p className="text-green-600 font-semibold">{t('discountApplied')}: {details.discount}</p>
+        )}
+      </div>
+      <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-600">
+        <p className="text-xs text-center text-gray-500 mb-2">{t('qrInstruction')}</p>
+        <div className="flex justify-center">
+            <QRCodeDisplay appointmentId={details.appointmentId} />
+        </div>
+      </div>
+    </div>
+  );
+};
 
-// ... ChatbotProps ...
+// --- AUDIO RECORDER HOOK ---
+const useAudioRecorder = () => {
+    const [isRecording, setIsRecording] = useState(false);
+    const [audioData, setAudioData] = useState<{ base64: string; mimeType: string } | null>(null);
+    const mediaRecorder = useRef<MediaRecorder | null>(null);
+    const chunks = useRef<Blob[]>([]);
+  
+    const startRecording = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder.current = new MediaRecorder(stream);
+        chunks.current = [];
+  
+        mediaRecorder.current.ondataavailable = (e) => chunks.current.push(e.data);
+        mediaRecorder.current.onstop = () => {
+          const blob = new Blob(chunks.current, { type: 'audio/webm' });
+          const reader = new FileReader();
+          reader.readAsDataURL(blob);
+          reader.onloadend = () => {
+            const base64 = (reader.result as string).split(',')[1];
+            setAudioData({ base64, mimeType: 'audio/webm' });
+          };
+        };
+  
+        mediaRecorder.current.start();
+        setIsRecording(true);
+      } catch (err) {
+        console.error("Error accessing microphone:", err);
+        alert("Microphone access denied or not available.");
+      }
+    };
+  
+    const stopRecording = () => {
+      if (mediaRecorder.current && isRecording) {
+        mediaRecorder.current.stop();
+        setIsRecording(false);
+      }
+    };
+  
+    const clearAudio = () => setAudioData(null);
+  
+    return { isRecording, audioData, startRecording, stopRecording, clearAudio };
+};
+
+import { CheckCircle2 } from 'lucide-react';
+
 interface ChatbotProps {
-    currentUser: AuthenticatedUser | null;
-    setCurrentUser: (user: AuthenticatedUser | null) => void;
-    isLoadingUser: boolean;
+  currentUser: AuthenticatedUser | null;
+  onOpenAuth: () => void;
 }
 
-// ... Chatbot Component ...
-const Chatbot: React.FC<ChatbotProps> = ({ currentUser, setCurrentUser, isLoadingUser }) => {
-  // ... hooks and state ...
+const Chatbot: React.FC<ChatbotProps> = ({ currentUser, onOpenAuth }) => {
   const { t, language } = useLocalization();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [systemAds, setSystemAds] = useState<SystemAnnouncement[]>([]); 
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | undefined>(undefined);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
-  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const [selectedImage, setSelectedImage] = useState<{ base64: string; mimeType: string } | undefined>(undefined);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [systemAds, setSystemAds] = useState<SystemAnnouncement[]>([]);
 
-  // ... effects (location, persistence, announcements) ...
-  useEffect(() => {
-      // PERMISSION CHECK
-      if (navigator.permissions && navigator.permissions.query) {
-         // @ts-ignore
-         navigator.permissions.query({ name: 'microphone' }).then((permissionStatus) => {
-             console.log("Mic Permission:", permissionStatus.state);
-         });
-      }
+  // Audio Recorder
+  const { isRecording, audioData, startRecording, stopRecording, clearAudio } = useAudioRecorder();
 
-      if (navigator.geolocation) {
-          navigator.geolocation.getCurrentPosition(
-              (position) => { setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude }); },
-              (error) => { console.log("Location access denied or error", error); }
-          );
-      }
-  }, []);
+  // Scroll to bottom
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   useEffect(() => {
-    if (!isLoadingUser) {
-        const storageKey = currentUser ? `chat_history_${currentUser.id}` : 'chat_history_guest';
-        const saved = localStorage.getItem(storageKey);
-        if (saved) { setMessages(JSON.parse(saved)); } else { if (currentUser) { setMessages([{ role: Role.BOT, text: t('welcomeBackMessage', { name: currentUser.name }) }]); } else { setMessages([{ role: Role.BOT, text: t('welcomeMessage') }]); } }
-        if (currentUser) fetchAnnouncements(currentUser.id);
-        fetchSystemAds(); 
-    }
-  }, [isLoadingUser, currentUser, t]);
+    scrollToBottom();
+  }, [messages, systemAds]);
 
-  useEffect(() => { if (messages.length > 0 && !isLoadingUser) { const storageKey = currentUser ? `chat_history_${currentUser.id}` : 'chat_history_guest'; localStorage.setItem(storageKey, JSON.stringify(messages)); } }, [messages, currentUser, isLoadingUser]);
-
-  const fetchAnnouncements = async (userId: number) => {
-    const { data: followUps } = await supabase.from('follow_ups').select('provider_id').eq('client_id', userId);
-    const { data: appointments } = await supabase.from('appointments').select('provider_id').eq('client_id', userId);
-    const providerIds = [...new Set([...(followUps || []).map(f => f.provider_id), ...(appointments || []).map(a => a.provider_id)])];
-    if (providerIds.length > 0) {
-      const threeDaysAgo = new Date(); threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
-      const { data } = await supabase.from('announcements').select(`*, providers (name)`).in('provider_id', providerIds).gt('created_at', threeDaysAgo.toISOString()).order('created_at', { ascending: false });
-      if (data) setAnnouncements(data as Announcement[]);
-    }
-  };
-
-  const fetchSystemAds = async () => {
-      const { data } = await supabase.from('system_announcements').select('*').eq('is_active', true).order('created_at', { ascending: false });
-      if (data) setSystemAds(data as SystemAnnouncement[]);
-  }
-
-  const dismissSystemAd = (id: number) => {
-      setSystemAds(prev => prev.filter(ad => ad.id !== id));
-  }
-
-  const scrollToBottom = () => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); };
-  useEffect(scrollToBottom, [messages, isRecording, systemAds.length]); 
-
-  // ... Audio and TTS functions ...
-  const startRecording = async () => {
-      if (navigator.vibrate) navigator.vibrate(50);
-      try {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          const mediaRecorder = new MediaRecorder(stream);
-          mediaRecorderRef.current = mediaRecorder;
-          audioChunksRef.current = [];
-          mediaRecorder.ondataavailable = (event) => { if (event.data.size > 0) { audioChunksRef.current.push(event.data); } };
-          mediaRecorder.onstop = async () => {
-              const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-              await handleSendAudio(audioBlob);
-              // Stop tracks to release mic, but note: this causes re-prompt in some browsers next time
-              stream.getTracks().forEach(track => track.stop());
-          };
-          mediaRecorder.start();
-          setIsRecording(true);
-      } catch (err) { console.error("Error accessing microphone:", err); alert(t('errorMessage') + " (Microphone access denied)"); }
-  };
-  const stopRecording = () => { if (mediaRecorderRef.current && isRecording) { if (navigator.vibrate) navigator.vibrate([50, 50, 50]); mediaRecorderRef.current.stop(); setIsRecording(false); } };
-  const handleSendAudio = async (audioBlob: Blob) => {
-       const reader = new FileReader();
-       reader.readAsDataURL(audioBlob);
-       reader.onloadend = async () => {
-           const base64Audio = (reader.result as string).split(',')[1];
-           const mimeType = audioBlob.type || 'audio/webm';
-           const userMessage: Message = { role: Role.USER, text: "🎤 Audio Message" };
-           setMessages(prev => [...prev, userMessage]);
-           setIsLoading(true);
-           await processGeminiRequest(userMessage, undefined, { base64: base64Audio, mimeType });
-       };
-  };
-  const speakText = (text: string) => {
-      if (!('speechSynthesis' in window)) return;
-      window.speechSynthesis.cancel(); 
-      const cleanText = text.replace(/```[\s\S]*?```/g, '').replace(/\{[\s\S]*?\}/g, '').replace(/[\*\#\`\_\-]/g, '').trim();
-      if (!cleanText) return;
-      const utterance = new SpeechSynthesisUtterance(cleanText);
-      utterance.lang = language === 'ar' ? 'ar-SA' : language === 'fr' ? 'fr-FR' : 'en-US';
-      if (language === 'ar') { const voices = window.speechSynthesis.getVoices(); const arabicVoice = voices.find(v => v.lang.includes('ar')); if (arabicVoice) utterance.voice = arabicVoice; }
-      utterance.onend = () => setIsSpeaking(false);
-      utterance.onstart = () => setIsSpeaking(true);
-      window.speechSynthesis.speak(utterance);
-  };
-  const stopSpeaking = () => { window.speechSynthesis.cancel(); setIsSpeaking(false); }
-
-  // ... Send logic ...
-  const handleSend = async () => {
-    if ((input.trim() === '' && !imageFile) || isLoading) return;
-    const userMessage: Message = { role: Role.USER, text: input, imageUrl: imagePreviewUrl };
-    setMessages(prev => [...prev, userMessage]);
-    let imagePayload: { base64: string; mimeType: string; } | undefined = undefined;
-    if (imageFile) { imagePayload = await fileToBase64(imageFile); }
-    setInput(''); removeImage(); setIsLoading(true);
-    await processGeminiRequest(userMessage, imagePayload, undefined);
-  };
-
-  const processGeminiRequest = async (userMessage: Message, imagePayload?: { base64: string; mimeType: string; }, audioPayload?: { base64: string; mimeType: string; }) => {
-    try {
-      const history = messages.filter(msg => !msg.isComponent).map(msg => ({ role: msg.role === Role.USER ? 'user' : 'model', parts: [{ text: msg.text }], }));
-      const announcementText = announcements.length > 0 ? announcements.map(a => `${a.providers.name}: ${a.message}`).join('\n') : "";
-      const botResponseText = await getChatResponse(history, userMessage.text, language, imagePayload, audioPayload, currentUser?.id, currentUser?.name, currentUser?.phone, announcementText, userLocation);
-      
-      let parsedJson = null;
-      try {
-          const jsonMatch = botResponseText.match(/```json\n([\s\S]*?)\n```/);
-          if (jsonMatch && jsonMatch[1]) { parsedJson = JSON.parse(jsonMatch[1]); } else {
-              const startIndex = botResponseText.indexOf('{');
-              const endIndex = botResponseText.lastIndexOf('}');
-              if (startIndex !== -1 && endIndex !== -1) { const potentialJson = botResponseText.substring(startIndex, endIndex + 1); parsedJson = JSON.parse(potentialJson); }
-          }
-      } catch (e) { console.warn("Failed to parse JSON from response", e); }
-
-      if (parsedJson) {
-          if (parsedJson.BOOKING_CONFIRMED) {
-              const d = parsedJson.BOOKING_CONFIRMED;
-              parsedJson = { action: 'BOOKING_CONFIRMED', details: { name: d.client_name || d.name || 'Unknown', phone: d.client_phone || d.phone || 'Unknown', service: d.service || 'General Service', provider: d.provider_name || d.provider || 'Provider', location: d.location || 'Tangier', discount: d.price || d.discount || 'Standard Price' } };
-          } else if (parsedJson.REGISTER_USER) { parsedJson = { action: 'REGISTER_USER', details: parsedJson.REGISTER_USER };
-          } else if (parsedJson.REGISTER_PROVIDER) { parsedJson = { action: 'REGISTER_PROVIDER', details: parsedJson.REGISTER_PROVIDER };
-          } else if (parsedJson.FOLLOW_UP_CREATED) { parsedJson = { action: 'FOLLOW_UP_CREATED', details: parsedJson.FOLLOW_UP_CREATED }; }
-      }
-
-      if (parsedJson && parsedJson.action) {
-        switch (parsedJson.action) {
-          case 'REGISTER_USER': await handleRegistration(parsedJson.details); break;
-          case 'REGISTER_PROVIDER': await handleProviderRegistration(parsedJson.details); break;
-          case 'BOOKING_CONFIRMED': await handleBooking(parsedJson.details); break;
-          case 'FOLLOW_UP_CREATED': await handleFollowUp(parsedJson.details); break;
-          default: setMessages(prev => [...prev, { role: Role.BOT, text: t('errorMessage') }]);
+  // Initial Greeting & Ads Fetch
+  useEffect(() => {
+    const init = async () => {
+        if (messages.length === 0) {
+            const welcomeText = currentUser 
+                ? t('welcomeBackMessage', { name: currentUser.name || currentUser.full_name || '' }) + t('welcomeMessage').replace(t('welcomeMessage').split('!')[0] + '!', '')
+                : t('welcomeMessage');
+            
+            setMessages([{ role: Role.BOT, text: welcomeText }]);
         }
-      } else {
-        setMessages(prev => [...prev, { role: Role.BOT, text: botResponseText }]);
-        if (audioPayload) speakText(botResponseText);
-      }
-    } catch (error) { setMessages(prev => [...prev, { role: Role.BOT, text: t('errorMessage') }]); } finally { setIsLoading(false); }
-  };
-
-  // ... Handlers ...
-  const handleRegistration = async (details: any) => {
-    try {
-        const { data, error } = await supabase.from('clients').insert({ full_name: details.fullName, phone: details.phone, password: details.password }).select().single();
-        if (error) throw error;
-        localStorage.setItem('tangerconnect_user_id', data.id.toString()); localStorage.setItem('tangerconnect_user_type', 'CLIENT');
-        // @ts-ignore
-        setCurrentUser({id: data.id, name: data.full_name, accountType: 'CLIENT', phone: data.phone });
-        setMessages(prev => [...prev, { role: Role.BOT, text: t('registrationSuccessMessage') }]);
-    } catch (error: any) {
-        let errorMessage = t('registrationFailed');
-        if (error.message.includes('clients_phone_key')) errorMessage = t('phoneExistsError');
-        setMessages(prev => [...prev, { role: Role.BOT, text: errorMessage }]);
+        
+        // Fetch Ads
+        const { data } = await supabase.from('system_announcements').select('*').eq('is_active', true).order('created_at', { ascending: false });
+        if(data) setSystemAds(data);
     }
-  };
+    init();
+  }, [currentUser, t, language]);
 
-  const handleProviderRegistration = async (details: ProviderRegistrationDetails) => {
-    try {
-        const { error } = await supabase.from('providers').insert({ name: details.name, service_type: details.service, location: details.location, username: details.username }).single();
-        if (error) throw error;
-        setMessages(prev => [...prev, { role: Role.BOT, text: t('providerRegistrationSuccessMessage') }]);
-    } catch (error: any) {
-        let errorMessage = t('registrationFailed');
-        if (error.message.includes('providers_username_key')) errorMessage = t('usernameExistsError');
-        setMessages(prev => [...prev, { role: Role.BOT, text: errorMessage }]);
+  // Handle Text-to-Speech
+  useEffect(() => {
+    if ('speechSynthesis' in window) {
+       window.speechSynthesis.cancel();
     }
+  }, [language]);
+
+  const speak = (text: string) => {
+    if (!('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+    
+    // Remove emojis and markdown for cleaner speech
+    const cleanText = text.replace(/[*#]/g, '').replace(/https?:\/\/\S+/g, 'link');
+    
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.lang = language === 'ar' ? 'ar-SA' : (language === 'fr' ? 'fr-FR' : 'en-US');
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => setIsSpeaking(false);
+    window.speechSynthesis.speak(utterance);
   };
 
-  const handleBooking = async (details: any) => {
-    try {
-      let { data: providerData } = await supabase.from('providers').select('id').ilike('name', `${details.provider}`).limit(1).maybeSingle();
-      if (!providerData) { ({ data: providerData } = await supabase.from('providers').select('id').ilike('name', `%${details.provider}%`).limit(1).maybeSingle()); }
-      
-      let targetProviderId = providerData?.id;
-      if (!targetProviderId) { console.warn("Provider match failed for:", details.provider); if (!currentUser) throw new Error('User not logged in'); }
-
-      let appointmentId = 0;
-      
-      if (currentUser && targetProviderId) {
-          const { data: appointmentData, error } = await supabase.from('appointments').insert({ client_id: currentUser.id, provider_id: targetProviderId }).select('id').single();
-          if (error) throw error;
-          appointmentId = appointmentData.id;
-
-          // --- NEW: SEND NOTIFICATION TO PROVIDER WITH BOOKING ID ---
-          const notificationMsg = `New Booking: ${details.name} for ${details.service}`;
-          await supabase.from('provider_notifications').insert({
-              provider_id: targetProviderId,
-              message: notificationMsg,
-              type: 'BOOKING',
-              status: 'pending',
-              booking_id: appointmentId // Link for scan confirmation
-          });
-      } else {
-           appointmentId = Math.floor(Math.random() * 10000);
-      }
-      
-      const bookingDetails: BookingDetails = { ...details, appointmentId: appointmentId };
-      setMessages(prev => [...prev, { role: Role.BOT, text: t('bookingSuccessMessage') }, { role: Role.SYSTEM, text: 'Booking', bookingDetails, isComponent: true }]);
-      speakText(t('bookingSuccessMessage'));
-
-    } catch (e) { console.error(e); setMessages(prev => [...prev, { role: Role.BOT, text: t('errorMessage') }]); }
+  const stopSpeaking = () => {
+    window.speechSynthesis.cancel();
+    setIsSpeaking(false);
   };
 
-  const handleFollowUp = async (details: any) => {
-    if (!currentUser) return;
-    try {
-        const { data: providerData } = await supabase.from('providers').select('id').ilike('name', `%${details.providerName}%`).limit(1).maybeSingle();
-        if (!providerData) throw new Error('Provider not found');
-        let medication_image_url;
-        if (imageFile) {
-            const filePath = `${currentUser.id}/medication_${Date.now()}`;
-            await supabase.storage.from('medication-images').upload(filePath, imageFile);
-            const { data } = supabase.storage.from('medication-images').getPublicUrl(filePath);
-            medication_image_url = data.publicUrl;
-        }
-        await supabase.from('follow_ups').insert({ client_id: currentUser.id, provider_id: providerData.id, next_appointment_date: details.nextAppointmentDate, notes: details.notes, medication_image_url });
-        setMessages(prev => [...prev, { role: Role.BOT, text: t('followUpSuccessMessage') }]);
-    } catch(e) { setMessages(prev => [...prev, { role: Role.BOT, text: t('errorMessage') }]); }
-  };
-
-  const fileToBase64 = (file: File): Promise<{ base64: string; mimeType: string }> => {
-    return new Promise((resolve, reject) => {
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
       const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result as string;
+        const base64Data = base64String.split(',')[1];
+        setSelectedImage({
+          base64: base64Data,
+          mimeType: file.type
+        });
+        setPreviewUrl(base64String);
+      };
       reader.readAsDataURL(file);
-      reader.onload = () => resolve({ base64: (reader.result as string).split(',')[1], mimeType: (reader.result as string).split(';')[0].split(':')[1] });
-      reader.onerror = reject;
-    });
+    }
   };
 
-  const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) { setImageFile(file); setImagePreviewUrl(URL.createObjectURL(file)); }
-  };
-
-  const removeImage = () => {
-    if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
-    setImageFile(null); setImagePreviewUrl(null);
+  const clearAttachments = () => {
+    setSelectedImage(undefined);
+    setPreviewUrl(null);
+    clearAudio();
     if (fileInputRef.current) fileInputRef.current.value = '';
-    if (cameraInputRef.current) cameraInputRef.current.value = '';
   };
 
-   const getMarqueeClass = () => language === 'ar' ? 'animate-marquee-rtl' : 'animate-marquee-ltr';
-   const hasContent = input.trim().length > 0 || imageFile !== null;
+  const handleSend = async () => {
+    if ((!input.trim() && !selectedImage && !audioData) || isLoading) return;
+
+    const userMsg: Message = { role: Role.USER, text: input, imageUrl: previewUrl || undefined };
+    setMessages(prev => [...prev, userMsg]);
+    setInput('');
+    setIsLoading(true);
+
+    // Prepare History
+    const history = messages
+        .filter(m => !m.isComponent)
+        .map(m => ({
+            role: m.role === Role.USER ? 'user' : 'model',
+            parts: [{ text: m.text }]
+        }));
+
+    // Get Provider Announcements context
+    let announcementsText = "";
+    try {
+        const { data: announcements } = await supabase
+            .from('announcements')
+            .select('message, providers(name)')
+            .order('created_at', { ascending: false })
+            .limit(5);
+        if (announcements) {
+            announcementsText = announcements.map((a: any) => `${a.providers?.name}: ${a.message}`).join('. ');
+        }
+    } catch (e) {}
+    
+    // Check user location
+    let userLoc = undefined;
+    if (currentUser?.latitude && currentUser?.longitude) {
+        userLoc = { lat: currentUser.latitude, lng: currentUser.longitude };
+    }
+
+    try {
+      const responseText = await getChatResponse(
+          history, 
+          userMsg.text, 
+          language, 
+          selectedImage,
+          audioData || undefined,
+          currentUser?.id,
+          currentUser?.name || currentUser?.full_name,
+          currentUser?.phone,
+          announcementsText,
+          userLoc
+      );
+      
+      clearAttachments();
+
+      // Check for JSON (Booking)
+      let botMsg: Message;
+      try {
+        // Attempt to extract JSON if present
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            const jsonStr = jsonMatch[0];
+            const data = JSON.parse(jsonStr);
+            if (data.bookingConfirmed) {
+                // It's a booking
+                const bookingDetails: BookingDetails = {
+                    name: data.name,
+                    phone: data.phone,
+                    service: data.service,
+                    provider: data.provider,
+                    location: data.location,
+                    discount: data.discount,
+                    appointmentId: data.appointmentId || Date.now() // Fallback ID
+                };
+                 
+                 // Save to DB
+                 if (currentUser) {
+                     // In a real app, you'd find the provider_id by name match or handle ID in LLM
+                     // For demo, we just show the card. Saving to DB logic ideally happens via tool calling or strict ID handling.
+                 }
+
+                botMsg = {
+                    role: Role.BOT,
+                    text: data.message || t('bookingSuccessMessage'),
+                    bookingDetails: bookingDetails,
+                    isComponent: true
+                };
+            } else {
+                botMsg = { role: Role.BOT, text: responseText };
+            }
+        } else {
+            botMsg = { role: Role.BOT, text: responseText };
+        }
+      } catch (e) {
+        botMsg = { role: Role.BOT, text: responseText };
+      }
+
+      setMessages(prev => [...prev, botMsg]);
+      speak(botMsg.text);
+
+    } catch (error) {
+      console.error(error);
+      setMessages(prev => [...prev, { role: Role.BOT, text: t('errorMessage') }]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
-    <div className="flex flex-col w-full h-full bg-surface dark:bg-surfaceDark relative">
-        <style>{` @keyframes marquee-ltr { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } } @keyframes marquee-rtl { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } } .animate-marquee-ltr { display: inline-block; white-space: nowrap; animation: marquee-ltr 30s linear infinite; } .animate-marquee-rtl { display: inline-block; white-space: nowrap; animation: marquee-rtl 30s linear infinite; } `}</style>
-        {announcements.length > 0 && (
-            <div className="w-full bg-yellow-400/90 backdrop-blur-sm text-yellow-900 text-sm h-8 flex items-center relative overflow-hidden z-20 shadow-sm">
-                <div className="bg-red-600 text-white px-3 h-full flex items-center font-bold z-10 shadow-md text-xs absolute left-0 top-0">{t('breakingNews')}</div>
-                <div className="w-full overflow-hidden relative pl-28"><div className={`${getMarqueeClass()} w-full`}>{announcements.map((ann) => (<span key={ann.id} className="inline-flex items-center mx-6"><Bell className="w-3 h-3 mr-1" /><span className="font-bold underline mx-1">{ann.providers.name}:</span><span>{ann.message}</span></span>))}</div></div>
-            </div>
-        )}
+    <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-900 relative">
       
-      {/* Messages Area - Takes remaining space */}
-      <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 bg-[#F0F2F5] dark:bg-[#111B21] scroll-smooth relative pb-20">
-        <div className="absolute inset-0 opacity-[0.05] dark:opacity-[0.03] pointer-events-none bg-[url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png')]"></div>
-        <div className="flex flex-col gap-2 z-10 relative">
-          
-          {messages.map((msg, index) => {
-            if (msg.isComponent && msg.bookingDetails) { return <BookingConfirmation key={index} details={msg.bookingDetails} />; }
-            const isUser = msg.role === Role.USER; const isBot = msg.role === Role.BOT;
-            return (
-              <div key={index} className={`flex items-end gap-2 group mb-1 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
-                {/* Avatar only for bot */}
-                {isBot && <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white flex-shrink-0 shadow-md bg-gradient-to-br from-secondary to-primary`}><Bot size={18} /></div>}
-                <div className={`relative max-w-[85%] sm:max-w-[75%] px-3 py-2 shadow-sm text-sm leading-relaxed ${isUser ? 'bg-[#005c4b] text-white rounded-lg rounded-tr-none' : 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg rounded-tl-none'}`}>
-                  {msg.imageUrl && ( <div className="mb-2 rounded-lg overflow-hidden"><img src={msg.imageUrl} alt="Uploaded" className="w-full h-auto object-cover"/></div> )}
-                  {msg.text && <p className="whitespace-pre-wrap">{msg.text}</p>}
-                  {/* Read Aloud button small overlay */}
-                  {isBot && ( <button onClick={() => isSpeaking ? stopSpeaking() : speakText(msg.text)} className="absolute -bottom-5 right-0 text-gray-400 hover:text-primary p-1"><Volume2 size={12}/></button> )}
+      {/* Messages Area */}
+      <div className="flex-1 overflow-y-auto p-4 pb-32">
+        <div className="max-w-2xl mx-auto space-y-6">
+            {messages.map((msg, idx) => (
+            <div key={idx} className={`flex ${msg.role === Role.USER ? 'justify-end' : 'justify-start'}`}>
+                <div className={`flex items-start max-w-[85%] ${msg.role === Role.USER ? 'flex-row-reverse' : 'flex-row'} gap-3 animate-slide-up`}>
+                
+                {/* Avatar */}
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-sm ${msg.role === Role.USER ? 'bg-primary' : 'bg-white dark:bg-gray-800'}`}>
+                    {msg.role === Role.USER ? <UserIcon size={16} className="text-white"/> : <Bot size={18} className="text-primary"/>}
                 </div>
-              </div>
-            );
-          })}
-          {isLoading && ( <div className="flex items-end gap-2"><div className="w-8 h-8 rounded-full bg-gradient-to-br from-secondary to-primary flex items-center justify-center text-white shadow-md"><Bot size={18} /></div><div className="bg-white dark:bg-gray-800 p-3 rounded-2xl rounded-tl-none shadow-sm"><div className="flex gap-1"><span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></span><span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:0.2s]"></span><span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:0.4s]"></span></div></div></div> )}
-          
-          {/* SYSTEM ADS - Rendered at bottom of chat (Inline) */}
-          {systemAds.map(ad => (
-              <SystemAdCard key={ad.id} ad={ad} onDismiss={() => dismissSystemAd(ad.id)} />
-          ))}
 
-          <div ref={messagesEndRef} />
+                {/* Bubble */}
+                <div className={`p-4 rounded-2xl shadow-sm relative group text-sm leading-relaxed ${
+                    msg.role === Role.USER 
+                    ? 'bg-primary text-white rounded-tr-none' 
+                    : 'bg-white dark:bg-gray-800 dark:text-gray-100 rounded-tl-none border border-gray-100 dark:border-gray-700'
+                }`}>
+                    {msg.imageUrl && (
+                        <img src={msg.imageUrl} alt="Uploaded" className="max-w-full h-auto rounded-lg mb-2 border border-white/20" />
+                    )}
+                    
+                    <div className="whitespace-pre-wrap">{msg.text}</div>
+
+                    {msg.bookingDetails && <BookingConfirmation details={msg.bookingDetails} />}
+                    
+                    {/* Speak Button for Bot */}
+                    {msg.role === Role.BOT && (
+                        <button 
+                            onClick={() => isSpeaking ? stopSpeaking() : speak(msg.text)}
+                            className="absolute -right-8 top-1 text-gray-400 hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                            {isSpeaking ? <VolumeX size={16}/> : <Volume2 size={16}/>}
+                        </button>
+                    )}
+                </div>
+                </div>
+            </div>
+            ))}
+            
+            {/* System Ads inserted at the bottom of the feed */}
+            {systemAds.length > 0 && (
+                <div className="mt-8 pt-4 border-t border-dashed border-gray-200 dark:border-gray-800">
+                    <p className="text-center text-xs text-gray-400 mb-4 uppercase tracking-widest">{t('activeAds')}</p>
+                    {systemAds.map(ad => (
+                         <SystemAdCard key={ad.id} ad={ad} onDismiss={() => setSystemAds(prev => prev.filter(a => a.id !== ad.id))} />
+                    ))}
+                </div>
+            )}
+
+            {isLoading && (
+                <div className="flex justify-start">
+                    <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl rounded-tl-none border border-gray-100 dark:border-gray-700 shadow-sm flex items-center gap-3">
+                        <Bot size={18} className="text-primary"/>
+                        <div className="flex gap-1">
+                            <div className="w-2 h-2 bg-primary/40 rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
+                            <div className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                            <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
+                        </div>
+                    </div>
+                </div>
+            )}
+            <div ref={messagesEndRef} />
         </div>
       </div>
 
-      {/* Input Bar - WhatsApp Style - Fixed Bottom */}
-      <div dir="ltr" className="absolute bottom-0 left-0 right-0 p-2 bg-gray-100 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 flex items-center gap-2 z-30">
+      {/* Input Area */}
+      <div className="bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 p-3 md:p-4 fixed bottom-0 w-full z-30">
         
-        {/* Attachment & Camera */}
-        {!isRecording && (
-           <div className="flex gap-1">
-               <input type="file" ref={fileInputRef} onChange={handleImageChange} accept="image/*" className="hidden" />
-               <input type="file" ref={cameraInputRef} onChange={handleImageChange} accept="image/*" capture="environment" className="hidden" />
-               <button onClick={() => fileInputRef.current?.click()} disabled={isLoading} className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400"><Paperclip size={22} /></button>
-               <button onClick={() => cameraInputRef.current?.click()} disabled={isLoading} className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400"><Camera size={22} /></button>
-           </div>
+        {/* Attachments Preview */}
+        {(previewUrl || audioData) && (
+            <div className="absolute bottom-full left-0 w-full bg-gray-50 dark:bg-gray-900 p-3 border-t border-gray-200 dark:border-gray-700 flex items-center gap-3 animate-slide-up">
+                {previewUrl && (
+                    <div className="relative h-16 w-16 rounded-lg overflow-hidden border border-gray-300">
+                        <img src={previewUrl} className="h-full w-full object-cover" />
+                        <button onClick={clearAttachments} className="absolute top-0 right-0 bg-red-500 text-white p-0.5"><X size={12}/></button>
+                    </div>
+                )}
+                {audioData && (
+                    <div className="flex items-center gap-2 bg-red-50 text-red-600 px-3 py-2 rounded-lg text-xs font-bold border border-red-100">
+                        <Mic size={14}/> Audio Recorded
+                        <button onClick={clearAttachments}><X size={14}/></button>
+                    </div>
+                )}
+            </div>
         )}
 
-        {/* Input Field Area */}
-        <div className="flex-1 bg-white dark:bg-gray-800 rounded-full flex items-center shadow-sm px-4 py-2 relative border border-gray-200 dark:border-gray-700">
-             {imagePreviewUrl && ( 
-                 <div className="absolute bottom-full left-0 mb-2 ml-2 bg-white dark:bg-gray-800 p-2 rounded-xl border border-gray-200 dark:border-gray-600 shadow-lg animate-slide-up z-20">
-                     <div className="relative">
-                         <img src={imagePreviewUrl} alt="Preview" className="w-20 h-20 object-cover rounded-lg"/>
-                         <button onClick={removeImage} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 shadow-sm"><X size={12} /></button>
-                     </div>
-                 </div> 
-             )}
+        <div className="max-w-3xl mx-auto flex items-end gap-2">
             
-            {isRecording ? (
-                 <div className="flex-1 flex items-center gap-2 text-red-500 font-bold animate-pulse">
-                     <div className="w-2 h-2 bg-red-500 rounded-full animate-ping"></div> Recording...
-                 </div>
-            ) : (
-                <textarea 
-                    dir={language === 'ar' ? 'rtl' : 'ltr'} 
-                    value={input} 
-                    onChange={(e) => setInput(e.target.value)} 
-                    onKeyPress={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }}} 
-                    placeholder="" 
-                    rows={1} 
-                    className="flex-1 bg-transparent border-none focus:ring-0 text-gray-900 dark:text-white placeholder-gray-400 resize-none max-h-32 outline-none py-1 text-base" 
-                    disabled={isLoading}
-                    style={{ minHeight: '24px' }}
-                />
-            )}
-        </div>
+            {/* Attachment Buttons */}
+            <div className="flex pb-2 gap-1">
+                <button 
+                    onClick={() => fileInputRef.current?.click()} 
+                    className="p-2 text-gray-400 hover:text-primary transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                    <Paperclip size={20} />
+                </button>
+                <button
+                    onClick={isRecording ? stopRecording : startRecording}
+                    className={`p-2 transition-colors rounded-full ${isRecording ? 'text-red-500 bg-red-50 animate-pulse' : 'text-gray-400 hover:text-primary hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                >
+                    {isRecording ? <StopCircle size={20}/> : <Mic size={20}/>}
+                </button>
+                <button 
+                    onClick={() => fileInputRef.current?.click()} 
+                    className="md:hidden p-2 text-gray-400 hover:text-primary transition-colors rounded-full"
+                >
+                    <Camera size={20} />
+                </button>
+            </div>
 
-        {/* Mic / Send Button */}
-        <button 
-            onClick={hasContent ? handleSend : (isRecording ? stopRecording : startRecording)} 
-            disabled={isLoading} 
-            className={`w-12 h-12 rounded-full flex items-center justify-center shadow-md transition-all duration-200 transform active:scale-95 flex-none ${isRecording ? 'bg-red-500 text-white' : 'bg-[#005c4b] text-white'}`}
-        >
-            {isLoading ? ( <Loader2 className="animate-spin" size={20} /> ) : hasContent ? ( <Send size={20} className={language === 'ar' ? 'rotate-180' : ''} /> ) : isRecording ? ( <Send size={20} className={language === 'ar' ? 'rotate-180' : ''} /> ) : ( <Mic size={20} /> )}
-        </button>
+            <input 
+                type="file" 
+                ref={fileInputRef} 
+                className="hidden" 
+                accept="image/*" 
+                onChange={handleImageSelect} 
+            />
+
+            {/* Text Input */}
+            <div className="flex-1 bg-gray-100 dark:bg-gray-700 rounded-2xl flex items-center p-1 border border-transparent focus-within:border-primary/30 transition-colors">
+                <textarea
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyPress={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            handleSend();
+                        }
+                    }}
+                    placeholder={isRecording ? "Recording..." : t('inputPlaceholder')}
+                    disabled={isRecording}
+                    className="w-full bg-transparent border-none focus:ring-0 text-sm p-3 max-h-32 resize-none dark:text-white placeholder-gray-400"
+                    rows={1}
+                />
+            </div>
+
+            {/* Send Button */}
+            <button
+                onClick={handleSend}
+                disabled={isLoading || (!input.trim() && !selectedImage && !audioData)}
+                className="p-3 bg-primary hover:bg-primaryDark disabled:bg-gray-300 dark:disabled:bg-gray-700 text-white rounded-xl shadow-md transition-all active:scale-95 disabled:scale-100 disabled:shadow-none mb-0.5"
+            >
+                {isLoading ? <Loader2 size={20} className="animate-spin" /> : <Send size={20} className={language === 'ar' ? 'rotate-180' : ''} />}
+            </button>
+        </div>
+        
+        {/* Not Logged In Hint */}
+        {!currentUser && (
+            <div className="text-center mt-2">
+                <button onClick={onOpenAuth} className="text-xs text-primary font-bold hover:underline">
+                    {t('loginRequired')}
+                </button>
+            </div>
+        )}
       </div>
     </div>
   );

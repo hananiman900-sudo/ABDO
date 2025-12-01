@@ -17,7 +17,6 @@ export interface AuthenticatedUser {
   longitude?: number;
   bio?: string;
   profile_image_url?: string;
-  is_broker?: boolean;
   social_links?: { instagram?: string; facebook?: string; website?: string; gps?: string; };
 }
 

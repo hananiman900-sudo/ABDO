@@ -1,114 +1,65 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useLocalization } from '../hooks/useLocalization';
-import { BookingDetails, FollowUp, AuthenticatedUser, ProviderService, ProviderNotification, Product } from '../types';
+import { BookingDetails, FollowUp, AuthenticatedUser, ProviderService, ProviderNotification } from '../types';
 import { supabase } from '../services/supabaseClient';
-import { CheckCircle, XCircle, Camera, Loader2, Upload, Send, LogOut, User, Calendar, FileText, Lock, Phone, X, RefreshCw, BarChart, History, Users, Edit, Trash, Smartphone, MessageCircle, MapPin, Briefcase, Save, Image as ImageIcon, MapIcon, Bell, Clock, AlertTriangle, Package, Plus, ShoppingBag, Instagram, Facebook, Link as LinkIcon, Settings, PenTool } from 'lucide-react';
+import { CheckCircle, XCircle, Camera, Loader2, Upload, Send, LogOut, User, Calendar, FileText, Lock, Phone, X, RefreshCw, BarChart, History, Users, Edit, Trash, Smartphone, MessageCircle, MapPin, Briefcase, Save, Image as ImageIcon, Megaphone } from 'lucide-react';
 import jsQR from 'jsqr';
 
-interface ScannedAppointment extends BookingDetails {}
+// --- SUB-COMPONENTS ---
 
-// --- Sub-Components ---
-
-const RestrictedGuard: React.FC<{ provider: AuthenticatedUser; children: React.ReactNode }> = ({ provider, children }) => {
+const RestrictedGuard: React.FC<{ isActive: boolean; children: React.ReactNode }> = ({ isActive, children }) => {
     const { t } = useLocalization();
-    const [daysRemaining, setDaysRemaining] = useState(0);
-    const [isExpired, setIsExpired] = useState(false);
-
-    useEffect(() => {
-        if (provider.subscriptionEndDate) {
-            const end = new Date(provider.subscriptionEndDate);
-            const now = new Date();
-            const diff = end.getTime() - now.getTime();
-            const days = Math.ceil(diff / (1000 * 3600 * 24));
-            setDaysRemaining(days);
-            setIsExpired(days <= 0);
-        } else {
-            setIsExpired(true);
-        }
-    }, [provider.subscriptionEndDate]);
-
-    if (isExpired) {
-         return (
-             <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-6 bg-white dark:bg-gray-800 rounded-3xl shadow-xl border-2 border-red-100">
-                 <div className="w-24 h-24 bg-red-50 rounded-full flex items-center justify-center mb-6">
-                    <Lock size={48} className="text-red-500" />
-                 </div>
-                 <h3 className="text-2xl font-bold mb-2 dark:text-white text-red-600">{t('subscriptionExpired')}</h3>
-                 <p className="text-gray-600 dark:text-gray-300 mb-6 max-w-sm">{t('accountLockedDesc')}</p>
-                 <a href="https://wa.me/212617774846" target="_blank" rel="noreferrer" className="flex items-center gap-2 bg-green-500 text-white px-8 py-3 rounded-xl font-bold hover:bg-green-600 shadow-lg shadow-green-200">
-                     <MessageCircle size={24} /> {t('renewNow')}
-                 </a>
-                 <div className="mt-4 text-sm font-bold text-gray-400">Admin: 0617774846</div>
-             </div>
-         );
-    }
-
+    if (isActive) return <>{children}</>;
     return (
-        <div className="relative">
-             {daysRemaining <= 4 && (
-                 <div className="mb-4 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 p-4 rounded-xl flex items-center gap-3">
-                     <AlertTriangle className="text-amber-500 flex-shrink-0" />
-                     <div>
-                         <p className="font-bold text-amber-800 dark:text-amber-300">{t('subscriptionWarning')}</p>
-                         <p className="text-xs text-amber-700 dark:text-amber-400">{t('daysLeft', {days: daysRemaining})}</p>
-                     </div>
-                 </div>
-             )}
-            {children}
+        <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-4 rounded-r-lg m-4 animate-fade-in">
+            <h3 className="font-bold text-red-700 dark:text-red-400 flex items-center gap-2"><Lock size={18}/> {t('subscriptionExpired')}</h3>
+            <p className="text-sm text-red-600 dark:text-red-300 mt-1">{t('accountLockedDesc')}</p>
+            <button className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-bold shadow-sm">{t('renewNow')}</button>
         </div>
     );
 };
 
-const ProviderNotifications: React.FC<{ providerId: number; refreshTrigger: number }> = ({ providerId, refreshTrigger }) => {
+const ProviderNotifications: React.FC<{ providerId: number }> = ({ providerId }) => {
     const { t } = useLocalization();
-    const [notifs, setNotifs] = useState<ProviderNotification[]>([]);
-    const [unreadCount, setUnreadCount] = useState(0);
-    const [selectedNotif, setSelectedNotif] = useState<ProviderNotification | null>(null);
+    const [notifications, setNotifications] = useState<ProviderNotification[]>([]);
+    const [loading, setLoading] = useState(true);
 
-    const fetchNotifs = async () => {
-        const { data } = await supabase.from('provider_notifications')
-            .select('*')
-            .eq('provider_id', providerId)
-            .order('created_at', { ascending: false })
-            .limit(20);
-            
-        if (data) {
-            setNotifs(data as ProviderNotification[]);
-            setUnreadCount(data.filter((n: any) => !n.is_read).length);
-        }
+    useEffect(() => {
+        const fetchNotifs = async () => {
+            const { data } = await supabase.from('provider_notifications').select('*').eq('provider_id', providerId).order('created_at', { ascending: false }).limit(10);
+            setNotifications(data || []);
+            setLoading(false);
+        };
+        fetchNotifs();
+        // Real-time subscription could go here
+    }, [providerId]);
+
+    const markAsRead = async (id: number) => {
+        await supabase.from('provider_notifications').update({ is_read: true }).eq('id', id);
+        setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
     };
 
-    useEffect(() => { fetchNotifs(); }, [providerId, refreshTrigger]);
-
-    const handleClick = async (n: ProviderNotification) => {
-        if (!n.is_read) {
-            await supabase.from('provider_notifications').update({ is_read: true }).eq('id', n.id);
-            fetchNotifs();
-        }
-        setSelectedNotif(n);
-    }
+    if (loading) return <div className="p-4 flex justify-center"><Loader2 className="animate-spin text-purple-500"/></div>;
 
     return (
-        <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 relative max-h-80 overflow-y-auto">
-             <div className="absolute top-6 right-6 flex items-center gap-2">
-                {unreadCount > 0 && <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">{unreadCount}</span>}
-                <button onClick={() => fetchNotifs()} className="p-1 text-gray-400 hover:text-primary"><RefreshCw size={14}/></button>
-            </div>
-            <h4 className="font-bold mb-4 flex items-center gap-2 dark:text-white"><Bell size={20}/> {t('providerNotifications')}</h4>
-            <div className="space-y-3">
-                {notifs.map(n => (
-                    <div key={n.id} onClick={() => handleClick(n)} className={`flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-colors ${n.is_read ? 'bg-gray-50 dark:bg-gray-700' : 'bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800'}`}>
-                         {/* Status Dot */}
-                         <div className={`mt-1.5 w-3 h-3 rounded-full flex-shrink-0 shadow-sm ${n.status === 'completed' ? 'bg-green-500' : 'bg-red-500 animate-pulse'}`}></div>
-                         <div>
-                             <p className="text-sm dark:text-white font-medium">{n.message}</p>
-                             <p className="text-xs text-gray-400 mt-1">{new Date(n.created_at).toLocaleString()}</p>
-                         </div>
-                    </div>
-                ))}
-                {notifs.length === 0 && <p className="text-center text-gray-400 text-sm py-4">{t('noNotifications')}</p>}
-            </div>
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-4 h-full">
+            <h3 className="font-bold text-lg mb-4 flex items-center gap-2 dark:text-white"><MessageCircle className="text-purple-500"/> {t('notifications')}</h3>
+            {notifications.length === 0 ? (
+                <p className="text-gray-400 text-center py-4 text-sm">{t('noNotifications')}</p>
+            ) : (
+                <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
+                    {notifications.map(n => (
+                        <div key={n.id} className={`p-3 rounded-xl text-sm border ${n.is_read ? 'bg-gray-50 dark:bg-gray-700 border-transparent' : 'bg-purple-50 dark:bg-purple-900/20 border-purple-100 dark:border-purple-800'}`}>
+                            <p className="dark:text-gray-200">{n.message}</p>
+                            <div className="flex justify-between items-center mt-2">
+                                <span className="text-xs text-gray-400">{new Date(n.created_at).toLocaleTimeString()}</span>
+                                {!n.is_read && <button onClick={() => markAsRead(n.id)} className="text-xs text-purple-600 font-bold hover:underline">Mark read</button>}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
         </div>
     );
 };
@@ -116,29 +67,33 @@ const ProviderNotifications: React.FC<{ providerId: number; refreshTrigger: numb
 const ScanHistory: React.FC<{ providerId: number }> = ({ providerId }) => {
     const { t } = useLocalization();
     const [history, setHistory] = useState<any[]>([]);
-    
+
     useEffect(() => {
-        supabase.from('scan_history').select('*').eq('provider_id', providerId).order('created_at', { ascending: false }).limit(20)
-        .then(({ data }) => {
-             setHistory(data || []);
-        });
+        const fetchHistory = async () => {
+            const { data } = await supabase.from('scan_history').select('*').eq('provider_id', providerId).order('created_at', { ascending: false }).limit(5);
+            setHistory(data || []);
+        };
+        fetchHistory();
     }, [providerId]);
 
     return (
-        <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 relative">
-            <h4 className="font-bold mb-4 flex items-center gap-2 dark:text-white"><History size={20}/> {t('scanHistory')}</h4>
-            <div className="space-y-3">
-                {history.map(h => (
-                    <div key={h.id} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-xl">
-                        <div>
-                            <p className="font-bold text-sm dark:text-white">{h.client_name}</p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">{h.client_phone}</p>
-                        </div>
-                        <div className="text-xs text-gray-400">{new Date(h.created_at).toLocaleDateString()}</div>
-                    </div>
-                ))}
-                {history.length === 0 && <p className="text-center text-gray-400 text-sm py-4">{t('noNotifications')}</p>}
-            </div>
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-4">
+             <h3 className="font-bold text-lg mb-4 flex items-center gap-2 dark:text-white"><History className="text-green-500"/> {t('scanHistory')}</h3>
+             {history.length === 0 ? (
+                 <p className="text-gray-400 text-center py-4 text-sm">{t('noNotifications')}</p>
+             ) : (
+                 <div className="space-y-3">
+                     {history.map((h, i) => (
+                         <div key={i} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-xl">
+                             <div>
+                                 <p className="font-bold text-sm dark:text-white">{h.client_name || 'Unknown'}</p>
+                                 <p className="text-xs text-gray-500">{new Date(h.created_at).toLocaleDateString()}</p>
+                             </div>
+                             <div className="text-green-500 bg-green-100 dark:bg-green-900/30 p-1.5 rounded-full"><CheckCircle size={14}/></div>
+                         </div>
+                     ))}
+                 </div>
+             )}
         </div>
     );
 };
@@ -146,263 +101,87 @@ const ScanHistory: React.FC<{ providerId: number }> = ({ providerId }) => {
 const ClientList: React.FC<{ providerId: number }> = ({ providerId }) => {
     const { t } = useLocalization();
     const [clients, setClients] = useState<any[]>([]);
-    const [newCount, setNewCount] = useState(0);
-
+    
     useEffect(() => {
         const fetchClients = async () => {
-            const { data } = await supabase.from('follows').select('client_id, created_at, clients(full_name, phone)').eq('provider_id', providerId);
-            if (data) {
-                setClients(data.map(d => d.clients));
-                const today = new Date().toISOString().split('T')[0];
-                setNewCount(data.filter(d => d.created_at >= today).length);
-            }
-        };
+            const { data } = await supabase.from('follows').select('clients(full_name, phone, profile_image_url)').eq('provider_id', providerId).limit(5);
+            if(data) setClients(data.map((d:any) => d.clients));
+        }
         fetchClients();
     }, [providerId]);
 
     return (
-        <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 h-full relative max-h-80 overflow-y-auto">
-            <div className="absolute top-6 right-6 flex items-center gap-2">
-                {newCount > 0 && <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">{newCount} New</span>}
-            </div>
-            <h4 className="font-bold mb-4 flex items-center gap-2 dark:text-white"><Users size={20}/> {t('followers')}</h4>
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-4">
+            <h3 className="font-bold text-lg mb-4 flex items-center gap-2 dark:text-white"><Users className="text-blue-500"/> {t('followers')}</h3>
             <div className="space-y-3">
-                {clients.map((c, i) => (
-                    <div key={i} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-xl">
-                        <div>
-                            <p className="font-bold text-sm dark:text-white">{c.full_name}</p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">{c.phone}</p>
+                {clients.length === 0 ? <p className="text-center text-gray-400 text-sm">No followers yet</p> : 
+                    clients.map((c, i) => (
+                        <div key={i} className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center font-bold text-blue-600 overflow-hidden">
+                                {c.profile_image_url ? <img src={c.profile_image_url} className="w-full h-full object-cover"/> : c.full_name?.[0]}
+                            </div>
+                            <div>
+                                <p className="font-bold text-sm dark:text-white">{c.full_name}</p>
+                                <p className="text-xs text-gray-500">{c.phone}</p>
+                            </div>
                         </div>
-                        <div className="flex gap-2">
-                            <a href={`tel:${c.phone}`} className="p-2 bg-green-100 text-green-600 rounded-full hover:bg-green-200"><Phone size={16}/></a>
-                            <a href={`https://wa.me/${c.phone.replace(/^0/, '212')}`} target="_blank" rel="noreferrer" className="p-2 bg-green-500 text-white rounded-full hover:bg-green-600"><MessageCircle size={16}/></a>
-                        </div>
-                    </div>
-                ))}
-                {clients.length === 0 && <p className="text-center text-gray-400 text-sm py-4">{t('noFollowUps')}</p>}
+                    ))
+                }
             </div>
         </div>
     );
-};
+}
 
 const AnnouncementManager: React.FC<{ providerId: number }> = ({ providerId }) => {
     const { t } = useLocalization();
-    const [ads, setAds] = useState<any[]>([]);
     const [message, setMessage] = useState('');
-    const [editingId, setEditingId] = useState<number | null>(null);
-    const [isSending, setIsSending] = useState(false);
+    const [loading, setLoading] = useState(false);
 
-    const fetchAds = async () => {
-        const { data } = await supabase.from('announcements').select('*').eq('provider_id', providerId).order('created_at', { ascending: false });
-        setAds(data || []);
+    const handlePost = async () => {
+        if(!message.trim()) return;
+        setLoading(true);
+        await supabase.from('announcements').insert({ provider_id: providerId, message });
+        setLoading(false);
+        setMessage('');
+        alert(t('success'));
     };
-
-    useEffect(() => { fetchAds(); }, [providerId]);
-
-    const handleSend = async () => {
-        if (!message.trim()) return;
-        setIsSending(true);
-        if (editingId) {
-            await supabase.from('announcements').update({ message }).eq('id', editingId);
-        } else {
-            await supabase.from('announcements').insert({ provider_id: providerId, message });
-        }
-        setMessage(''); setEditingId(null); setIsSending(false); fetchAds();
-    };
-
-    const handleDelete = async (id: number) => {
-        if(confirm(t('delete') + '?')) {
-            await supabase.from('announcements').delete().eq('id', id);
-            fetchAds();
-        }
-    }
 
     return (
-        <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-            <h4 className="font-bold mb-4 flex items-center gap-2 dark:text-white"><Send size={20}/> {t('sendAnnouncementTitle')}</h4>
-            <div className="flex gap-2 mb-6">
-                <input 
-                    value={message} 
-                    onChange={e => setMessage(e.target.value)} 
-                    placeholder={t('messagePlaceholder')}
-                    className="flex-1 bg-gray-100 dark:bg-gray-700 rounded-xl px-4 outline-none dark:text-white"
-                />
-                <button onClick={handleSend} disabled={isSending} className="bg-primary text-white p-3 rounded-xl hover:bg-primaryDark">
-                    {isSending ? <Loader2 className="animate-spin"/> : <Send size={20}/>}
-                </button>
-            </div>
-            <h5 className="text-sm font-bold mb-2 text-gray-500">{t('myActiveAds')}</h5>
-            <div className="space-y-2 max-h-40 overflow-y-auto">
-                {ads.map(ad => (
-                    <div key={ad.id} className="flex justify-between items-center p-3 border border-gray-100 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-900/30">
-                        <p className="text-sm dark:text-gray-300 truncate flex-1">{ad.message}</p>
-                        <div className="flex gap-1 ml-2">
-                            <button onClick={() => { setMessage(ad.message); setEditingId(ad.id); }} className="p-1 text-blue-500"><Edit size={16}/></button>
-                            <button onClick={() => handleDelete(ad.id)} className="p-1 text-red-500"><Trash size={16}/></button>
-                        </div>
-                    </div>
-                ))}
-            </div>
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-4">
+             <h3 className="font-bold text-lg mb-4 flex items-center gap-2 dark:text-white"><Smartphone className="text-orange-500"/> {t('posts')}</h3>
+             <textarea 
+                value={message}
+                onChange={e => setMessage(e.target.value)}
+                placeholder={t('messagePlaceholder')}
+                className="w-full p-3 bg-gray-50 dark:bg-gray-700 rounded-xl mb-3 text-sm outline-none focus:ring-2 focus:ring-orange-500 dark:text-white resize-none"
+                rows={3}
+             />
+             <button onClick={handlePost} disabled={loading} className="w-full bg-orange-500 text-white py-2 rounded-lg font-bold text-sm shadow-md active:scale-95 transition-transform">
+                 {loading ? <Loader2 className="animate-spin mx-auto"/> : t('sendButton')}
+             </button>
         </div>
     );
-};
-
-const StoreManager: React.FC<{ provider: AuthenticatedUser }> = ({ provider }) => {
-    // ... (Keep existing implementation)
-    const { t } = useLocalization();
-    const [products, setProducts] = useState<Product[]>([]);
-    const [newProduct, setNewProduct] = useState({ name: '', description: '', price: '', category: 'General' });
-    const [isLoading, setIsLoading] = useState(false);
-
-    const fetchProducts = async () => {
-        const { data } = await supabase.from('products').select('*').order('created_at', { ascending: false });
-        setProducts(data || []);
-    };
-
-    useEffect(() => { fetchProducts(); }, []);
-
-    const handleAddProduct = async () => {
-        if(!newProduct.name || !newProduct.price) return;
-        setIsLoading(true);
-        await supabase.from('products').insert({
-            name: newProduct.name,
-            description: newProduct.description,
-            price: parseFloat(newProduct.price),
-            category: newProduct.category
-        });
-        setNewProduct({ name: '', description: '', price: '', category: 'General' });
-        setIsLoading(false);
-        fetchProducts();
-    };
-
-    const handleDelete = async (id: number) => {
-        if(confirm(t('delete'))) {
-            await supabase.from('products').delete().eq('id', id);
-            fetchProducts();
-        }
-    }
-
-    return (
-        <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-            <div className="flex justify-between items-center mb-4">
-                <h4 className="font-bold flex items-center gap-2 dark:text-white"><ShoppingBag size={20}/> {t('storeManager')}</h4>
-                <span className="bg-purple-100 text-purple-600 px-2 py-1 rounded text-xs font-bold">Admin Access</span>
-            </div>
-            
-            <div className="space-y-3 mb-6">
-                <input placeholder={t('productName')} value={newProduct.name} onChange={e => setNewProduct({...newProduct, name: e.target.value})} className="w-full p-3 bg-gray-50 dark:bg-gray-700 rounded-xl outline-none dark:text-white"/>
-                <input placeholder={t('productDescription')} value={newProduct.description} onChange={e => setNewProduct({...newProduct, description: e.target.value})} className="w-full p-3 bg-gray-50 dark:bg-gray-700 rounded-xl outline-none dark:text-white"/>
-                <div className="flex gap-2">
-                    <input placeholder={t('price')} type="number" value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: e.target.value})} className="w-full p-3 bg-gray-50 dark:bg-gray-700 rounded-xl outline-none dark:text-white"/>
-                    <button onClick={handleAddProduct} disabled={isLoading} className="bg-green-500 text-white px-6 rounded-xl font-bold hover:bg-green-600">
-                        {isLoading ? <Loader2 className="animate-spin"/> : <Plus/>}
-                    </button>
-                </div>
-            </div>
-
-            <div className="space-y-2 max-h-60 overflow-y-auto">
-                {products.map(p => (
-                    <div key={p.id} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-900/30 rounded-xl border dark:border-gray-700">
-                        <div>
-                            <p className="font-bold dark:text-white">{p.name}</p>
-                            <p className="text-sm text-primary font-bold">{p.price} DH</p>
-                        </div>
-                        <button onClick={() => handleDelete(p.id)} className="text-red-500 p-2"><Trash size={16}/></button>
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-};
+}
 
 const ProfileManager: React.FC<{ provider: AuthenticatedUser }> = ({ provider }) => {
-    // ... (Keep existing implementation logic but improve styling)
-    const { t, language } = useLocalization();
-    const [bio, setBio] = useState(provider.bio || '');
+    const { t } = useLocalization();
     const [services, setServices] = useState<ProviderService[]>([]);
-    const [socialLinks, setSocialLinks] = useState({ instagram: '', facebook: '', website: '', gps: '' });
     const [newService, setNewService] = useState({ name: '', price: '', discount: '' });
-    const [isLoading, setIsLoading] = useState(false);
-    const [locationLoading, setLocationLoading] = useState(false);
-    const [imageLoading, setImageLoading] = useState(false);
-    const [successMsg, setSuccessMsg] = useState('');
+    const [bio, setBio] = useState(provider.bio || '');
+    const [loading, setLoading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Tangier Neighborhoods
-    const neighborhoods = t('neighborhoods').split(',').map(s => s.trim());
+    useEffect(() => {
+        fetchServices();
+    }, [provider.id]);
 
     const fetchServices = async () => {
         const { data } = await supabase.from('provider_services').select('*').eq('provider_id', provider.id);
         setServices(data || []);
     };
 
-    useEffect(() => { 
-        fetchServices(); 
-        let initialSocial = { instagram: '', facebook: '', website: '', gps: '' };
-        if(provider.social_links) {
-             if(typeof provider.social_links === 'string') {
-                 try { initialSocial = JSON.parse(provider.social_links); } catch(e){}
-             } else {
-                 // @ts-ignore
-                 initialSocial = provider.social_links;
-             }
-        }
-        setSocialLinks(initialSocial);
-    }, [provider.id]);
-
-    const showSuccess = (msg: string) => {
-        setSuccessMsg(msg);
-        setTimeout(() => setSuccessMsg(''), 3000);
-    }
-
-    const handleUpdateProfile = async () => {
-        setIsLoading(true);
-        const cleanSocial = {
-             instagram: socialLinks.instagram,
-             facebook: socialLinks.facebook,
-             website: socialLinks.website,
-             gps: socialLinks.gps
-        };
-        await supabase.from('providers').update({ bio, social_links: cleanSocial }).eq('id', provider.id);
-        setIsLoading(false);
-        showSuccess(t('savedSuccessfully'));
-    };
-
-    const handleNeighborhoodSelect = async (neighborhood: string) => {
-        const newLocation = `${neighborhood}, Tanger`;
-        await supabase.from('providers').update({ location: newLocation }).eq('id', provider.id);
-        showSuccess(t('savedSuccessfully'));
-    }
-
-    const handleSetLocation = () => {
-        setLocationLoading(true);
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-                async (position) => {
-                    const { latitude, longitude } = position.coords;
-                    await supabase.from('providers').update({ latitude, longitude }).eq('id', provider.id);
-                    setLocationLoading(false);
-                    showSuccess(t('locationSet'));
-                }, 
-                (error) => {
-                    setLocationLoading(false);
-                    console.error("GPS Error:", error);
-                    let errMsg = t('locationError');
-                    if (error.code === 1) errMsg = t('gpsPermissionDenied');
-                    else if (error.code === 2) errMsg = t('gpsUnavailable');
-                    else if (error.code === 3) errMsg = t('gpsTimeout');
-                    alert(errMsg);
-                },
-                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-            );
-        } else {
-            alert(t('locationError'));
-            setLocationLoading(false);
-        }
-    };
-
     const handleAddService = async () => {
-        if (!newService.name || !newService.price) return;
+        if(!newService.name || !newService.price) return;
         await supabase.from('provider_services').insert({
             provider_id: provider.id,
             name: newService.name,
@@ -417,331 +196,293 @@ const ProfileManager: React.FC<{ provider: AuthenticatedUser }> = ({ provider })
         await supabase.from('provider_services').delete().eq('id', id);
         fetchServices();
     };
-    
+
+    const handleSaveBio = async () => {
+        await supabase.from('providers').update({ bio }).eq('id', provider.id);
+        alert(t('savedSuccessfully'));
+    };
+
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if(!file) return;
-        
-        setImageLoading(true);
+        setLoading(true);
         try {
             const fileExt = file.name.split('.').pop();
-            const fileName = `${provider.id}_${Date.now()}.${fileExt}`;
-            const filePath = `avatars/${fileName}`;
-            const { error: uploadError } = await supabase.storage.from('profiles').upload(filePath, file);
-            if (uploadError) throw uploadError;
-            const { data } = supabase.storage.from('profiles').getPublicUrl(filePath);
+            const fileName = `provider_${provider.id}_${Date.now()}.${fileExt}`;
+            const { error } = await supabase.storage.from('profiles').upload(fileName, file);
+            if(error) throw error;
+            const { data } = supabase.storage.from('profiles').getPublicUrl(fileName);
             await supabase.from('providers').update({ profile_image_url: data.publicUrl }).eq('id', provider.id);
-            showSuccess(t('savedSuccessfully'));
-        } catch(e: any) { 
-            console.error(e);
-            alert(t('uploadError') + ` (${e.message})`);
+            alert(t('savedSuccessfully'));
+        } catch(e) {
+            alert(t('uploadError'));
         } finally {
-            setImageLoading(false);
-            if (fileInputRef.current) fileInputRef.current.value = '';
+            setLoading(false);
         }
     };
 
-    const handleRemoveImage = async () => {
-         await supabase.from('providers').update({ profile_image_url: null }).eq('id', provider.id);
-         showSuccess(t('savedSuccessfully'));
-    }
-
     return (
-        <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 h-full relative">
-            {successMsg && (
-                <div className="absolute top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-xl shadow-lg flex items-center gap-2 animate-fade-in z-10">
-                    <CheckCircle size={16}/> {successMsg}
-                </div>
-            )}
-
-            <h4 className="font-bold mb-4 flex items-center gap-2 dark:text-white"><Settings size={20}/> {t('edit')} {t('profileAndServices')}</h4>
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+            <h3 className="font-bold text-xl mb-6 dark:text-white flex items-center gap-2"><Briefcase className="text-purple-600"/> {t('profileAndServices')}</h3>
             
-            {/* Bio & Location */}
-            <div className="mb-6 space-y-4">
-                 <div>
-                    <label className="text-xs font-bold text-gray-500 block mb-2">{t('bioLabel')}</label>
+            {/* Image & Bio */}
+            <div className="mb-8 flex flex-col md:flex-row gap-6">
+                <div className="text-center">
+                    <div className="w-24 h-24 rounded-full bg-gray-100 mx-auto mb-2 overflow-hidden relative">
+                        {loading ? <Loader2 className="animate-spin m-auto mt-8"/> : 
+                         <img src={provider.profile_image_url || `https://ui-avatars.com/api/?name=${provider.name}&background=random`} className="w-full h-full object-cover"/>
+                        }
+                    </div>
+                    <button onClick={() => fileInputRef.current?.click()} className="text-xs text-purple-600 font-bold hover:underline">{t('uploadProfileImage')}</button>
+                    <input type="file" hidden ref={fileInputRef} onChange={handleImageUpload} />
+                </div>
+                <div className="flex-1 space-y-3">
                     <textarea 
                         value={bio} 
                         onChange={e => setBio(e.target.value)} 
-                        className="w-full p-3 bg-gray-50 dark:bg-gray-700 rounded-xl dark:text-white outline-none focus:ring-2 focus:ring-primary/50"
+                        placeholder={t('bioLabel')} 
+                        className="w-full p-3 bg-gray-50 dark:bg-gray-700 rounded-xl text-sm outline-none border border-gray-200 dark:border-gray-600 dark:text-white" 
                         rows={3}
                     />
-                 </div>
-                 
-                 <div>
-                    <label className="text-xs font-bold text-gray-500 block mb-2">{t('location')}</label>
-                    <div className="flex gap-2">
-                        <select onChange={(e) => handleNeighborhoodSelect(e.target.value)} className="flex-1 p-3 bg-gray-50 dark:bg-gray-700 rounded-xl dark:text-white outline-none">
-                            <option value="">{t('selectNeighborhood')}</option>
-                            {neighborhoods.map((n, i) => <option key={i} value={n}>{n}</option>)}
-                        </select>
-                        <button onClick={handleSetLocation} disabled={locationLoading} className="px-4 bg-blue-50 text-blue-600 rounded-xl font-bold flex items-center gap-2 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400">
-                            {locationLoading ? <Loader2 className="animate-spin"/> : <MapPin/>}
-                        </button>
-                    </div>
-                 </div>
-
-                 {/* Social Links */}
-                <div className="space-y-2 mt-4">
-                     <h5 className="font-bold text-xs text-gray-500">Social Media Links</h5>
-                     <div className="grid grid-cols-1 gap-2">
-                        <div className="flex items-center gap-2">
-                            <Instagram size={18} className="text-pink-600" />
-                            <input placeholder="Instagram Link" value={socialLinks.instagram} onChange={e => setSocialLinks({...socialLinks, instagram: e.target.value})} className="flex-1 p-2 bg-gray-50 dark:bg-gray-700 rounded-lg text-sm dark:text-white"/>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Facebook size={18} className="text-blue-600" />
-                            <input placeholder="Facebook Link" value={socialLinks.facebook} onChange={e => setSocialLinks({...socialLinks, facebook: e.target.value})} className="flex-1 p-2 bg-gray-50 dark:bg-gray-700 rounded-lg text-sm dark:text-white"/>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <MapIcon size={18} className="text-green-500" />
-                            <input placeholder="GPS Link" value={socialLinks.gps} onChange={e => setSocialLinks({...socialLinks, gps: e.target.value})} className="flex-1 p-2 bg-gray-50 dark:bg-gray-700 rounded-lg text-sm dark:text-white"/>
-                        </div>
-                     </div>
+                    <button onClick={handleSaveBio} className="px-4 py-2 bg-purple-100 dark:bg-purple-900/30 text-purple-600 rounded-lg text-xs font-bold">{t('saveProfile')}</button>
                 </div>
             </div>
 
-            {/* Image Actions */}
-            <div className="flex flex-wrap gap-2 mb-6 border-b dark:border-gray-700 pb-6">
-                <button onClick={() => fileInputRef.current?.click()} disabled={imageLoading} className="flex-1 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg flex justify-center items-center gap-2 text-gray-600 dark:text-gray-300 font-bold text-sm">
-                    {imageLoading ? <Loader2 size={16} className="animate-spin"/> : <ImageIcon size={16}/>} {t('uploadProfileImage')}
-                </button>
-                <button onClick={handleRemoveImage} className="py-2 px-4 bg-red-50 dark:bg-red-900/20 rounded-lg text-red-600 dark:text-red-400">
-                     <Trash size={16}/>
-                </button>
-                <button onClick={handleUpdateProfile} disabled={isLoading} className="flex-1 py-2 bg-primary text-white rounded-lg font-bold text-sm flex justify-center items-center gap-2">
-                    {isLoading ? <Loader2 size={16} className="animate-spin"/> : <Save size={16}/>} {t('saveProfile')}
-                </button>
-                <input type="file" ref={fileInputRef} hidden onChange={handleImageUpload} accept="image/*"/>
-            </div>
-
-            {/* Services */}
+            {/* Services List */}
             <div>
-                <h5 className="font-bold text-sm mb-3 dark:text-white">{t('addService')}</h5>
-                <div className="flex flex-col gap-2 mb-2">
-                    <input placeholder={t('serviceName')} value={newService.name} onChange={e => setNewService({...newService, name: e.target.value})} className="w-full p-2 bg-gray-50 dark:bg-gray-700 rounded-lg text-sm outline-none dark:text-white"/>
-                    <div className="flex gap-2">
-                        <input placeholder={t('price')} type="number" value={newService.price} onChange={e => setNewService({...newService, price: e.target.value})} className="flex-1 p-2 bg-gray-50 dark:bg-gray-700 rounded-lg text-sm outline-none dark:text-white"/>
-                        <input placeholder={t('discountPrice')} type="number" value={newService.discount} onChange={e => setNewService({...newService, discount: e.target.value})} className="flex-1 p-2 bg-gray-50 dark:bg-gray-700 rounded-lg text-sm outline-none dark:text-white"/>
-                        <button onClick={handleAddService} className="bg-primary text-white p-2 rounded-lg flex items-center justify-center"><Plus size={20}/></button>
-                    </div>
-                </div>
-
-                <div className="space-y-2 mt-4 max-h-40 overflow-y-auto">
+                <h4 className="font-bold mb-3 text-sm text-gray-500 uppercase">{t('services')}</h4>
+                <div className="space-y-3 mb-4">
                     {services.map(s => (
-                        <div key={s.id} className="flex justify-between items-center p-2 bg-gray-50 dark:bg-gray-900/30 rounded-lg border border-gray-100 dark:border-gray-700">
+                        <div key={s.id} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-xl">
                             <div>
-                                <div className="font-bold text-sm dark:text-white">{s.name}</div>
-                                <div className="text-xs">
-                                    <span className="line-through text-red-400 mr-2">{s.price} DH</span>
-                                    <span className="font-bold text-green-600">{s.discount_price || s.price} DH</span>
-                                </div>
+                                <p className="font-bold dark:text-white">{s.name}</p>
+                                <p className="text-xs text-gray-500">{s.discount_price ? <span className="text-green-600">{s.discount_price} DH</span> : <span>{s.price} DH</span>}</p>
                             </div>
-                            <button onClick={() => handleDeleteService(s.id)} className="text-red-500"><Trash size={14}/></button>
+                            <button onClick={() => handleDeleteService(s.id)} className="text-red-400 hover:text-red-600"><Trash size={16}/></button>
                         </div>
                     ))}
                 </div>
+                
+                {/* Add Service Form */}
+                <div className="grid grid-cols-2 gap-2 mb-2">
+                    <input value={newService.name} onChange={e => setNewService({...newService, name: e.target.value})} placeholder={t('serviceName')} className="p-2 bg-gray-50 dark:bg-gray-700 rounded-lg text-sm outline-none dark:text-white col-span-2"/>
+                    <input value={newService.price} onChange={e => setNewService({...newService, price: e.target.value})} type="number" placeholder={t('price')} className="p-2 bg-gray-50 dark:bg-gray-700 rounded-lg text-sm outline-none dark:text-white"/>
+                    <input value={newService.discount} onChange={e => setNewService({...newService, discount: e.target.value})} type="number" placeholder={t('discountPrice')} className="p-2 bg-gray-50 dark:bg-gray-700 rounded-lg text-sm outline-none dark:text-white"/>
+                </div>
+                <button onClick={handleAddService} className="w-full py-2 bg-purple-600 text-white rounded-lg font-bold text-sm shadow-sm">{t('addService')}</button>
             </div>
-        </div>
-    );
-}
-
-const QRScannerComponent: React.FC<{ providerId: number; onScanSuccess: () => void }> = ({ providerId, onScanSuccess }) => {
-    // ... (Keep existing implementation)
-    const { t } = useLocalization();
-    const [scannedData, setScannedData] = useState<ScannedAppointment | null>(null);
-    const [error, setError] = useState<string | null>(null);
-    const [showScanner, setShowScanner] = useState(false);
-    const [isVerifying, setIsVerifying] = useState(false);
-    const [confirmationMsg, setConfirmationMsg] = useState('');
-    const videoRef = useRef<HTMLVideoElement>(null);
-    const requestRef = useRef<number>();
-    const fileInputRef = useRef<HTMLInputElement>(null);
-
-    useEffect(() => { return () => stopCamera(); }, []);
-    useEffect(() => { if (showScanner) startCamera(); else stopCamera(); }, [showScanner]);
-
-    const startCamera = async () => {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-            if (videoRef.current) {
-                videoRef.current.srcObject = stream;
-                videoRef.current.onloadedmetadata = () => {
-                    videoRef.current?.play().catch(e => console.error(e));
-                    requestRef.current = requestAnimationFrame(scanVideoFrame);
-                };
-            }
-        } catch (err) { setError(t('errorMessage')); setShowScanner(false); }
-    };
-
-    const stopCamera = () => {
-        if (requestRef.current) cancelAnimationFrame(requestRef.current);
-        if (videoRef.current && videoRef.current.srcObject) {
-            (videoRef.current.srcObject as MediaStream).getTracks().forEach(track => track.stop());
-            videoRef.current.srcObject = null;
-        }
-    };
-
-    const scanVideoFrame = () => {
-        if (videoRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
-            const canvas = document.createElement('canvas');
-            canvas.width = videoRef.current.videoWidth;
-            canvas.height = videoRef.current.videoHeight;
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-                ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
-                if (code) { handleScanResult({ text: code.data }); return; }
-            }
-        }
-        requestRef.current = requestAnimationFrame(scanVideoFrame);
-    };
-
-    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            const img = new Image();
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                canvas.width = img.width;
-                canvas.height = img.height;
-                const ctx = canvas.getContext('2d');
-                if (ctx) {
-                    ctx.drawImage(img, 0, 0);
-                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                    const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
-                    if (code) {
-                        handleScanResult({ text: code.data });
-                    } else {
-                        setError(t('qrNotDetected'));
-                    }
-                }
-            };
-            img.src = event.target?.result as string;
-        };
-        reader.readAsDataURL(file);
-    };
-
-    const handleScanResult = async (result: { text: string }) => {
-        setShowScanner(false); stopCamera(); setIsVerifying(true); setError(null);
-        try {
-            const data = JSON.parse(result.text);
-            if (!data.appointmentId) throw new Error('Invalid');
-            const { data: appt } = await supabase.from('appointments').select(`id, clients (full_name, phone), providers (name, service_type, provider_services(name, price, discount_price))`).eq('id', data.appointmentId).single();
-            if (!appt) throw new Error('NotFound');
-            
-            setScannedData({
-                appointmentId: appt.id,
-                name: appt.clients.full_name,
-                phone: appt.clients.phone,
-                service: appt.providers.service_type,
-                provider: appt.providers.name,
-                location: "",
-                discount: "View Details",
-            });
-
-        } catch (e) { setError(t('invalidQR')); }
-        finally { setIsVerifying(false); }
-    };
-
-    const confirmScan = async () => {
-        if(!scannedData) return;
-        setIsVerifying(true);
-        try {
-            // 1. Archive Scan
-            await supabase.from('scan_history').insert({
-                provider_id: providerId,
-                client_name: scannedData.name,
-                client_phone: scannedData.phone
-            });
-
-            // 2. Update Notification to Green (Completed)
-            // Robust update: Search for pending notification by booking_id
-            const { error: updateError } = await supabase.from('provider_notifications')
-                .update({ status: 'completed', is_read: true })
-                .eq('booking_id', scannedData.appointmentId);
-
-            if (updateError) console.warn("Notification update warning:", updateError);
-
-            setConfirmationMsg(t('verificationSuccess'));
-            setScannedData(null);
-            onScanSuccess(); // Trigger refresh
-            setTimeout(() => setConfirmationMsg(''), 3000);
-        } catch(e) {
-            setError(t('errorMessage'));
-        } finally {
-            setIsVerifying(false);
-        }
-    }
-
-    return (
-        <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 text-center mb-6 relative">
-             {confirmationMsg && (
-                 <div className="absolute top-0 left-0 w-full h-full bg-green-50 dark:bg-green-900/90 z-10 rounded-2xl flex items-center justify-center flex-col animate-fade-in">
-                     <CheckCircle size={48} className="text-green-500 mb-2"/>
-                     <h3 className="text-xl font-bold text-green-700 dark:text-white">{confirmationMsg}</h3>
-                 </div>
-             )}
-
-             <h3 className="text-xl font-bold dark:text-white mb-4">{t('qrScannerTitle')}</h3>
-             {!showScanner && !scannedData && (
-                 <div className="space-y-3">
-                     <button onClick={() => setShowScanner(true)} className="w-full bg-dark text-white py-3 rounded-xl font-bold flex justify-center gap-2 hover:bg-black">
-                         <Camera/> {t('scanWithCamera')}
-                     </button>
-                     <p className="text-sm text-gray-400">- OR -</p>
-                     <input type="file" ref={fileInputRef} hidden accept="image/*" onChange={handleFileUpload} />
-                     <button onClick={() => fileInputRef.current?.click()} className="w-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-white py-3 rounded-xl font-bold flex justify-center gap-2 hover:bg-gray-200 dark:hover:bg-gray-600">
-                         <Upload/> {t('uploadQRImage')}
-                     </button>
-                 </div>
-             )}
-             {showScanner && (
-                 <div className="relative w-full aspect-square bg-black rounded-xl overflow-hidden">
-                     <video ref={videoRef} className="w-full h-full object-cover"/>
-                     <button onClick={() => setShowScanner(false)} className="absolute top-2 right-2 bg-white/20 p-2 rounded-full text-white"><X/></button>
-                 </div>
-             )}
-             {scannedData && (
-                 <div className="bg-white border-2 border-blue-500 p-4 rounded-xl mt-4 text-left dark:bg-gray-700 dark:text-white dark:border-blue-400 shadow-lg transform scale-105 transition-transform">
-                     <div className="text-center mb-4">
-                         <h4 className="text-lg font-bold text-blue-600 dark:text-blue-400">{t('clientHasArrived')}</h4>
-                         <div className="text-sm text-gray-500">{new Date().toLocaleDateString()}</div>
-                     </div>
-                     
-                     <div className="space-y-2 mb-4">
-                         <div className="flex justify-between border-b border-gray-100 dark:border-gray-600 pb-2">
-                             <span className="text-gray-500 dark:text-gray-300">{t('clientName')}:</span>
-                             <span className="font-bold">{scannedData.name}</span>
-                         </div>
-                         <div className="flex justify-between border-b border-gray-100 dark:border-gray-600 pb-2">
-                             <span className="text-gray-500 dark:text-gray-300">{t('service')}:</span>
-                             <span className="font-bold">{scannedData.service}</span>
-                         </div>
-                         <div className="flex justify-between border-b border-gray-100 dark:border-gray-600 pb-2">
-                             <span className="text-gray-500 dark:text-gray-300">{t('price')}:</span>
-                             <span className="font-bold text-green-600">Check Services</span>
-                         </div>
-                     </div>
-
-                     <div className="flex gap-2">
-                         <button onClick={() => setScannedData(null)} className="flex-1 bg-gray-200 text-gray-800 py-3 rounded-xl font-bold">{t('close')}</button>
-                         <button onClick={confirmScan} disabled={isVerifying} className="flex-1 bg-green-500 text-white py-3 rounded-xl font-bold hover:bg-green-600 flex justify-center items-center">
-                             {isVerifying ? <Loader2 className="animate-spin"/> : t('markAsCompleted')}
-                         </button>
-                     </div>
-                 </div>
-             )}
-             {error && <div className="text-red-500 mt-4 font-bold">{error} <button onClick={() => setError(null)} className="underline ml-2">{t('tryAgain')}</button></div>}
         </div>
     );
 };
 
+const RequestAd: React.FC<{ providerId: number }> = ({ providerId }) => {
+    const { t } = useLocalization();
+    const [step, setStep] = useState(1);
+    const [adData, setAdData] = useState({ message: '', image: '' });
+    const [loading, setLoading] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
+    const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if(!file) return;
+        setLoading(true);
+        try {
+            const fileName = `ad_req_${providerId}_${Date.now()}`;
+            const { error } = await supabase.storage.from('announcement-images').upload(fileName, file);
+            if(error) throw error;
+            const { data } = supabase.storage.from('announcement-images').getPublicUrl(fileName);
+            setAdData({...adData, image: data.publicUrl});
+        } catch(e) { alert(t('uploadError')); }
+        finally { setLoading(false); }
+    }
+
+    const submitRequest = async () => {
+        setLoading(true);
+        // We use system_announcements with active=false as a request
+        const { error } = await supabase.from('system_announcements').insert({
+            title: 'PAID AD REQUEST',
+            message: `REQ from Provider ${providerId}: ${adData.message}`,
+            image_url: adData.image,
+            is_active: false // Needs Admin Approval
+        });
+        setLoading(false);
+        if(!error) setStep(3);
+    }
+
+    if(step === 3) return (
+        <div className="bg-green-50 p-6 rounded-2xl text-center">
+            <CheckCircle size={48} className="mx-auto text-green-500 mb-4"/>
+            <h3 className="font-bold text-green-700">{t('requestSent')}</h3>
+            <p className="text-sm text-gray-600 mt-2">{t('waitForCall')}</p>
+        </div>
+    );
+
+    return (
+        <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-purple-100 dark:border-purple-900">
+            <h4 className="font-bold flex items-center gap-2 dark:text-white mb-4"><Megaphone className="text-purple-500"/> {t('requestBoost')}</h4>
+            
+            {step === 1 ? (
+                <div className="text-center">
+                    <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-xl mb-4">
+                        <p className="font-bold text-2xl text-purple-600 dark:text-purple-400">{t('price50DH')}</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">3 Days Duration</p>
+                    </div>
+                    <p className="text-sm text-gray-600 dark:text-gray-300 mb-6">{t('boostDesc')}</p>
+                    <button onClick={() => setStep(2)} className="w-full bg-purple-600 text-white py-3 rounded-xl font-bold">{t('continue')}</button>
+                </div>
+            ) : (
+                <div className="space-y-4">
+                    <textarea placeholder={t('messageLabel')} value={adData.message} onChange={e => setAdData({...adData, message: e.target.value})} className="w-full p-3 bg-gray-50 dark:bg-gray-700 rounded-xl outline-none dark:text-white"/>
+                    <button onClick={() => fileInputRef.current?.click()} className="w-full py-3 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl text-gray-500 flex justify-center items-center gap-2">
+                        {loading ? <Loader2 className="animate-spin"/> : <ImageIcon/>} Upload Image
+                    </button>
+                    <input type="file" hidden ref={fileInputRef} onChange={handleUpload}/>
+                    {adData.image && <img src={adData.image} className="h-32 w-full object-cover rounded-xl"/>}
+                    <button onClick={submitRequest} disabled={loading || !adData.message} className="w-full bg-green-500 text-white py-3 rounded-xl font-bold">{t('submitRequest')}</button>
+                </div>
+            )}
+        </div>
+    );
+};
+
+const QRScannerComponent: React.FC<{ providerId: number }> = ({ providerId }) => {
+  const { t } = useLocalization();
+  const [scanResult, setScanResult] = useState<string | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [verificationStatus, setVerificationStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [bookingData, setBookingData] = useState<any>(null);
+
+  const startScan = async () => {
+    setIsScanning(true);
+    setScanResult(null);
+    setVerificationStatus('idle');
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play();
+        requestAnimationFrame(tick);
+      }
+    } catch (err) {
+      console.error("Error opening camera", err);
+      setIsScanning(false);
+    }
+  };
+
+  const stopScan = () => {
+    setIsScanning(false);
+    if (videoRef.current && videoRef.current.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach(track => track.stop());
+      videoRef.current.srcObject = null;
+    }
+  };
+
+  const tick = () => {
+    if (!isScanning || !videoRef.current || !canvasRef.current) return;
+    if (videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
+      const canvas = canvasRef.current;
+      const video = videoRef.current;
+      canvas.height = video.videoHeight;
+      canvas.width = video.videoWidth;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'dontInvert' });
+        if (code) {
+          handleScan(code.data);
+          return;
+        }
+      }
+    }
+    requestAnimationFrame(tick);
+  };
+
+  const handleScan = async (data: string) => {
+    stopScan();
+    setScanResult(data);
+    setVerificationStatus('loading');
+    try {
+        const parsed = JSON.parse(data);
+        if(!parsed.appointmentId) throw new Error("Invalid QR");
+
+        // Verify with Supabase
+        const { data: appointment, error } = await supabase
+            .from('appointments')
+            .select('*, clients(*)')
+            .eq('id', parsed.appointmentId)
+            .eq('provider_id', providerId)
+            .single();
+
+        if (error || !appointment) {
+            setVerificationStatus('error');
+        } else {
+            setBookingData(appointment);
+            setVerificationStatus('success');
+            
+            // Record Scan History
+            await supabase.from('scan_history').insert({
+                provider_id: providerId,
+                client_name: appointment.clients?.full_name || 'Guest',
+                client_phone: appointment.clients?.phone || 'N/A'
+            });
+        }
+    } catch (e) {
+        setVerificationStatus('error');
+    }
+  };
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 flex flex-col items-center">
+        <h3 className="font-bold text-xl mb-6 dark:text-white flex items-center gap-2"><Camera className="text-purple-600"/> {t('qrScannerTitle')}</h3>
+        
+        {isScanning ? (
+            <div className="relative w-full aspect-square bg-black rounded-2xl overflow-hidden mb-4">
+                <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" />
+                <canvas ref={canvasRef} className="hidden" />
+                <div className="absolute inset-0 border-2 border-green-500/50 flex items-center justify-center">
+                    <div className="w-48 h-48 border-2 border-green-500 rounded-xl animate-pulse"/>
+                </div>
+                <button onClick={stopScan} className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white/20 backdrop-blur-md text-white px-4 py-2 rounded-full text-sm font-bold">{t('cancel')}</button>
+            </div>
+        ) : (
+            <div className="w-full text-center">
+                {verificationStatus === 'idle' && (
+                    <button onClick={startScan} className="w-full h-48 bg-gray-100 dark:bg-gray-700 rounded-2xl flex flex-col items-center justify-center gap-4 hover:bg-gray-200 transition-colors">
+                        <Camera size={48} className="text-gray-400"/>
+                        <span className="font-bold text-gray-500">{t('scanWithCamera')}</span>
+                    </button>
+                )}
+                
+                {verificationStatus === 'loading' && <Loader2 className="animate-spin mx-auto text-purple-600" size={48}/>}
+                
+                {verificationStatus === 'success' && (
+                    <div className="bg-green-50 p-6 rounded-2xl border border-green-100 animate-fade-in">
+                        <CheckCircle size={48} className="text-green-500 mx-auto mb-4"/>
+                        <h4 className="font-bold text-xl text-green-700 mb-2">{t('verificationSuccess')}</h4>
+                        <p className="text-gray-600">{bookingData?.clients?.full_name}</p>
+                        <p className="text-gray-500 text-sm">{new Date(bookingData?.created_at).toLocaleString()}</p>
+                        <button onClick={() => setVerificationStatus('idle')} className="mt-4 text-green-700 font-bold underline">{t('scanWithCamera')}</button>
+                    </div>
+                )}
+                
+                {verificationStatus === 'error' && (
+                    <div className="bg-red-50 p-6 rounded-2xl border border-red-100 animate-fade-in">
+                        <XCircle size={48} className="text-red-500 mx-auto mb-4"/>
+                        <h4 className="font-bold text-xl text-red-700 mb-2">{t('invalidQR')}</h4>
+                        <button onClick={() => setVerificationStatus('idle')} className="mt-4 text-red-700 font-bold underline">{t('tryAgain')}</button>
+                    </div>
+                )}
+            </div>
+        )}
+    </div>
+  );
+};
+
+// --- MAIN PORTAL ---
 interface ProviderPortalProps {
     provider: AuthenticatedUser;
     onLogout: () => void;
@@ -749,89 +490,71 @@ interface ProviderPortalProps {
 
 const ProviderPortal: React.FC<ProviderPortalProps> = ({ provider, onLogout }) => {
     const { t } = useLocalization();
-    const [refreshNotifs, setRefreshNotifs] = useState(0);
-    const [stats, setStats] = useState({ followers: 0, scans: 0, posts: 0 });
-
-    const isValid = provider.isActive && provider.subscriptionEndDate && new Date(provider.subscriptionEndDate) > new Date();
-    // Admin Check: Strict Phone Match
     const isAdmin = provider.phone === '0617774846';
+    
+    // Stats State
+    const [stats, setStats] = useState({ followers: 0, scans: 0, ads: 0 });
 
     useEffect(() => {
-        fetchStats();
+        const getStats = async () => {
+            const { count: followers } = await supabase.from('follows').select('*', {count: 'exact', head: true}).eq('provider_id', provider.id);
+            const { count: scans } = await supabase.from('scan_history').select('*', {count: 'exact', head: true}).eq('provider_id', provider.id);
+            const { count: ads } = await supabase.from('announcements').select('*', {count: 'exact', head: true}).eq('provider_id', provider.id);
+            setStats({ followers: followers || 0, scans: scans || 0, ads: ads || 0 });
+        }
+        getStats();
     }, [provider.id]);
 
-    const fetchStats = async () => {
-        const { count: followers } = await supabase.from('follows').select('id', { count: 'exact' }).eq('provider_id', provider.id);
-        const { count: scans } = await supabase.from('scan_history').select('id', { count: 'exact' }).eq('provider_id', provider.id);
-        const { count: posts } = await supabase.from('announcements').select('id', { count: 'exact' }).eq('provider_id', provider.id);
-        setStats({ followers: followers || 0, scans: scans || 0, posts: posts || 0 });
-    }
-
     return (
-        <div className="pb-32 px-4">
-             {/* Header (Instagram Style) */}
-             <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 mb-6">
-                 <div className="flex items-center gap-4 mb-6">
-                     <div className="w-20 h-20 rounded-full border-2 border-primary p-0.5 flex-shrink-0">
-                         <div className="w-full h-full rounded-full overflow-hidden bg-gray-200">
-                             {provider.profile_image_url ? (
-                                 <img src={provider.profile_image_url} className="w-full h-full object-cover"/>
-                             ) : (
-                                 <User className="w-full h-full p-4 text-gray-400"/>
-                             )}
-                         </div>
-                     </div>
-                     <div className="flex-1 flex justify-around text-center">
+        <div className="pb-32 px-4 bg-gray-50 dark:bg-gray-900 min-h-full">
+            
+            {/* 1. Instagram-Style Header */}
+            <div className="pt-8 pb-6 bg-white dark:bg-gray-800 rounded-b-3xl shadow-sm mb-6 -mx-4 px-6 border-b dark:border-gray-700">
+                <div className="flex items-center gap-6">
+                    <div className="w-20 h-20 rounded-full bg-purple-100 p-1">
+                        <img 
+                            src={provider.profile_image_url || `https://ui-avatars.com/api/?name=${provider.name}&background=random`} 
+                            className="w-full h-full rounded-full object-cover"
+                        />
+                    </div>
+                    <div className="flex-1 flex justify-around text-center">
                          <div>
-                             <span className="block font-bold text-xl dark:text-white">{stats.followers}</span>
+                             <span className="block font-bold text-lg dark:text-white">{stats.followers}</span>
                              <span className="text-xs text-gray-500">{t('followers')}</span>
                          </div>
                          <div>
-                             <span className="block font-bold text-xl dark:text-white">{stats.scans}</span>
+                             <span className="block font-bold text-lg dark:text-white">{stats.scans}</span>
                              <span className="text-xs text-gray-500">{t('totalScans')}</span>
                          </div>
                          <div>
-                             <span className="block font-bold text-xl dark:text-white">{stats.posts}</span>
-                             <span className="text-xs text-gray-500">{t('activeAds')}</span>
+                             <span className="block font-bold text-lg dark:text-white">{stats.ads}</span>
+                             <span className="text-xs text-gray-500">{t('posts')}</span>
                          </div>
-                     </div>
-                 </div>
-                 
-                 <div>
-                     <div className="flex justify-between items-start">
-                         <div>
-                             <h2 className="font-bold text-lg dark:text-white">{provider.name}</h2>
-                             <span className="text-sm text-primary font-bold">{provider.service_type}</span>
-                         </div>
-                         <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${isValid ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                             {isValid ? t('statusActive') : t('statusPending')}
-                         </span>
-                     </div>
-                     {provider.bio && <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">{provider.bio}</p>}
-                 </div>
-             </div>
+                    </div>
+                </div>
+                <div className="mt-4">
+                    <h1 className="font-bold text-xl dark:text-white">{provider.name}</h1>
+                    <p className="text-purple-600 text-sm font-medium">{provider.service_type}</p>
+                    <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">{provider.bio || "No bio yet."}</p>
+                </div>
+                <div className="flex gap-2 mt-4">
+                     <button className="flex-1 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg text-sm font-bold dark:text-white">{t('edit')} {t('profileAndServices')}</button>
+                     <button onClick={onLogout} className="px-4 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-lg"><LogOut size={18}/></button>
+                </div>
+            </div>
 
-             <RestrictedGuard provider={provider}>
-                 {/* Widget Grid */}
-                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                     
-                     <div className="space-y-6">
-                         <QRScannerComponent providerId={provider.id} onScanSuccess={() => { setRefreshNotifs(prev => prev + 1); fetchStats(); }} />
-                         <ProviderNotifications providerId={provider.id} refreshTrigger={refreshNotifs} />
-                     </div>
-
-                     <div className="space-y-6">
-                         <AnnouncementManager providerId={provider.id} />
-                         <ProfileManager provider={provider} />
-                     </div>
-
-                     <div className="space-y-6">
-                        {isAdmin && <StoreManager provider={provider} />}
-                        <ClientList providerId={provider.id} />
-                        <ScanHistory providerId={provider.id} />
-                     </div>
-                 </div>
-             </RestrictedGuard>
+            {/* 2. Grid Content */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <RestrictedGuard isActive={provider.isActive !== false}>
+                    <QRScannerComponent providerId={provider.id} />
+                    <ProviderNotifications providerId={provider.id} />
+                    <ScanHistory providerId={provider.id} />
+                    <ClientList providerId={provider.id} />
+                    <AnnouncementManager providerId={provider.id} />
+                    <ProfileManager provider={provider} />
+                    <RequestAd providerId={provider.id} />
+                </RestrictedGuard>
+            </div>
         </div>
     );
 };

@@ -29,8 +29,15 @@ const DraggableFab = ({ onClick }: { onClick: () => void }) => {
     };
 
     // Touch Handlers
-    const onTouchStart = (e: React.TouchEvent) => handleStart(e.touches[0].clientX, e.touches[0].clientY);
-    const onTouchMove = (e: React.TouchEvent) => handleMove(e.touches[0].clientX, e.touches[0].clientY);
+    const onTouchStart = (e: React.TouchEvent) => {
+        // e.stopPropagation(); 
+        handleStart(e.touches[0].clientX, e.touches[0].clientY);
+    };
+    
+    const onTouchMove = (e: React.TouchEvent) => {
+        // e.preventDefault() is handled by touchAction: none style
+        handleMove(e.touches[0].clientX, e.touches[0].clientY);
+    };
 
     // Mouse Handlers (for PC)
     const onMouseDown = (e: React.MouseEvent) => {
@@ -52,7 +59,7 @@ const DraggableFab = ({ onClick }: { onClick: () => void }) => {
                 position: 'fixed', 
                 left: `${position.x}px`, 
                 top: `${position.y}px`, 
-                touchAction: 'none' 
+                touchAction: 'none' // CRITICAL: This prevents screen scrolling while dragging
             }}
             onTouchStart={onTouchStart}
             onTouchMove={onTouchMove}
@@ -104,22 +111,27 @@ export const JobBoard: React.FC<{ isOpen: boolean; onClose: () => void; currentU
     }, [isOpen]);
 
     const fetchJobs = async () => {
-        setLoading(true);
-        // Select all fields AND the count of related comments
-        const { data, error } = await supabase
-            .from('job_posts')
-            .select('*, job_comments(count)')
-            .order('created_at', { ascending: false });
-        
-        if (data) {
-            // Transform the data to flatten comments_count
-            const formattedJobs: JobPost[] = data.map((job: any) => ({
-                ...job,
-                comments_count: job.job_comments?.[0]?.count || 0
-            }));
-            setJobs(formattedJobs);
+        try {
+            setLoading(true);
+            // Select all fields AND the count of related comments
+            const { data, error } = await supabase
+                .from('job_posts')
+                .select('*, job_comments(count)')
+                .order('created_at', { ascending: false });
+            
+            if (data) {
+                // Transform the data to flatten comments_count
+                const formattedJobs: JobPost[] = data.map((job: any) => ({
+                    ...job,
+                    comments_count: job.job_comments?.[0]?.count || 0
+                }));
+                setJobs(formattedJobs);
+            }
+        } catch(e) {
+            console.log("Error fetching jobs", e);
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
     const handleStartPost = () => {
@@ -227,15 +239,16 @@ export const JobBoard: React.FC<{ isOpen: boolean; onClose: () => void; currentU
         setCommentLoading(false);
     }
 
-    // Filter Logic
-    const filteredJobs = jobs.filter(j => {
+    // Filter Logic - SAFE CHECK ADDED
+    const safeJobs = jobs || [];
+    const filteredJobs = safeJobs.filter(j => {
         const typeMatch = activeTab === 'OFFERS' ? j.post_type === 'EMPLOYER' : j.post_type === 'SEEKER';
         const catMatch = categoryFilter === 'ALL' || j.category === categoryFilter;
         return typeMatch && catMatch;
     });
 
-    // Calculate Category Counts based on Active Tab
-    const currentTabJobs = jobs.filter(j => activeTab === 'OFFERS' ? j.post_type === 'EMPLOYER' : j.post_type === 'SEEKER');
+    // Calculate Category Counts based on Active Tab - SAFE CHECK ADDED
+    const currentTabJobs = safeJobs.filter(j => activeTab === 'OFFERS' ? j.post_type === 'EMPLOYER' : j.post_type === 'SEEKER');
     const categoryCounts = categories.reduce((acc, curr) => {
         acc[curr] = currentTabJobs.filter(j => j.category === curr).length;
         return acc;
@@ -243,12 +256,14 @@ export const JobBoard: React.FC<{ isOpen: boolean; onClose: () => void; currentU
 
 
     const formatTime = (dateStr: string) => {
-        const date = new Date(dateStr);
-        const now = new Date();
-        const diffMs = now.getTime() - date.getTime();
-        const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
-        if(diffHrs < 24) return `${diffHrs}h ${t('postedAgo')}`;
-        return date.toLocaleDateString();
+        try {
+            const date = new Date(dateStr);
+            const now = new Date();
+            const diffMs = now.getTime() - date.getTime();
+            const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
+            if(diffHrs < 24) return `${diffHrs}h ${t('postedAgo')}`;
+            return date.toLocaleDateString();
+        } catch (e) { return dateStr; }
     }
 
     if (!isOpen) return null;
@@ -338,7 +353,7 @@ export const JobBoard: React.FC<{ isOpen: boolean; onClose: () => void; currentU
                                                         {job.image_url ? (
                                                             <img src={job.image_url} className="w-full h-full object-cover rounded-xl"/>
                                                         ) : (
-                                                            job.user_name.charAt(0).toUpperCase()
+                                                            job.user_name?.charAt(0).toUpperCase()
                                                         )}
                                                     </div>
                                                     <div>
@@ -385,7 +400,7 @@ export const JobBoard: React.FC<{ isOpen: boolean; onClose: () => void; currentU
                                                      </button>
                                                 </div>
                                                 <a 
-                                                    href={`https://wa.me/${job.contact_phone.replace(/\s/g, '').replace(/^0/, '212')}?text=Hello, I saw your post on TangerConnect for: ${job.title}`} 
+                                                    href={`https://wa.me/${job.contact_phone?.replace(/\s/g, '').replace(/^0/, '212')}?text=Hello, I saw your post on TangerConnect for: ${job.title}`} 
                                                     target="_blank" 
                                                     rel="noreferrer"
                                                     className={`px-4 py-2 rounded-full text-xs font-bold text-white shadow-sm flex items-center gap-2 ${job.post_type === 'EMPLOYER' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'}`}
