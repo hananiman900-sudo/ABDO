@@ -10,51 +10,45 @@ export const getChatResponse = async (
   image?: { base64: string; mimeType: string; },
   audio?: { base64: string; mimeType: string; },
   userId?: number,
-  userName?: string,
-  userPhone?: string,
-  announcementsText: string = "",
-  userLocation?: { lat: number, lng: number }
+  userName?: string
 ): Promise<string> => {
     
-    // 1. Get Keys
     const config = (window as any).TANGER_CONFIG || (window as any).process?.env || {};
     let apiKeys: string[] = config.API_KEYS || [config.API_KEY];
     if (!apiKeys || apiKeys.length === 0) return "System Error: No API Key.";
 
-    // 2. Context
-    let providersListString = "Info unavailable.";
+    // Fetch Providers
+    let providers = "No data";
     try {
         const { data } = await supabase.from('providers').select('name, service_type, location, id');
-        if(data) providersListString = JSON.stringify(data);
+        if(data) providers = JSON.stringify(data);
     } catch(e) {}
 
-    const systemInstruction = `You are TangerConnect AI, a smart assistant for Tangier.
-    Language: ${language}. User: ${userName || 'Guest'}.
-    Providers: ${providersListString}.
+    const systemInstruction = `You are TangerConnect AI (طنجة كونكت), a helpful city assistant.
+    Language: ${language} (Default to Arabic unless user speaks otherwise). 
+    User: ${userName || 'Guest'}.
+    Providers Data: ${providers}.
     
-    ROLE:
-    1. Help users find services (Doctors, Plumbers, etc.).
-    2. VISUAL ANALYSIS: If a user has a problem (e.g., toothache), ask them to upload a photo. Analyze the photo and suggest the nearest specialist.
-    3. BOOKING: If a user wants to visit a provider, Offer to "Book Appointment".
+    TASKS:
+    1. GENERAL: Help users with services (Real Estate, Jobs, Doctors).
     
-    IMPORTANT JSON OUTPUT FOR BOOKING:
-    If the user confirms they want to book/visit a provider, you MUST return a JSON object ONLY:
-    {
-      "bookingConfirmed": true,
-      "provider": "Provider Name",
-      "service": "Service Name",
-      "location": "Location",
-      "discount": "10% Off",
-      "message": "Appointment Confirmed! Show this QR code."
-    }
+    2. MEDICAL/DENTAL SCENARIO: 
+       - If user says "My tooth hurts" or "I need a dentist":
+       - Step 1: Ask "Can you describe the pain? Or upload a photo if visible?"
+       - Step 2: If photo provided, say "Analyzing..." then "I see inflammation. I recommend seeing a dentist."
+       - Step 3: Suggest nearest dentist from 'Providers Data'.
+       - Step 4: Ask "Want to book an appointment?"
+       - Step 5: If YES, generate booking JSON.
+       
+    3. BOOKING RESPONSE:
+       If confirming a booking, DO NOT output text. Output strictly JSON:
+       { "bookingConfirmed": true, "provider": "Name", "service": "Type", "message": "تم الحجز! المرجو إظهار هذا الرمز للطبيب." }
     
-    Otherwise, reply naturally in ${language}.
+    Otherwise, reply naturally in ${language}. Keep it short and helpful.
     `;
 
-    const userParts: any[] = [];
-    if (newMessage) userParts.push({ text: newMessage });
+    const userParts: any[] = [{ text: newMessage }];
     if (image) userParts.push({ inlineData: { data: image.base64, mimeType: image.mimeType } });
-    if (audio) userParts.push({ inlineData: { data: audio.base64, mimeType: audio.mimeType } });
 
     const contents = [...history, { role: 'user', parts: userParts }];
 

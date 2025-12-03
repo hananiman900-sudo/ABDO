@@ -1,19 +1,13 @@
 
-import React, { createContext, useContext, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { Language } from '../types';
 
 interface Translations {
   [key: string]: { [lang in Language]: string };
 }
 
-type TranslationPlaceholder = { [key: string]: string | number };
-
 export const translations: Translations = {
-  appName: {
-    ar: 'TangerConnect AI',
-    en: 'TangerConnect AI',
-    fr: 'TangerConnect AI',
-  },
+  appName: { ar: 'طنجة كونكت', en: 'TangerConnect', fr: 'TangerConnect' },
   // --- GENERAL ---
   search: { ar: 'بحث', en: 'Search', fr: 'Rechercher' },
   loading: { ar: 'جاري التحميل...', en: 'Loading...', fr: 'Chargement...' },
@@ -22,9 +16,11 @@ export const translations: Translations = {
   cancel: { ar: 'إلغاء', en: 'Cancel', fr: 'Annuler' },
   delete: { ar: 'مسح', en: 'Delete', fr: 'Supprimer' },
   edit: { ar: 'تعديل', en: 'Edit', fr: 'Modifier' },
+  share: { ar: 'مشاركة', en: 'Share', fr: 'Partager' },
   back: { ar: 'رجوع', en: 'Back', fr: 'Retour' },
   menu: { ar: 'القائمة', en: 'Menu', fr: 'Menu' },
   home: { ar: 'الرئيسية', en: 'Home', fr: 'Accueil' },
+  guest: { ar: 'زائر', en: 'Guest', fr: 'Invité' },
   
   // --- AUTH ---
   loginRegister: { ar: 'دخول / تسجيل', en: 'Login / Register', fr: 'Connexion / S\'inscrire' },
@@ -33,7 +29,8 @@ export const translations: Translations = {
   logout: { ar: 'خروج', en: 'Logout', fr: 'Déconnexion' },
   username: { ar: 'إسم المستخدم', en: 'Username', fr: 'Nom d\'utilisateur' },
   password: { ar: 'كلمة السر', en: 'Password', fr: 'Mot de passe' },
-  phone: { ar: 'الهاتف', en: 'Phone', fr: 'Téléphone' },
+  phone: { ar: 'رقم الهاتف', en: 'Phone Number', fr: 'Numéro de téléphone' },
+  phoneOrUsername: { ar: 'رقم الهاتف أو إسم المستخدم', en: 'Phone or Username', fr: 'Tél ou Nom d\'utilisateur' },
   fullName: { ar: 'الإسم الكامل', en: 'Full Name', fr: 'Nom complet' },
   accountType: { ar: 'نوع الحساب', en: 'Account Type', fr: 'Type de compte' },
   client: { ar: 'زبون', en: 'Client', fr: 'Client' },
@@ -41,50 +38,111 @@ export const translations: Translations = {
   loginButton: { ar: 'دخول', en: 'Login', fr: 'Connexion' },
   registerButton: { ar: 'تسجيل', en: 'Register', fr: 'S\'inscrire' },
   
+  // --- PROFILE ---
+  posts: { ar: 'الخدمات', en: 'Services', fr: 'Services' },
+  followers: { ar: 'المتابعين', en: 'Followers', fr: 'Abonnés' },
+  visits: { ar: 'زيارات اليوم', en: 'Visits Today', fr: 'Visites' },
+  following: { ar: 'أتابع', en: 'Following', fr: 'Abonnements' },
+  
   // --- STORE SPECIFIC ---
-  storeWelcomeTitle: { ar: 'مرحبا بك في المتجر!', en: 'Welcome to Store!', fr: 'Bienvenue !' },
+  storeWelcomeTitle: { ar: 'مرحبا بك!', en: 'Welcome!', fr: 'Bienvenue !' },
   storeWelcomeMsg: { ar: 'الدفع عند الاستلام! شوف السلعة عاد خلص.', en: 'Cash on Delivery! Check goods then pay.', fr: 'Paiement à la livraison ! Vérifiez d\'abord.' },
-  shopNow: { ar: 'تسوق الآن', en: 'Shop Now', fr: 'Acheter' },
+  shopNow: { ar: 'تصفح العروض', en: 'Shop Now', fr: 'Acheter' },
   addToCart: { ar: 'أضف للسلة', en: 'Add to Cart', fr: 'Ajouter au panier' },
   buyNow: { ar: 'شراء الآن', en: 'Buy Now', fr: 'Acheter Maintenant' },
-  checkout: { ar: 'تأكيد الطلب', en: 'Checkout', fr: 'Commander' },
+  checkout: { ar: 'طلب الآن', en: 'Order Now', fr: 'Commander' },
   total: { ar: 'المجموع', en: 'Total', fr: 'Total' },
   cartEmpty: { ar: 'السلة فارغة', en: 'Cart is empty', fr: 'Panier vide' },
-  orderPlaced: { ar: 'تم إرسال طلبك بنجاح! سيتصل بك البائع قريبا.', en: 'Order placed successfully!', fr: 'Commande passée avec succès !' },
-  sizes: { ar: 'المقاسات المتوفرة', en: 'Available Sizes', fr: 'Tailles Dispo' },
+  orderPlaced: { ar: 'تم الطلب! سنتصل بك قريبا.', en: 'Order placed!', fr: 'Commande passée !' },
+  sizes: { ar: 'المقاسات', en: 'Sizes', fr: 'Tailles' },
   description: { ar: 'الوصف', en: 'Description', fr: 'Description' },
   category_clothes: { ar: 'ملابس', en: 'Clothing', fr: 'Vêtements' },
   category_electronics: { ar: 'إلكترونيات', en: 'Electronics', fr: 'Électronique' },
   category_accessories: { ar: 'أكسسوارات', en: 'Accessories', fr: 'Accessoires' },
   category_home: { ar: 'منزل', en: 'Home', fr: 'Maison' },
   category_beauty: { ar: 'تجميل', en: 'Beauty', fr: 'Beauté' },
+  freeDelivery: { ar: 'توصيل مجاني', en: 'Free Delivery', fr: 'Livraison Gratuite' },
+  welcomeBackMessage: { ar: 'مرحبا {name}', en: 'Welcome {name}', fr: 'Bienvenue {name}' },
+  flashSale: { ar: 'عروض خاصة', en: 'Flash Sale', fr: 'Vente Flash' },
+  addProduct: { ar: 'إضافة منتج', en: 'Add Product', fr: 'Ajouter Produit' },
+  adminPanel: { ar: 'الإدارة', en: 'Admin', fr: 'Admin' },
+  adRequests: { ar: 'طلبات الإشهار', en: 'Ad Requests', fr: 'Demandes Pub' },
   
   // --- CHATBOT ---
-  inputPlaceholder: { ar: 'كتب ميساج هنا...', en: 'Type a message...', fr: 'Écrivez un message...' },
+  inputPlaceholder: { ar: 'كتب رسالة...', en: 'Type a message...', fr: 'Écrivez un message...' },
   recording: { ar: 'جاري التسجيل...', en: 'Recording...', fr: 'Enregistrement...' },
+  bookingSuccessMessage: { ar: 'تم الحجز! ورّي هاد QR للكود.', en: 'Booked! Show QR.', fr: 'Réservé ! Montrez le QR.' },
+  welcomeMessage: { ar: 'مرحبا! أنا المساعد الذكي. باش نقدر نعاونك؟', en: 'Hello! How can I help?', fr: 'Bonjour ! Comment aider ?' },
+  service: { ar: 'الخدمة', en: 'Service', fr: 'Service' },
+  with: { ar: 'مع', en: 'With', fr: 'Avec' },
+  discountApplied: { ar: 'تخفيض', en: 'Discount', fr: 'Réduction' },
+  bookingConfirmedTitle: { ar: 'تأكيد الموعد', en: 'Booking Confirmed', fr: 'RDV Confirmé' },
+  sponsored: { ar: 'إشهار', en: 'Sponsored', fr: 'Sponsorisé' },
   
   // --- REAL ESTATE & JOBS ---
-  realEstateTitle: { ar: 'عقارات', en: 'Real Estate', fr: 'Immobilier' },
-  jobBoardTitle: { ar: 'سوق الشغل', en: 'Job Market', fr: 'Emploi' },
-  postAd: { ar: 'نشر إعلان', en: 'Post Ad', fr: 'Publier' },
+  realEstateTitle: { ar: 'السمسار', en: 'Real Estate', fr: 'Immobilier' },
+  jobBoardTitle: { ar: 'سوق الشغل', en: 'Jobs', fr: 'Emploi' },
+  postAd: { ar: 'نشر', en: 'Post', fr: 'Publier' },
+  postNewAd: { ar: 'إعلان جديد', en: 'New Ad', fr: 'Nouvelle Annonce' },
+  filterRent: { ar: 'كراء', en: 'Rent', fr: 'Location' },
+  filterBuy: { ar: 'شراء', en: 'Buy', fr: 'Achat' },
+  filterAll: { ar: 'الكل', en: 'All', fr: 'Tout' },
+  tabOffers: { ar: 'عروض', en: 'Offers', fr: 'Offres' },
+  tabTalent: { ar: 'طلبات', en: 'Seekers', fr: 'Demandes' },
+  jobCategory: { ar: 'مجال', en: 'Category', fr: 'Catégorie' },
+  jobTitle: { ar: 'العنوان', en: 'Title', fr: 'Titre' },
+  salaryPlaceholder: { ar: 'الراتب', en: 'Salary', fr: 'Salaire' },
+  experienceDesc: { ar: 'التفاصيل', en: 'Details', fr: 'Détails' },
+  skillsPlaceholder: { ar: 'المهارات', en: 'Skills', fr: 'Compétences' },
+  postNow: { ar: 'نشر الآن', en: 'Post Now', fr: 'Publier' },
+  chooseRole: { ar: 'شنو بغيتي؟', en: 'Goal?', fr: 'But ?' },
+  iamHiring: { ar: 'بغت خدام', en: 'Hiring', fr: 'Je recrute' },
+  iamLooking: { ar: 'كنقلب على خدمة', en: 'Looking', fr: 'Je cherche' },
+  applyWhatsApp: { ar: 'تواصل', en: 'Contact', fr: 'Contact' },
+  hireWhatsApp: { ar: 'تواصل', en: 'Contact', fr: 'Contact' },
+  writeComment: { ar: 'تعليق...', en: 'Comment...', fr: 'Commentaire...' },
+  postedAgo: { ar: 'منذ', en: 'ago', fr: 'il y a' },
+  noPosts: { ar: 'والو حاليا', en: 'No posts', fr: 'Aucun post' },
   
   // --- PROVIDER PORTAL ---
   controlRoom: { ar: 'غرفة التحكم', en: 'Control Room', fr: 'Salle de Contrôle' },
-  goToApp: { ar: 'الذهاب للتطبيق', en: 'Go to App', fr: 'Aller à l\'App' },
-  qrScannerTitle: { ar: 'ماسح الكود', en: 'QR Scanner', fr: 'Scanner QR' },
+  goToApp: { ar: 'تطبيق الزبناء', en: 'Client View', fr: 'Vue Client' },
+  qrScannerTitle: { ar: 'مسح الكود', en: 'Scan QR', fr: 'Scanner QR' },
   notifications: { ar: 'الإشعارات', en: 'Notifications', fr: 'Notifications' },
-  scanHistory: { ar: 'سجل العمليات', en: 'History', fr: 'Historique' },
-  followers: { ar: 'المتابعين', en: 'Followers', fr: 'Abonnés' },
-  requestBoost: { ar: 'طلب إعلان ممول', en: 'Request Ad', fr: 'Demander Pub' },
+  scanHistory: { ar: 'سجل الزبناء', en: 'History', fr: 'Historique' },
+  requestBoost: { ar: 'طلب إشهار', en: 'Request Ad', fr: 'Demande Pub' },
+  verificationSuccess: { ar: 'كود صحيح!', en: 'Valid!', fr: 'Valide !' },
+  invalidQR: { ar: 'كود غير صالح', en: 'Invalid QR', fr: 'QR Invalide' },
+  scanWithCamera: { ar: 'الكاميرا', en: 'Camera', fr: 'Caméra' },
+  uploadQRImage: { ar: 'رفع صورة QR', en: 'Upload QR', fr: 'Télécharger QR' },
+  messageLabel: { ar: 'نص الإعلان...', en: 'Ad text...', fr: 'Texte pub...' },
+  sendButton: { ar: 'إرسال', en: 'Send', fr: 'Envoyer' },
+  requestSent: { ar: 'تم الإرسال', en: 'Sent', fr: 'Envoyé' },
+  uploadError: { ar: 'خطأ', en: 'Error', fr: 'Erreur' },
+  providerDirectory: { ar: 'دليل المهنيين', en: 'Provider Directory', fr: 'Annuaire Pro' },
   
   // --- ERRORS ---
-  errorMessage: { ar: 'حدث خطأ ما', en: 'Error', fr: 'Erreur' },
-  loginRequired: { ar: 'يجب تسجيل الدخول أولا', en: 'Login Required', fr: 'Connexion Requise' },
+  errorMessage: { ar: 'خطأ', en: 'Error', fr: 'Erreur' },
+  loginRequired: { ar: 'سجل الدخول', en: 'Login First', fr: 'Connexion Requise' },
+  success: { ar: 'تم', en: 'Success', fr: 'Succès' },
 
   // --- OTHERS ---
-  noPosts: { ar: 'لا توجد منشورات حاليا', en: 'No posts yet', fr: 'Aucun post' },
-  priceDH: { ar: 'درهم', en: 'DH', fr: 'DH' },
-  call: { ar: 'اتصال', en: 'Call', fr: 'Appeler' },
+  priceDH: { ar: 'د.م', en: 'DH', fr: 'DH' },
+  call: { ar: 'اتصل', en: 'Call', fr: 'Appeler' },
+  shop: { ar: 'المتجر', en: 'Shop', fr: 'Boutique' },
+  myAppointments: { ar: 'مواعيدي', en: 'Appointments', fr: 'RDV' },
+  databaseSetupTitle: { ar: 'إعداد قاعدة البيانات', en: 'DB Setup', fr: 'Config BDD' },
+  bookedOn: { ar: 'يوم', en: 'On', fr: 'Le' },
+  noAppointmentsFound: { ar: 'لا توجد مواعيد', en: 'No appointments', fr: 'Aucun RDV' },
+  viewQRCode: { ar: 'QR', en: 'QR', fr: 'QR' },
+  downloadQR: { ar: 'تحميل', en: 'Download', fr: 'Télécharger' },
+  copied: { ar: 'منسوخ', en: 'Copied', fr: 'Copié' },
+  copyCode: { ar: 'نسخ', en: 'Copy', fr: 'Copier' },
+  databaseSetupDesc: { ar: 'شغل هاد الأكواد ف Supabase', en: 'Run in Supabase', fr: 'Exécuter dans Supabase' },
+  createAdminUser: { ar: 'إنشاء أدمن', en: 'Create Admin', fr: 'Créer Admin' },
+  completeSQLScript: { ar: 'الكل', en: 'All', fr: 'Tout' },
+  v12UpdateTitle: { ar: 'تحديث V12', en: 'V12', fr: 'V12' },
+  v13UpdateTitle: { ar: 'تحديث V13', en: 'V13', fr: 'V13' },
   
   // --- NEIGHBORHOODS ---
   neighborhoods: {
@@ -92,31 +150,59 @@ export const translations: Translations = {
     en: 'Mesnana, Casabarata, Dradeb, City Center, Malabata, Mojamaa, Val Fleuri, Bani Makada, Aouama, Marchan, Boukhalef, Tanger Balia, Sidi Driss, Msalla, Mohamed V Blvd, Placatoro, Ziaten, Jirari, Souani, Mghogha, Braness, California, Ain Ktiwat, Marjane, Iberia',
     fr: 'Mesnana, Casabarata, Dradeb, Centre Ville, Malabata, Mojamaa, Val Fleuri, Bani Makada, Aouama, Marchan, Boukhalef, Tanger Balia, Sidi Driss, Msalla, Bd Mohamed V, Placatoro, Ziaten, Jirari, Souani, Mghogha, Braness, California, Ain Ktiwat, Marjane, Iberia',
   },
+  
+  // Filters
+  price: { ar: 'الثمن', en: 'Price', fr: 'Prix' },
+  minPrice: { ar: 'من', en: 'Min', fr: 'Min' },
+  maxPrice: { ar: 'إلى', en: 'Max', fr: 'Max' },
+  allNeighborhoods: { ar: 'كل الأحياء', en: 'All Areas', fr: 'Tous Quartiers' },
+  forRent: { ar: 'كراء', en: 'Rent', fr: 'Location' },
+  forSale: { ar: 'بيع', en: 'Sale', fr: 'Vente' },
+  propertyTitle: { ar: 'العنوان', en: 'Title', fr: 'Titre' },
+  propertyType: { ar: 'النوع', en: 'Type', fr: 'Type' },
+  selectNeighborhood: { ar: 'الحي', en: 'Area', fr: 'Quartier' },
+  submitAd: { ar: 'نشر', en: 'Submit', fr: 'Publier' },
+  noNotifications: { ar: 'والو', en: 'None', fr: 'Aucune' },
+
+  // Job Categories
+  cat_security: { ar: 'أمن', en: 'Security', fr: 'Sécurité' },
+  cat_nurse: { ar: 'تمريض', en: 'Nursing', fr: 'Infirmier' },
+  cat_med_assistant: { ar: 'مساعد طبي', en: 'Medical Assistant', fr: 'Assistant Médical' },
+  cat_reception: { ar: 'استقبال', en: 'Reception', fr: 'Réception' },
+  cat_services: { ar: 'خدمات', en: 'Services', fr: 'Services' },
+  cat_accountant: { ar: 'محاسبة', en: 'Accounting', fr: 'Comptabilité' },
+  cat_other: { ar: 'آخر', en: 'Other', fr: 'Autre' },
+  jobDescPlaceholder: { ar: 'الوصف...', en: 'Description...', fr: 'Description...' }
 };
 
 interface LocalizationContextType {
+  t: (key: string) => string;
   language: Language;
-  t: (key: keyof typeof translations | string, placeholders?: TranslationPlaceholder) => string;
+  setLanguage: (lang: Language) => void;
+  dir: 'rtl' | 'ltr';
 }
 
 const LocalizationContext = createContext<LocalizationContextType | undefined>(undefined);
 
-export const LocalizationProvider: React.FC<{ language: Language; children: ReactNode }> = ({ language, children }) => {
-  const t = (key: keyof typeof translations | string, placeholders?: TranslationPlaceholder) => {
-    const translationKey = key as string;
-    let translation = translations[translationKey]?.[language] || translations[translationKey]?.[Language.EN] || translationKey;
-    
-    if (placeholders) {
-      Object.entries(placeholders).forEach(([k, v]) => {
-        translation = translation.replace(`{${k}}`, String(v));
-      });
-    }
+export const LocalizationProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  // STRICT DEFAULT TO ARABIC
+  const [language, setLanguage] = useState<Language>(Language.AR);
+
+  useEffect(() => {
+    // Dynamic Dir adjustment
+    document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
+    document.documentElement.lang = language;
+  }, [language]);
+
+  const t = (key: string) => {
+    const translation = translations[key]?.[language];
+    if (!translation) return translations[key]?.['ar'] || key;
     return translation;
   };
 
   return React.createElement(
     LocalizationContext.Provider,
-    { value: { language, t } },
+    { value: { t, language, setLanguage, dir: language === 'ar' ? 'rtl' : 'ltr' } },
     children
   );
 };
