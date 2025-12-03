@@ -1,11 +1,11 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Message, Role, BookingDetails, AuthenticatedUser, SystemAnnouncement } from '../types';
+import { Message, Role, BookingDetails, AuthenticatedUser, SystemAnnouncement, UrgentAd } from '../types';
 import { getChatResponse } from '../services/geminiService';
 import { useLocalization } from '../hooks/useLocalization';
 import { supabase } from '../services/supabaseClient';
 import QRCodeDisplay from './QRCodeDisplay';
-import { Send, Mic, Paperclip, Camera, Loader2, X } from 'lucide-react';
+import { Send, Mic, Paperclip, Camera, Loader2, X, Zap } from 'lucide-react';
 
 const SystemAdCard: React.FC<{ ad: SystemAnnouncement; onDismiss: () => void }> = ({ ad, onDismiss }) => (
     <div className="w-full mb-4 px-4 relative">
@@ -26,14 +26,25 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
     const fileRef = useRef<HTMLInputElement>(null);
     const [preview, setPreview] = useState<string | null>(null);
     const [systemAds, setSystemAds] = useState<SystemAnnouncement[]>([]);
+    const [urgentAds, setUrgentAds] = useState<UrgentAd[]>([]);
 
     useEffect(() => {
         if(messages.length===0) setMessages([{ role: Role.BOT, text: t('welcomeMessage') }]);
+        
+        // Fetch System Ads
         const fetchAds = async () => {
             const { data } = await supabase.from('system_announcements').select('*').eq('is_active', true);
             if(data) setSystemAds(data);
         }
+        
+        // Fetch Urgent Ticker Ads
+        const fetchUrgent = async () => {
+            const { data } = await supabase.from('urgent_ads').select('*, providers(name)').eq('is_active', true);
+            setUrgentAds(data as any || []);
+        }
+
         fetchAds();
+        fetchUrgent();
     }, []);
 
     useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
@@ -77,6 +88,15 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
 
     return (
         <div className="flex flex-col h-full bg-[#efeae2]">
+            {/* URGENT TICKER */}
+            {urgentAds.length > 0 && (
+                <div className="bg-yellow-300 text-black py-1 overflow-hidden whitespace-nowrap border-b border-yellow-400 z-10 shadow-sm">
+                    <div className="animate-marquee inline-block font-bold text-xs">
+                        {urgentAds.map(ad => `📢 ${ad.providers?.name || 'Urgent'}: ${ad.message}  •  `)}
+                    </div>
+                </div>
+            )}
+
             <div className="flex-1 overflow-y-auto py-4">
                 {systemAds.map(ad => <SystemAdCard key={ad.id} ad={ad} onDismiss={() => setSystemAds(prev => prev.filter(a => a.id !== ad.id))}/>)}
                 {messages.map((m, i) => (

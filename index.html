@@ -50,6 +50,13 @@
             animation: {
               'slide-up': 'slideUp 0.3s ease-out',
               'fade-in': 'fadeIn 0.2s ease-out',
+              'marquee': 'marquee 15s linear infinite',
+            },
+            keyframes: {
+              marquee: {
+                '0%': { transform: 'translateX(100%)' },
+                '100%': { transform: 'translateX(-100%)' },
+              }
             }
           }
         }

@@ -1,9 +1,9 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useLocalization } from '../hooks/useLocalization';
-import { AuthenticatedUser, ProviderNotification, AdRequest } from '../types';
+import { AuthenticatedUser, ProviderNotification, AdRequest, Offer, UrgentAd } from '../types';
 import { supabase } from '../services/supabaseClient';
-import { CheckCircle, XCircle, Camera, Loader2, Upload, MessageCircle, History, Users, Megaphone, Settings, ArrowLeft, Image as ImageIcon, QrCode, Bell, User, LayoutGrid, FileText, Lock, LogOut, Grid, Bookmark, Heart, Plus } from 'lucide-react';
+import { CheckCircle, XCircle, Camera, Loader2, Upload, MessageCircle, History, Users, Megaphone, Settings, ArrowLeft, Image as ImageIcon, QrCode, Bell, User, LayoutGrid, FileText, Lock, LogOut, Grid, Bookmark, Heart, Plus, Zap, Tag, Instagram, Facebook, MapPin, Edit3 } from 'lucide-react';
 import jsQR from 'jsqr';
 
 // --- SUB-COMPONENTS (FULL SCREEN VIEWS) ---
@@ -54,18 +54,157 @@ const HistoryView: React.FC<{ providerId: number; onClose: () => void }> = ({ pr
         <div className="fixed inset-0 bg-white z-50 flex flex-col animate-slide-up">
             <div className="p-4 border-b flex items-center gap-3">
                 <button onClick={onClose}><ArrowLeft/></button>
-                <h2 className="font-bold text-xl">{t('scanHistory')}</h2>
+                <h2 className="font-bold text-xl">{t('statsTitle')}</h2>
             </div>
-            <div className="p-4 space-y-2">
-                {history.map((h, i) => (
-                     <div key={i} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                         <div><p className="font-bold text-sm">{h.client_name}</p><p className="text-xs text-gray-500">{new Date(h.created_at).toLocaleDateString()}</p></div>
-                         <CheckCircle size={16} className="text-green-500"/>
-                     </div>
-                ))}
+            <div className="p-4">
+                <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+                    <table className="w-full text-sm">
+                        <thead className="bg-gray-50">
+                            <tr>
+                                <th className="p-3 text-right">{t('clientName')}</th>
+                                <th className="p-3 text-right">{t('visitDate')}</th>
+                                <th className="p-3 text-right">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {history.map((h, i) => (
+                                <tr key={i} className="border-t">
+                                    <td className="p-3 font-bold">{h.client_name}</td>
+                                    <td className="p-3 text-gray-500">{new Date(h.created_at).toLocaleDateString()}</td>
+                                    <td className="p-3 text-green-600"><CheckCircle size={14}/></td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     );
+}
+
+const UrgentAdsView: React.FC<{ providerId: number; onClose: () => void }> = ({ providerId, onClose }) => {
+    const { t } = useLocalization();
+    const [ads, setAds] = useState<UrgentAd[]>([]);
+    const [message, setMessage] = useState('');
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => { fetchAds(); }, []);
+    const fetchAds = async () => {
+        const { data } = await supabase.from('urgent_ads').select('*').eq('provider_id', providerId).order('created_at', { ascending: false });
+        setAds(data || []);
+    }
+
+    const handleCreate = async () => {
+        if(!message.trim()) return;
+        setLoading(true);
+        await supabase.from('urgent_ads').insert({ provider_id: providerId, message, is_active: true });
+        setMessage('');
+        fetchAds();
+        setLoading(false);
+    }
+
+    const handleDelete = async (id: number) => {
+        await supabase.from('urgent_ads').delete().eq('id', id);
+        fetchAds();
+    }
+
+    return (
+        <div className="fixed inset-0 bg-white z-50 flex flex-col animate-slide-up">
+             <div className="p-4 border-b flex items-center gap-3">
+                <button onClick={onClose}><ArrowLeft/></button>
+                <h2 className="font-bold text-xl">{t('urgentAds')}</h2>
+            </div>
+            <div className="p-4 space-y-4">
+                <div className="flex gap-2">
+                    <input value={message} onChange={e => setMessage(e.target.value)} placeholder="Urgent message for ticker..." className="flex-1 border p-2 rounded-lg outline-none"/>
+                    <button onClick={handleCreate} disabled={loading} className="bg-red-500 text-white px-4 py-2 rounded-lg font-bold">{t('postAd')}</button>
+                </div>
+                <div className="space-y-2">
+                    {ads.map(ad => (
+                        <div key={ad.id} className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg flex justify-between items-center">
+                            <span className="text-sm font-bold">{ad.message}</span>
+                            <button onClick={() => handleDelete(ad.id)} className="text-red-500"><XCircle size={18}/></button>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    )
+}
+
+const OffersView: React.FC<{ providerId: number; onClose: () => void }> = ({ providerId, onClose }) => {
+    const { t } = useLocalization();
+    const [offers, setOffers] = useState<Offer[]>([]);
+    const [newOffer, setNewOffer] = useState({ title: '', original_price: '', discount_price: '', image: '' });
+    const [loading, setLoading] = useState(false);
+    const fileRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => { fetchOffers(); }, []);
+    const fetchOffers = async () => {
+        const { data } = await supabase.from('provider_offers').select('*').eq('provider_id', providerId);
+        setOffers(data || []);
+    }
+
+    const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if(!file) return;
+        setLoading(true);
+        try {
+            const fileName = `offer_${providerId}_${Date.now()}`;
+            await supabase.storage.from('product-images').upload(fileName, file);
+            const { data } = supabase.storage.from('product-images').getPublicUrl(fileName);
+            setNewOffer(prev => ({ ...prev, image: data.publicUrl }));
+        } catch(e) {} finally { setLoading(false); }
+    }
+
+    const handleCreate = async () => {
+        if(!newOffer.title) return;
+        setLoading(true);
+        await supabase.from('provider_offers').insert({ 
+            provider_id: providerId, 
+            title: newOffer.title, 
+            original_price: parseFloat(newOffer.original_price), 
+            discount_price: parseFloat(newOffer.discount_price),
+            image_url: newOffer.image
+        });
+        setNewOffer({ title: '', original_price: '', discount_price: '', image: '' });
+        fetchOffers();
+        setLoading(false);
+    }
+
+    return (
+        <div className="fixed inset-0 bg-white z-50 flex flex-col animate-slide-up">
+            <div className="p-4 border-b flex items-center gap-3">
+                <button onClick={onClose}><ArrowLeft/></button>
+                <h2 className="font-bold text-xl">{t('offers')}</h2>
+            </div>
+            <div className="p-4 space-y-4">
+                <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 space-y-2">
+                    <input placeholder={t('titleLabel')} value={newOffer.title} onChange={e => setNewOffer({...newOffer, title: e.target.value})} className="w-full p-2 rounded border"/>
+                    <div className="flex gap-2">
+                         <input type="number" placeholder={t('originalPrice')} value={newOffer.original_price} onChange={e => setNewOffer({...newOffer, original_price: e.target.value})} className="flex-1 p-2 rounded border"/>
+                         <input type="number" placeholder={t('discountPrice')} value={newOffer.discount_price} onChange={e => setNewOffer({...newOffer, discount_price: e.target.value})} className="flex-1 p-2 rounded border"/>
+                    </div>
+                    <button onClick={() => fileRef.current?.click()} className="w-full py-2 bg-white border border-dashed rounded flex justify-center text-gray-500"><ImageIcon size={18}/> Image</button>
+                    <input type="file" ref={fileRef} hidden onChange={handleUpload}/>
+                    {newOffer.image && <img src={newOffer.image} className="h-20 object-cover rounded"/>}
+                    <button onClick={handleCreate} disabled={loading} className="w-full bg-blue-600 text-white py-2 rounded font-bold">{t('createOffer')}</button>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                    {offers.map(o => (
+                        <div key={o.id} className="border rounded-lg p-2 bg-white shadow-sm">
+                            {o.image_url && <img src={o.image_url} className="w-full h-24 object-cover rounded mb-2"/>}
+                            <h4 className="font-bold text-sm">{o.title}</h4>
+                            <div className="flex gap-2 text-xs">
+                                <span className="line-through text-gray-400">{o.original_price}</span>
+                                <span className="text-red-500 font-bold">{o.discount_price}</span>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    )
 }
 
 const AdsView: React.FC<{ providerId: number; onClose: () => void }> = ({ providerId, onClose }) => {
@@ -165,7 +304,10 @@ const QRScannerView: React.FC<{ providerId: number; onClose: () => void }> = ({ 
             
             // Log visit logic
             await supabase.from('scan_history').insert({ provider_id: providerId, client_name: "Client #" + parsed.appointmentId, client_phone: "Verified" });
-            
+            // Increment Stats
+            const { data: p } = await supabase.from('providers').select('visits_count').eq('id', providerId).single();
+            await supabase.from('providers').update({ visits_count: (p?.visits_count || 0) + 1 }).eq('id', providerId);
+
             setStatus('success');
         } catch(e) { setStatus('error'); }
     };
@@ -200,18 +342,70 @@ const QRScannerView: React.FC<{ providerId: number; onClose: () => void }> = ({ 
     );
 }
 
+const EditProfileModal: React.FC<{ provider: AuthenticatedUser; onClose: () => void }> = ({ provider, onClose }) => {
+    const { t } = useLocalization();
+    const [form, setForm] = useState({ 
+        bio: provider.bio || '', 
+        instagram: provider.social_links?.instagram || '', 
+        facebook: provider.social_links?.facebook || '', 
+        gps: provider.social_links?.gps || '' 
+    });
+    const [loading, setLoading] = useState(false);
+
+    const handleSave = async () => {
+        setLoading(true);
+        const { error } = await supabase.from('providers').update({ 
+            bio: form.bio, 
+            social_links: { instagram: form.instagram, facebook: form.facebook, gps: form.gps } 
+        }).eq('id', provider.id);
+        setLoading(false);
+        if(!error) { alert(t('success')); onClose(); }
+        else alert(t('errorMessage'));
+    }
+
+    return (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl w-full max-w-sm p-6 space-y-4">
+                <h2 className="font-bold text-lg">{t('editProfile')}</h2>
+                <textarea value={form.bio} onChange={e => setForm({...form, bio: e.target.value})} placeholder={t('bioLabel')} className="w-full p-2 border rounded-lg h-24"/>
+                <div className="space-y-2">
+                    <h4 className="font-bold text-xs uppercase text-gray-400">{t('socialLinks')}</h4>
+                    <div className="flex items-center gap-2 border rounded-lg p-2"><Instagram size={16}/><input value={form.instagram} onChange={e => setForm({...form, instagram: e.target.value})} placeholder="Instagram Username" className="flex-1 outline-none text-sm"/></div>
+                    <div className="flex items-center gap-2 border rounded-lg p-2"><Facebook size={16}/><input value={form.facebook} onChange={e => setForm({...form, facebook: e.target.value})} placeholder="Facebook Username" className="flex-1 outline-none text-sm"/></div>
+                    <div className="flex items-center gap-2 border rounded-lg p-2"><MapPin size={16}/><input value={form.gps} onChange={e => setForm({...form, gps: e.target.value})} placeholder="GPS Coordinates" className="flex-1 outline-none text-sm"/></div>
+                </div>
+                <div className="flex gap-2">
+                    <button onClick={onClose} className="flex-1 py-2 bg-gray-100 rounded-lg">{t('cancel')}</button>
+                    <button onClick={handleSave} disabled={loading} className="flex-1 py-2 bg-black text-white rounded-lg font-bold">{t('saveProfile')}</button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
 // --- INSTAGRAM STYLE PORTAL ---
 const ProviderPortal: React.FC<{ provider: AuthenticatedUser; onLogout: () => void }> = ({ provider, onLogout }) => {
     const { t } = useLocalization();
-    const [view, setView] = useState<'scan' | 'notifications' | 'history' | 'ads' | null>(null);
+    const [view, setView] = useState<'scan' | 'notifications' | 'history' | 'ads' | 'offers' | 'urgent' | null>(null);
+    const [editMode, setEditMode] = useState(false);
+
+    const GridItem = ({ icon: Icon, label, onClick, badge }: any) => (
+        <div onClick={onClick} className="aspect-square bg-gray-50 relative group cursor-pointer border border-white hover:bg-gray-100 transition-colors">
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-600">
+                <Icon size={28} strokeWidth={1.5} className="mb-2 text-gray-700"/>
+                <span className="text-[10px] font-bold uppercase tracking-wide">{label}</span>
+                {badge > 0 && <span className="absolute top-2 right-2 bg-red-500 text-white text-[9px] w-4 h-4 rounded-full flex items-center justify-center">{badge}</span>}
+            </div>
+        </div>
+    );
 
     return (
         <div className="h-screen bg-white overflow-y-auto" dir="rtl">
             {/* Nav */}
             <div className="sticky top-0 bg-white z-10 p-3 border-b flex justify-between items-center shadow-sm">
                 <h1 className="font-bold text-lg flex items-center gap-1">{provider.username || provider.name} <CheckCircle size={14} className="text-blue-500 fill-blue-500 text-white"/></h1>
-                <div className="flex gap-4">
-                    <button onClick={onLogout} className="text-xs font-bold bg-gray-100 px-3 py-1 rounded-md">{t('goToApp')}</button>
+                <div className="flex gap-3">
+                    <button onClick={onLogout} className="text-xs font-bold bg-black text-white px-3 py-1.5 rounded-full flex items-center gap-1"><LogOut size={12}/> {t('goToApp')}</button>
                     <Settings/>
                 </div>
             </div>
@@ -231,47 +425,34 @@ const ProviderPortal: React.FC<{ provider: AuthenticatedUser; onLogout: () => vo
                 <div>
                     <h2 className="font-bold">{provider.name}</h2>
                     <p className="text-gray-500 text-sm">{provider.service_type}</p>
-                    <p className="text-sm whitespace-pre-line">{provider.bio || "Welcome to my official profile."}</p>
+                    <p className="text-sm whitespace-pre-line mt-1">{provider.bio || t('bioLabel') + "..."}</p>
+                    {provider.social_links && (
+                        <div className="flex gap-3 mt-2">
+                             {provider.social_links.instagram && <Instagram size={16} className="text-pink-600"/>}
+                             {provider.social_links.facebook && <Facebook size={16} className="text-blue-600"/>}
+                             {provider.social_links.gps && <MapPin size={16} className="text-green-600"/>}
+                        </div>
+                    )}
                 </div>
                 <div className="flex gap-2 mt-4 mb-6">
-                    <button className="flex-1 bg-gray-100 py-1.5 rounded-lg font-bold text-sm">{t('edit')}</button>
+                    <button onClick={() => setEditMode(true)} className="flex-1 bg-gray-100 py-1.5 rounded-lg font-bold text-sm">{t('editProfile')}</button>
                     <button className="flex-1 bg-gray-100 py-1.5 rounded-lg font-bold text-sm">{t('share')}</button>
-                </div>
-
-                {/* Highlights / Tools */}
-                <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar mb-2">
-                    <div className="flex flex-col items-center gap-1 cursor-pointer" onClick={() => setView('scan')}>
-                        <div className="w-16 h-16 rounded-full border bg-gray-50 flex items-center justify-center"><QrCode size={24}/></div>
-                        <span className="text-xs">{t('qrScannerTitle')}</span>
-                    </div>
-                    <div className="flex flex-col items-center gap-1 cursor-pointer" onClick={() => setView('ads')}>
-                        <div className="w-16 h-16 rounded-full border bg-gray-50 flex items-center justify-center"><Megaphone size={24} className="text-pink-500"/></div>
-                        <span className="text-xs">{t('requestBoost')}</span>
-                    </div>
                 </div>
 
                 {/* Grid Tabs */}
                 <div className="flex border-t border-b">
                      <button className="flex-1 py-3 flex justify-center border-b-2 border-black"><Grid size={24}/></button>
-                     <button className="flex-1 py-3 flex justify-center text-gray-400"><Bookmark size={24}/></button>
+                     <button className="flex-1 py-3 flex justify-center text-gray-400"><Tag size={24}/></button>
                 </div>
 
-                {/* The "Grid" (Actually the Tools) */}
+                {/* THE CONTROL GRID */}
                 <div className="grid grid-cols-3 gap-0.5 mt-0.5">
-                    <div onClick={() => setView('notifications')} className="aspect-square bg-gray-100 relative group cursor-pointer border border-white">
-                        <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-500 hover:bg-gray-200">
-                             <Bell size={24} className="mb-1"/>
-                             <span className="text-[10px] font-bold">{t('notifications')}</span>
-                        </div>
-                    </div>
-                    <div onClick={() => setView('history')} className="aspect-square bg-gray-100 relative group cursor-pointer border border-white">
-                        <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-500 hover:bg-gray-200">
-                             <History size={24} className="mb-1"/>
-                             <span className="text-[10px] font-bold">{t('scanHistory')}</span>
-                        </div>
-                    </div>
-                    {/* Filler items */}
-                    {[1,2,3,4].map(i => <div key={i} className="aspect-square bg-gray-100"/>)}
+                    <GridItem icon={QrCode} label={t('qrScannerTitle')} onClick={() => setView('scan')}/>
+                    <GridItem icon={Megaphone} label={t('requestBoost')} onClick={() => setView('ads')}/>
+                    <GridItem icon={Tag} label={t('offers')} onClick={() => setView('offers')}/>
+                    <GridItem icon={History} label={t('statsTitle')} onClick={() => setView('history')}/>
+                    <GridItem icon={Bell} label={t('notifications')} onClick={() => setView('notifications')} badge={0}/>
+                    <GridItem icon={Zap} label={t('urgentAds')} onClick={() => setView('urgent')}/>
                 </div>
             </div>
 
@@ -279,6 +460,10 @@ const ProviderPortal: React.FC<{ provider: AuthenticatedUser; onLogout: () => vo
             {view === 'notifications' && <NotificationView providerId={provider.id} onClose={() => setView(null)} />}
             {view === 'history' && <HistoryView providerId={provider.id} onClose={() => setView(null)} />}
             {view === 'ads' && <AdsView providerId={provider.id} onClose={() => setView(null)} />}
+            {view === 'offers' && <OffersView providerId={provider.id} onClose={() => setView(null)} />}
+            {view === 'urgent' && <UrgentAdsView providerId={provider.id} onClose={() => setView(null)} />}
+            
+            {editMode && <EditProfileModal provider={provider} onClose={() => setEditMode(false)} />}
         </div>
     );
 };

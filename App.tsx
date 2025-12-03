@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { UserView, Language, AuthenticatedUser, AccountType, Role } from './types';
+import { UserView, Language, AuthenticatedUser, AccountType, Role, Offer } from './types';
 import Chatbot from './components/Chatbot';
 import ProviderPortal from './components/QRScanner';
 import AppointmentsDrawer from './components/AppointmentsDrawer';
@@ -10,14 +10,13 @@ import { RealEstate } from './components/RealEstate';
 import { JobBoard } from './components/JobBoard';
 import { useLocalization, LocalizationProvider } from './hooks/useLocalization';
 import { supabase } from './services/supabaseClient';
-import { LogIn, User, MapPin, ShoppingBag, Home, Briefcase, Settings, X, Phone, Globe, LayoutGrid, Heart, List, LogOut, CheckCircle, Edit, Share2, Grid, Bookmark, Menu, Users, Database } from 'lucide-react';
+import { LogIn, User, MapPin, ShoppingBag, Home, Briefcase, Settings, X, Phone, Globe, LayoutGrid, Heart, List, LogOut, CheckCircle, Edit, Share2, Grid, Bookmark, Menu, Users, Database, Instagram, Facebook, Tag } from 'lucide-react';
 
 // --- AUTH MODAL ---
 const AuthModal: React.FC<{ isOpen: boolean; onClose: () => void; onLogin: (user: AuthenticatedUser) => void }> = ({ isOpen, onClose, onLogin }) => {
     const { t, language } = useLocalization();
     const [isRegister, setIsRegister] = useState(false);
     const [loading, setLoading] = useState(false);
-    // Note: formData.phone is used as a generic identifier (Phone OR Username) for login
     const [formData, setFormData] = useState({ phone: '', password: '', name: '', type: AccountType.CLIENT, service_type: '', username: '' });
 
     const handleSubmit = async () => {
@@ -28,49 +27,26 @@ const AuthModal: React.FC<{ isOpen: boolean; onClose: () => void; onLogin: (user
                 const payload: any = { phone: formData.phone, password: formData.password, [formData.type === AccountType.CLIENT ? 'full_name' : 'name']: formData.name };
                 if (formData.type === AccountType.PROVIDER) {
                     payload.service_type = formData.service_type || 'General';
-                    // Allow explicit username registration, fallback to phone if empty
                     payload.username = formData.username || formData.phone; 
                     payload.is_active = true;
                 }
                 const { error } = await supabase.from(table).insert(payload);
                 if (error) throw error;
-                // Auto login after register
                 const query = supabase.from(table).select('*');
-                if (formData.type === AccountType.PROVIDER) {
-                    query.eq('username', payload.username);
-                } else {
-                    query.eq('phone', formData.phone);
-                }
+                if (formData.type === AccountType.PROVIDER) query.eq('username', payload.username);
+                else query.eq('phone', formData.phone);
                 const { data } = await query.single();
-                
                 if(data) onLogin({ id: data.id, name: data.full_name || data.name, accountType: formData.type, phone: data.phone, service_type: data.service_type, profile_image_url: data.profile_image_url, username: data.username });
             } else {
                 let user: any = null;
                 let type: AccountType = AccountType.CLIENT;
-                
-                // 1. Try finding in Clients table (Login by Phone only usually)
                 const { data: client } = await supabase.from('clients').select('*').eq('phone', formData.phone).eq('password', formData.password).single();
-                if (client) { 
-                    user = client; 
-                    type = AccountType.CLIENT; 
-                }
+                if (client) { user = client; type = AccountType.CLIENT; }
                 else {
-                    // 2. Try finding in Providers table (Login by Phone OR Username)
-                    // We check if the input matches phone OR username column
-                    const { data: provider } = await supabase
-                        .from('providers')
-                        .select('*')
-                        .eq('password', formData.password)
-                        .or(`phone.eq.${formData.phone},username.eq.${formData.phone}`)
-                        .single();
-                        
-                    if (provider) { 
-                        user = provider; 
-                        type = AccountType.PROVIDER; 
-                    }
+                    const { data: provider } = await supabase.from('providers').select('*').eq('password', formData.password).or(`phone.eq.${formData.phone},username.eq.${formData.phone}`).single();
+                    if (provider) { user = provider; type = AccountType.PROVIDER; }
                 }
-                
-                if (user) onLogin({ id: user.id, name: user.full_name || user.name, accountType: type, phone: user.phone, service_type: user.service_type, profile_image_url: user.profile_image_url, bio: user.bio, username: user.username });
+                if (user) onLogin({ id: user.id, name: user.full_name || user.name, accountType: type, phone: user.phone, service_type: user.service_type, profile_image_url: user.profile_image_url, bio: user.bio, username: user.username, social_links: user.social_links, followers_count: user.followers_count });
                 else alert(t('errorMessage'));
             }
         } catch (e: any) { alert(e.message || t('errorMessage')); } finally { setLoading(false); }
@@ -83,7 +59,7 @@ const AuthModal: React.FC<{ isOpen: boolean; onClose: () => void; onLogin: (user
             <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-3xl overflow-hidden shadow-2xl relative">
                 <button onClick={onClose} className="absolute top-4 right-4 text-gray-400"><X/></button>
                 <div className="p-8">
-                    <h2 className="text-2xl font-black mb-2 text-center dark:text-white">{isRegister ? t('registerTitle') : t('loginTitle')}</h2>
+                    <h2 className="text-2xl font-black mb-2 text-center dark:text-white flex items-center justify-center gap-2"><LogIn/> {isRegister ? t('registerTitle') : t('loginTitle')}</h2>
                     <div className="space-y-4">
                         {isRegister && (
                             <>
@@ -100,16 +76,7 @@ const AuthModal: React.FC<{ isOpen: boolean; onClose: () => void; onLogin: (user
                                 )}
                             </>
                         )}
-                        
-                        {/* Login Input (Phone or Username) */}
-                        <input 
-                            type="text" 
-                            placeholder={isRegister ? t('phone') : t('phoneOrUsername')} 
-                            value={formData.phone} 
-                            onChange={e => setFormData({...formData, phone: e.target.value})} 
-                            className="w-full p-3 bg-gray-50 rounded-xl outline-none"
-                        />
-                        
+                        <input type="text" placeholder={isRegister ? t('phone') : t('phoneOrUsername')} value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl outline-none"/>
                         <input type="password" placeholder={t('password')} value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl outline-none"/>
                         <button onClick={handleSubmit} disabled={loading} className="w-full py-3 bg-black text-white font-bold rounded-xl">{loading ? t('loading') : (isRegister ? t('registerButton') : t('loginButton'))}</button>
                         <p className="text-center text-sm text-gray-500 mt-4 cursor-pointer hover:underline" onClick={() => setIsRegister(!isRegister)}>{isRegister ? t('loginTitle') : t('registerTitle')}</p>
@@ -120,17 +87,82 @@ const AuthModal: React.FC<{ isOpen: boolean; onClose: () => void; onLogin: (user
     );
 };
 
+// --- PUBLIC PROVIDER PROFILE (INSTAGRAM STYLE FOR CLIENTS) ---
+const PublicProviderProfile: React.FC<{ provider: AuthenticatedUser; onClose: () => void }> = ({ provider, onClose }) => {
+    const { t } = useLocalization();
+    const [offers, setOffers] = useState<Offer[]>([]);
+
+    useEffect(() => {
+        const fetchOffers = async () => {
+            const { data } = await supabase.from('provider_offers').select('*').eq('provider_id', provider.id);
+            setOffers(data || []);
+        }
+        fetchOffers();
+    }, []);
+
+    return (
+        <div className="fixed inset-0 bg-white z-[70] flex flex-col animate-slide-up overflow-y-auto">
+            <div className="p-4 border-b flex items-center gap-3 sticky top-0 bg-white z-10">
+                <button onClick={onClose}><X/></button>
+                <h2 className="font-bold text-lg">{provider.name}</h2>
+            </div>
+            <div className="p-4">
+                <div className="flex items-center gap-6 mb-4">
+                     <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-yellow-400 to-purple-600 p-0.5">
+                        <img src={provider.profile_image_url || `https://ui-avatars.com/api/?name=${provider.name}`} className="w-full h-full rounded-full border-2 border-white object-cover"/>
+                     </div>
+                     <div className="flex-1 flex justify-around text-center">
+                         <div><div className="font-bold text-lg">{offers.length}</div><div className="text-xs text-gray-500">{t('offers')}</div></div>
+                         <div><div className="font-bold text-lg">{provider.followers_count || 0}</div><div className="text-xs text-gray-500">{t('followers')}</div></div>
+                     </div>
+                </div>
+                <div>
+                    <h2 className="font-bold">{provider.name}</h2>
+                    <p className="text-gray-500 text-sm">{provider.service_type}</p>
+                    <p className="text-sm whitespace-pre-line mt-1">{provider.bio}</p>
+                    {provider.social_links && (
+                        <div className="flex gap-3 mt-2">
+                             {provider.social_links.instagram && <a href={`https://instagram.com/${provider.social_links.instagram}`} target="_blank" className="text-pink-600"><Instagram size={18}/></a>}
+                             {provider.social_links.facebook && <a href={`https://facebook.com/${provider.social_links.facebook}`} target="_blank" className="text-blue-600"><Facebook size={18}/></a>}
+                             {provider.social_links.gps && <a href={`https://maps.google.com/?q=${provider.social_links.gps}`} target="_blank" className="text-green-600"><MapPin size={18}/></a>}
+                        </div>
+                    )}
+                </div>
+                <button className="w-full bg-blue-500 text-white font-bold py-2 rounded-lg mt-6 mb-6">Follow</button>
+                
+                <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><Tag size={20}/> {t('offers')}</h3>
+                <div className="grid grid-cols-2 gap-3">
+                    {offers.map(o => (
+                        <div key={o.id} className="border rounded-xl overflow-hidden shadow-sm">
+                            {o.image_url && <img src={o.image_url} className="w-full h-32 object-cover"/>}
+                            <div className="p-2">
+                                <h4 className="font-bold text-sm truncate">{o.title}</h4>
+                                <div className="flex gap-2 text-xs">
+                                    <span className="line-through text-gray-400">{o.original_price} DH</span>
+                                    <span className="text-red-600 font-bold">{o.discount_price} DH</span>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                    {offers.length === 0 && <p className="col-span-2 text-center text-gray-400">{t('noPosts')}</p>}
+                </div>
+            </div>
+        </div>
+    )
+}
+
 // --- PROVIDER DIRECTORY ---
 const ProviderDirectory: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
     const { t } = useLocalization();
     const [providers, setProviders] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
+    const [selectedProvider, setSelectedProvider] = useState<AuthenticatedUser | null>(null);
 
     useEffect(() => {
         if(isOpen) {
             const fetch = async () => {
                 setLoading(true);
-                const { data } = await supabase.from('providers').select('name, service_type, location, profile_image_url').eq('is_active', true);
+                const { data } = await supabase.from('providers').select('*').eq('is_active', true);
                 setProviders(data || []);
                 setLoading(false);
             }
@@ -149,7 +181,7 @@ const ProviderDirectory: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
                 </div>
                 <div className="flex-1 overflow-y-auto p-4 space-y-3">
                     {loading ? <p className="text-center text-gray-500">{t('loading')}</p> : providers.map((p, i) => (
-                        <div key={i} className="flex items-center gap-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-xl border border-gray-100 dark:border-gray-600">
+                        <div key={i} onClick={() => setSelectedProvider(p)} className="flex items-center gap-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-xl border border-gray-100 dark:border-gray-600 cursor-pointer hover:bg-gray-100">
                              <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden">
                                  <img src={p.profile_image_url || `https://ui-avatars.com/api/?name=${p.name}`} className="w-full h-full object-cover"/>
                              </div>
@@ -163,6 +195,7 @@ const ProviderDirectory: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
                     {!loading && providers.length === 0 && <p className="text-center text-gray-400">{t('noPosts')}</p>}
                 </div>
             </div>
+            {selectedProvider && <PublicProviderProfile provider={selectedProvider} onClose={() => setSelectedProvider(null)} />}
         </div>
     );
 };
@@ -257,7 +290,6 @@ const AppContent: React.FC = () => {
         if (stored) {
             const u = JSON.parse(stored);
             setUser(u);
-            // If provider login, show provider view by default
             if(u.accountType === AccountType.PROVIDER) setUserView(UserView.PROVIDER);
         }
     }, []);
@@ -330,8 +362,6 @@ const AppContent: React.FC = () => {
             <div className="flex-1 relative overflow-hidden">
                 <Chatbot currentUser={user} onOpenAuth={() => setShowAuth(true)} />
             </div>
-
-            {/* REMOVED BOTTOM NAVIGATION BAR */}
 
             <AuthModal isOpen={showAuth} onClose={() => setShowAuth(false)} onLogin={handleLogin} />
             <Store isOpen={showStore} onClose={() => setShowStore(false)} currentUser={user} onOpenAuth={() => setShowAuth(true)} />

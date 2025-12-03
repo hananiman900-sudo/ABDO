@@ -43,6 +43,11 @@ export const translations: Translations = {
   followers: { ar: 'المتابعين', en: 'Followers', fr: 'Abonnés' },
   visits: { ar: 'زيارات اليوم', en: 'Visits Today', fr: 'Visites' },
   following: { ar: 'أتابع', en: 'Following', fr: 'Abonnements' },
+  editProfile: { ar: 'تعديل الملف', en: 'Edit Profile', fr: 'Modifier Profil' },
+  saveProfile: { ar: 'حفظ التعديلات', en: 'Save Profile', fr: 'Enregistrer' },
+  bioLabel: { ar: 'الوصف (Bio)', en: 'Bio', fr: 'Bio' },
+  socialLinks: { ar: 'روابط التواصل', en: 'Social Links', fr: 'Réseaux Sociaux' },
+  gpsLink: { ar: 'موقع GPS', en: 'GPS Location', fr: 'Position GPS' },
   
   // --- STORE SPECIFIC ---
   storeWelcomeTitle: { ar: 'مرحبا بك!', en: 'Welcome!', fr: 'Bienvenue !' },
@@ -121,6 +126,18 @@ export const translations: Translations = {
   uploadError: { ar: 'خطأ', en: 'Error', fr: 'Erreur' },
   providerDirectory: { ar: 'دليل المهنيين', en: 'Provider Directory', fr: 'Annuaire Pro' },
   
+  // --- NEW FEATURES ---
+  offers: { ar: 'العروض', en: 'Offers', fr: 'Offres' },
+  createOffer: { ar: 'إنشاء عرض', en: 'Create Offer', fr: 'Créer Offre' },
+  urgentAds: { ar: 'إعلان عاجل', en: 'Urgent Ad', fr: 'Annonce Urgente' },
+  createUrgentAd: { ar: 'إنشاء إعلان عاجل (الشريط)', en: 'Create Ticker Ad', fr: 'Créer Ticker' },
+  statsTitle: { ar: 'الإحصائيات', en: 'Statistics', fr: 'Statistiques' },
+  clientName: { ar: 'إسم الزبون', en: 'Client Name', fr: 'Nom Client' },
+  visitDate: { ar: 'تاريخ الزيارة', en: 'Visit Date', fr: 'Date Visite' },
+  originalPrice: { ar: 'الثمن الأصلي', en: 'Original Price', fr: 'Prix Original' },
+  discountPrice: { ar: 'ثمن التخفيض', en: 'Discount Price', fr: 'Prix Remisé' },
+  titleLabel: { ar: 'العنوان', en: 'Title', fr: 'Titre' },
+  
   // --- ERRORS ---
   errorMessage: { ar: 'خطأ', en: 'Error', fr: 'Erreur' },
   loginRequired: { ar: 'سجل الدخول', en: 'Login First', fr: 'Connexion Requise' },
@@ -185,11 +202,9 @@ interface LocalizationContextType {
 const LocalizationContext = createContext<LocalizationContextType | undefined>(undefined);
 
 export const LocalizationProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // STRICT DEFAULT TO ARABIC
   const [language, setLanguage] = useState<Language>(Language.AR);
 
   useEffect(() => {
-    // Dynamic Dir adjustment
     document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
     document.documentElement.lang = language;
   }, [language]);
