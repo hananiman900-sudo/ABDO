@@ -18,6 +18,7 @@ export interface AuthenticatedUser {
   bio?: string;
   profile_image_url?: string;
   social_links?: { instagram?: string; facebook?: string; website?: string; gps?: string; };
+  service_type?: string;
 }
 
 export interface BookingDetails { name: string; phone: string; service: string; provider: string; location: string; discount: string; appointmentId: number; }
@@ -32,6 +33,7 @@ export interface Product { id: number; name: string; description: string; price:
 export interface Category { id: number; name: string; created_at: string; }
 export interface CartItem extends Product { quantity: number; selectedSize?: string; note?: string; }
 export interface Order { id: number; user_id: number; user_type: string; total_amount: number; status: 'pending' | 'delivered' | 'cancelled'; items: CartItem[]; customer_details?: { name: string; phone: string; }; created_at: string; }
+export interface AdRequest { id: number; provider_id: number; message: string; image_url: string; status: 'pending' | 'approved' | 'rejected'; created_at: string; providers?: { name: string; phone: string; }; }
 
 export interface Property {
   id: number;
