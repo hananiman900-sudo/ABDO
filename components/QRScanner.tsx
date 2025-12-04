@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useLocalization } from '../hooks/useLocalization';
 import { AuthenticatedUser, ProviderNotification, AdRequest, Offer, UrgentAd } from '../types';
 import { supabase } from '../services/supabaseClient';
-import { CheckCircle, XCircle, Camera, Loader2, Upload, MessageCircle, History, Users, Megaphone, Settings, ArrowLeft, Image as ImageIcon, QrCode, Bell, User, LayoutGrid, FileText, Lock, LogOut, Grid, Bookmark, Heart, Plus, Zap, Tag, Instagram, Facebook, MapPin, Edit3, Share2 } from 'lucide-react';
+import { CheckCircle, XCircle, Camera, Loader2, Upload, MessageCircle, History, Users, Megaphone, Settings, ArrowLeft, Image as ImageIcon, QrCode, Bell, User, LayoutGrid, FileText, Lock, LogOut, Grid, Bookmark, Heart, Plus, Zap, Tag, Instagram, Facebook, MapPin, Edit3, Share2, Info, Trash2, Edit } from 'lucide-react';
 import jsQR from 'jsqr';
 
 // --- SUB-COMPONENTS (FULL SCREEN VIEWS) ---
@@ -26,11 +26,17 @@ const NotificationView: React.FC<{ providerId: number; onClose: () => void }> = 
                 <button onClick={onClose}><ArrowLeft/></button>
                 <h2 className="font-bold text-xl">{t('notifications')}</h2>
             </div>
-            <div className="p-4 space-y-2">
+            <div className="p-4 space-y-3">
                 {notifications.map(n => (
-                    <div key={n.id} className="p-4 bg-gray-50 rounded-xl border flex items-center gap-3">
-                        <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                        <p className="text-sm">{n.message}</p>
+                    <div key={n.id} className={`p-4 rounded-xl border flex items-start gap-3 ${n.status === 'completed' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                        <div className={`mt-1 w-3 h-3 rounded-full ${n.status === 'completed' ? 'bg-green-500' : 'bg-red-500 animate-pulse'}`}></div>
+                        <div className="flex-1">
+                            <p className="text-sm font-semibold">{n.message}</p>
+                            <p className="text-xs mt-1 opacity-70">
+                                {new Date(n.created_at).toLocaleDateString()} • {n.status === 'completed' ? t('statusVerified') : t('statusPending')}
+                            </p>
+                        </div>
+                        {n.status === 'completed' && <CheckCircle size={16} className="text-green-600"/>}
                     </div>
                 ))}
                 {notifications.length === 0 && <p className="text-center text-gray-500 mt-10">{t('noNotifications')}</p>}
@@ -99,15 +105,20 @@ const UrgentAdsView: React.FC<{ providerId: number; onClose: () => void }> = ({ 
     const handleCreate = async () => {
         if(!message.trim()) return;
         setLoading(true);
-        await supabase.from('urgent_ads').insert({ provider_id: providerId, message, is_active: true });
-        setMessage('');
-        fetchAds();
+        const { error } = await supabase.from('urgent_ads').insert({ provider_id: providerId, message, is_active: true });
+        if(!error) {
+            setMessage('');
+            fetchAds();
+            alert(t('success'));
+        }
         setLoading(false);
     }
 
     const handleDelete = async (id: number) => {
-        await supabase.from('urgent_ads').delete().eq('id', id);
-        fetchAds();
+        if(confirm(t('delete') + '?')) {
+            await supabase.from('urgent_ads').delete().eq('id', id);
+            fetchAds();
+        }
     }
 
     return (
@@ -116,16 +127,24 @@ const UrgentAdsView: React.FC<{ providerId: number; onClose: () => void }> = ({ 
                 <button onClick={onClose}><ArrowLeft/></button>
                 <h2 className="font-bold text-xl">{t('urgentAds')}</h2>
             </div>
-            <div className="p-4 space-y-4">
+            <div className="p-4 space-y-4 overflow-y-auto">
+                {/* Professional Description */}
+                <div className="bg-yellow-50 p-4 rounded-xl border border-yellow-200 flex items-start gap-3">
+                    <Info className="text-yellow-600 shrink-0 mt-1"/>
+                    <p className="text-sm text-yellow-800">{t('urgentAdsDesc')}</p>
+                </div>
+
                 <div className="flex gap-2">
                     <input value={message} onChange={e => setMessage(e.target.value)} placeholder="Urgent message for ticker..." className="flex-1 border p-2 rounded-lg outline-none"/>
                     <button onClick={handleCreate} disabled={loading} className="bg-red-500 text-white px-4 py-2 rounded-lg font-bold">{t('postAd')}</button>
                 </div>
                 <div className="space-y-2">
                     {ads.map(ad => (
-                        <div key={ad.id} className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg flex justify-between items-center">
+                        <div key={ad.id} className="p-3 bg-white shadow-sm border rounded-lg flex justify-between items-center">
                             <span className="text-sm font-bold">{ad.message}</span>
-                            <button onClick={() => handleDelete(ad.id)} className="text-red-500"><XCircle size={18}/></button>
+                            <div className="flex gap-2">
+                                <button onClick={() => handleDelete(ad.id)} className="p-2 bg-gray-100 rounded-full text-red-500"><Trash2 size={16}/></button>
+                            </div>
                         </div>
                     ))}
                 </div>
@@ -172,11 +191,14 @@ const OffersView: React.FC<{ providerId: number; onClose: () => void }> = ({ pro
         setNewOffer({ title: '', original_price: '', discount_price: '', image: '' });
         fetchOffers();
         setLoading(false);
+        alert(t('success'));
     }
     
     const handleDelete = async (id: number) => {
-        await supabase.from('provider_offers').delete().eq('id', id);
-        fetchOffers();
+        if(confirm(t('delete') + '?')) {
+            await supabase.from('provider_offers').delete().eq('id', id);
+            fetchOffers();
+        }
     }
 
     return (
@@ -185,27 +207,40 @@ const OffersView: React.FC<{ providerId: number; onClose: () => void }> = ({ pro
                 <button onClick={onClose}><ArrowLeft/></button>
                 <h2 className="font-bold text-xl">{t('offers')}</h2>
             </div>
-            <div className="p-4 space-y-4">
-                <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 space-y-2">
-                    <input placeholder={t('titleLabel')} value={newOffer.title} onChange={e => setNewOffer({...newOffer, title: e.target.value})} className="w-full p-2 rounded border"/>
+            <div className="p-4 space-y-6 overflow-y-auto pb-20">
+                {/* Professional Description */}
+                <div className="bg-blue-50 p-4 rounded-xl border border-blue-200 flex items-start gap-3">
+                    <Info className="text-blue-600 shrink-0 mt-1"/>
+                    <p className="text-sm text-blue-800">{t('offersDesc')}</p>
+                </div>
+
+                <div className="bg-white p-4 rounded-xl border shadow-sm space-y-3">
+                    <h3 className="font-bold text-gray-700">{t('createOffer')}</h3>
+                    <input placeholder={t('titleLabel')} value={newOffer.title} onChange={e => setNewOffer({...newOffer, title: e.target.value})} className="w-full p-2 rounded border outline-none"/>
                     <div className="flex gap-2">
-                         <input type="number" placeholder={t('originalPrice')} value={newOffer.original_price} onChange={e => setNewOffer({...newOffer, original_price: e.target.value})} className="flex-1 p-2 rounded border"/>
-                         <input type="number" placeholder={t('discountPrice')} value={newOffer.discount_price} onChange={e => setNewOffer({...newOffer, discount_price: e.target.value})} className="flex-1 p-2 rounded border"/>
+                         <input type="number" placeholder={t('originalPrice')} value={newOffer.original_price} onChange={e => setNewOffer({...newOffer, original_price: e.target.value})} className="flex-1 p-2 rounded border outline-none"/>
+                         <input type="number" placeholder={t('discountPrice')} value={newOffer.discount_price} onChange={e => setNewOffer({...newOffer, discount_price: e.target.value})} className="flex-1 p-2 rounded border outline-none"/>
                     </div>
-                    <button onClick={() => fileRef.current?.click()} className="w-full py-2 bg-white border border-dashed rounded flex justify-center text-gray-500"><ImageIcon size={18}/> Image</button>
+                    <button onClick={() => fileRef.current?.click()} className="w-full py-2 bg-gray-50 border border-dashed rounded flex justify-center text-gray-500"><ImageIcon size={18}/> Image</button>
                     <input type="file" ref={fileRef} hidden onChange={handleUpload}/>
                     {newOffer.image && <img src={newOffer.image} className="h-20 object-cover rounded"/>}
-                    <button onClick={handleCreate} disabled={loading} className="w-full bg-blue-600 text-white py-2 rounded font-bold">{t('createOffer')}</button>
+                    <button onClick={handleCreate} disabled={loading} className="w-full bg-blue-600 text-white py-2 rounded font-bold">{loading ? t('loading') : t('save')}</button>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+
+                <div className="grid grid-cols-1 gap-3">
                     {offers.map(o => (
-                        <div key={o.id} className="border rounded-lg p-2 bg-white shadow-sm relative group">
-                            <button onClick={() => handleDelete(o.id)} className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1"><XCircle size={12}/></button>
-                            {o.image_url && <img src={o.image_url} className="w-full h-24 object-cover rounded mb-2"/>}
-                            <h4 className="font-bold text-sm">{o.title}</h4>
-                            <div className="flex gap-2 text-xs">
-                                <span className="line-through text-gray-400">{o.original_price}</span>
-                                <span className="text-red-500 font-bold">{o.discount_price}</span>
+                        <div key={o.id} className="border rounded-xl p-3 bg-white shadow-sm flex gap-3 relative">
+                            {o.image_url && <img src={o.image_url} className="w-20 h-20 object-cover rounded-lg bg-gray-100"/>}
+                            <div className="flex-1">
+                                <h4 className="font-bold text-sm">{o.title}</h4>
+                                <div className="flex gap-2 text-xs mt-1">
+                                    <span className="line-through text-gray-400">{o.original_price} DH</span>
+                                    <span className="text-red-500 font-bold">{o.discount_price} DH</span>
+                                </div>
+                            </div>
+                            <div className="flex flex-col gap-2">
+                                <button className="p-1.5 bg-gray-100 rounded-full text-blue-500"><Edit size={16}/></button>
+                                <button onClick={() => handleDelete(o.id)} className="p-1.5 bg-red-100 rounded-full text-red-500"><Trash2 size={16}/></button>
                             </div>
                         </div>
                     ))}
@@ -245,7 +280,10 @@ const AdsView: React.FC<{ providerId: number; onClose: () => void }> = ({ provid
         setLoading(true);
         await supabase.from('provider_ad_requests').insert({ provider_id: providerId, message: newAd.message, image_url: newAd.image, status: 'pending' });
         setNewAd({ message: '', image: '' });
-        alert(t('requestSent')); // Specific Arabic text "Your request is under review..."
+        
+        // SPECIFIC ARABIC FEEDBACK MESSAGE
+        alert('تم استلام طلبك. سيقوم الأدمن بمراجعة الإعلان والاتصال بكم');
+        
         fetchRequests();
         setLoading(false);
     }
@@ -341,6 +379,10 @@ const QRScannerView: React.FC<{ providerId: number; onClose: () => void }> = ({ 
             await supabase.from('scan_history').insert({ provider_id: providerId, client_name: "Client #" + parsed.appointmentId, client_phone: "Verified" });
             const { data: p } = await supabase.from('providers').select('visits_count').eq('id', providerId).single();
             await supabase.from('providers').update({ visits_count: (p?.visits_count || 0) + 1 }).eq('id', providerId);
+            
+            // Mark notification as completed if it exists
+            // (Assuming logic exists to link notification to appointmentId, but simplified here)
+            
             setStatus('success');
         } catch(e) { setStatus('error'); }
     };

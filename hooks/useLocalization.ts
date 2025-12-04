@@ -147,7 +147,7 @@ export const translations: Translations = {
   providerDirectory: { ar: 'دليل المهنيين', en: 'Provider Directory', fr: 'Annuaire Pro' },
   paidAdDesc: { ar: 'خدمة مدفوعة (50 درهم/أسبوع). إعلانك سيظهر في قائمة المحادثات.', en: 'Paid Service (50DH/Week). Ad appears in chat list.', fr: 'Service Payant (50DH/Semaine). Pub dans la liste.' },
   
-  // --- NEW FEATURES ---
+  // --- OFFERS & URGENT ADS ---
   offers: { ar: 'العروض', en: 'Offers', fr: 'Offres' },
   createOffer: { ar: 'إنشاء عرض', en: 'Create Offer', fr: 'Créer Offre' },
   urgentAds: { ar: 'إعلان عاجل', en: 'Urgent Ad', fr: 'Annonce Urgente' },
@@ -158,11 +158,15 @@ export const translations: Translations = {
   originalPrice: { ar: 'الثمن الأصلي', en: 'Original Price', fr: 'Prix Original' },
   discountPrice: { ar: 'ثمن التخفيض', en: 'Discount Price', fr: 'Prix Remisé' },
   titleLabel: { ar: 'العنوان', en: 'Title', fr: 'Titre' },
+  offersDesc: { ar: 'إضافة العروض تساعد في زيادة الحجوزات بنسبة كبيرة. العروض تظهر في صفحتك الشخصية للزبناء.', en: 'Adding offers increases bookings. They appear on your profile.', fr: 'Ajouter des offres augmente les réservations.' },
+  urgentAdsDesc: { ar: 'الإعلان العاجل يظهر كشريط إخباري عند جميع متابعيك. استخدمه للإعلانات الهامة فقط.', en: 'Urgent ads appear as a ticker for all followers.', fr: 'Les pubs urgentes apparaissent pour tous les abonnés.' },
+  statusPending: { ar: 'في الانتظار', en: 'Pending', fr: 'En attente' },
+  statusVerified: { ar: 'تم التحقق', en: 'Verified', fr: 'Vérifié' },
   
   // --- ERRORS ---
   errorMessage: { ar: 'خطأ', en: 'Error', fr: 'Erreur' },
   loginRequired: { ar: 'سجل الدخول', en: 'Login First', fr: 'Connexion Requise' },
-  success: { ar: 'تم', en: 'Success', fr: 'Succès' },
+  success: { ar: 'تم بنجاح', en: 'Success', fr: 'Succès' },
 
   // --- OTHERS ---
   priceDH: { ar: 'د.م', en: 'DH', fr: 'DH' },
