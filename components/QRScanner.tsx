@@ -245,7 +245,7 @@ const AdsView: React.FC<{ providerId: number; onClose: () => void }> = ({ provid
         setLoading(true);
         await supabase.from('provider_ad_requests').insert({ provider_id: providerId, message: newAd.message, image_url: newAd.image, status: 'pending' });
         setNewAd({ message: '', image: '' });
-        alert(t('requestSent'));
+        alert(t('requestSent')); // Specific Arabic text "Your request is under review..."
         fetchRequests();
         setLoading(false);
     }
@@ -285,6 +285,7 @@ const QRScannerView: React.FC<{ providerId: number; onClose: () => void }> = ({ 
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [scanning, setScanning] = useState(true);
+    const fileRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         if (!scanning) return;
@@ -303,7 +304,6 @@ const QRScannerView: React.FC<{ providerId: number; onClose: () => void }> = ({ 
         };
         startVideo();
         return () => { 
-            // Cleanup stream
             if(videoRef.current?.srcObject) {
                 const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
                 tracks.forEach(track => track.stop());
@@ -324,7 +324,7 @@ const QRScannerView: React.FC<{ providerId: number; onClose: () => void }> = ({ 
                     const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'dontInvert' });
                     if (code) {
                         processCode(code.data);
-                        return; // Stop loop
+                        return; 
                     }
                 }
             }
@@ -338,40 +338,77 @@ const QRScannerView: React.FC<{ providerId: number; onClose: () => void }> = ({ 
             const parsed = JSON.parse(data);
             if(!parsed.appointmentId) throw new Error();
             
-            // Log visit logic
             await supabase.from('scan_history').insert({ provider_id: providerId, client_name: "Client #" + parsed.appointmentId, client_phone: "Verified" });
-            
-            // Update provider Visits Count
             const { data: p } = await supabase.from('providers').select('visits_count').eq('id', providerId).single();
             await supabase.from('providers').update({ visits_count: (p?.visits_count || 0) + 1 }).eq('id', providerId);
-
             setStatus('success');
         } catch(e) { setStatus('error'); }
     };
 
+    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if(!file) return;
+
+        setScanning(false);
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                if(ctx) {
+                    ctx.drawImage(img, 0, 0);
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'dontInvert' });
+                    if(code) processCode(code.data);
+                    else setStatus('error');
+                }
+            };
+            img.src = event.target?.result as string;
+        };
+        reader.readAsDataURL(file);
+    };
+
     return (
-        <div className="fixed inset-0 bg-black text-white z-50 flex flex-col animate-slide-up">
-            <div className="p-4 flex justify-between items-center bg-black">
-                <button onClick={onClose}><ArrowLeft/></button>
-                <span className="font-bold">{t('qrScannerTitle')}</span>
-                <div/>
-            </div>
-            <div className="flex-1 flex flex-col items-center justify-center p-6 gap-6 relative">
-                {status === 'success' ? (
-                    <div className="text-center"><CheckCircle size={80} className="text-green-500 mx-auto"/><h2 className="text-2xl font-bold mt-4">{t('verificationSuccess')}</h2><button onClick={() => { setStatus('idle'); setScanning(true); }} className="mt-6 bg-white text-black px-6 py-2 rounded-full font-bold">Next</button></div>
-                ) : status === 'error' ? (
-                     <div className="text-center"><XCircle size={80} className="text-red-500 mx-auto"/><h2 className="text-2xl font-bold mt-4">{t('invalidQR')}</h2><button onClick={() => { setStatus('idle'); setScanning(true); }} className="mt-6 bg-white text-black px-6 py-2 rounded-full font-bold">Try Again</button></div>
-                ) : (
-                    <>
-                        <div className="w-full aspect-square border-2 border-white/20 rounded-xl relative overflow-hidden flex items-center justify-center bg-gray-900">
-                             <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover"/>
-                             <canvas ref={canvasRef} hidden />
-                             <div className="absolute inset-0 border-2 border-green-500/50 m-12 rounded-lg animate-pulse"></div>
-                        </div>
-                        <p className="text-center text-gray-400 text-sm">Align QR code within frame</p>
-                    </>
-                )}
-            </div>
+        <div className="fixed inset-0 bg-black/90 z-50 flex flex-col animate-fade-in items-center justify-center p-4">
+             <div className="w-full max-w-md bg-white rounded-2xl overflow-hidden relative shadow-2xl">
+                 <div className="p-4 bg-black text-white flex justify-between items-center">
+                    <button onClick={onClose}><ArrowLeft/></button>
+                    <span className="font-bold">{t('qrScannerTitle')}</span>
+                    <div/>
+                 </div>
+                 
+                 <div className="p-6 flex flex-col items-center gap-6">
+                    {status === 'success' ? (
+                        <div className="text-center py-10"><CheckCircle size={80} className="text-green-500 mx-auto"/><h2 className="text-2xl font-bold mt-4">{t('verificationSuccess')}</h2><button onClick={() => { setStatus('idle'); setScanning(true); }} className="mt-6 bg-black text-white px-6 py-2 rounded-full font-bold">Next</button></div>
+                    ) : status === 'error' ? (
+                         <div className="text-center py-10"><XCircle size={80} className="text-red-500 mx-auto"/><h2 className="text-2xl font-bold mt-4">{t('invalidQR')}</h2><button onClick={() => { setStatus('idle'); setScanning(true); }} className="mt-6 bg-black text-white px-6 py-2 rounded-full font-bold">Try Again</button></div>
+                    ) : (
+                        <>
+                            <div className="w-full aspect-square bg-black rounded-xl overflow-hidden relative">
+                                {scanning ? (
+                                    <>
+                                        <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover"/>
+                                        <div className="absolute inset-0 border-2 border-green-500/50 m-8 rounded-lg animate-pulse"></div>
+                                        <canvas ref={canvasRef} hidden />
+                                    </>
+                                ) : (
+                                    <div className="flex items-center justify-center h-full text-white">Processing Image...</div>
+                                )}
+                            </div>
+                            <div className="w-full text-center">
+                                <p className="text-sm text-gray-500 mb-4">Align QR code or upload file</p>
+                                <button onClick={() => fileRef.current?.click()} className="w-full py-3 border-2 border-dashed border-gray-300 rounded-xl font-bold text-gray-500 hover:border-black hover:text-black transition-colors flex items-center justify-center gap-2">
+                                    <Upload size={20}/> {t('uploadQRImage')}
+                                </button>
+                                <input type="file" ref={fileRef} hidden accept="image/*" onChange={handleFileUpload}/>
+                            </div>
+                        </>
+                    )}
+                 </div>
+             </div>
         </div>
     );
 }
@@ -446,6 +483,9 @@ const ProviderPortal: React.FC<{ provider: AuthenticatedUser; onLogout: () => vo
     const [view, setView] = useState<'scan' | 'notifications' | 'history' | 'ads' | 'offers' | 'urgent' | null>(null);
     const [editMode, setEditMode] = useState(false);
     
+    // In a real app, these would come from database counts. For now using props if available, else 0
+    const postsCount = 0; // Would be offers count
+
     const handleShare = () => {
         const text = `Chat with me on TangerConnect: ${provider.name}`;
         window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
@@ -479,7 +519,7 @@ const ProviderPortal: React.FC<{ provider: AuthenticatedUser; onLogout: () => vo
                         <img src={provider.profile_image_url || `https://ui-avatars.com/api/?name=${provider.name}`} className="w-full h-full rounded-full border-2 border-white object-cover"/>
                     </div>
                     <div className="flex-1 flex justify-around text-center">
-                        <div><div className="font-bold text-lg">0</div><div className="text-xs text-gray-500">{t('posts')}</div></div>
+                        <div><div className="font-bold text-lg">{postsCount}</div><div className="text-xs text-gray-500">{t('posts')}</div></div>
                         <div><div className="font-bold text-lg">{provider.followers_count || 0}</div><div className="text-xs text-gray-500">{t('followers')}</div></div>
                         <div><div className="font-bold text-lg">{provider.visits_count || 0}</div><div className="text-xs text-gray-500">{t('visits')}</div></div>
                     </div>

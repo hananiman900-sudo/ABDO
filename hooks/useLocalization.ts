@@ -139,13 +139,13 @@ export const translations: Translations = {
   verificationSuccess: { ar: 'كود صحيح!', en: 'Valid!', fr: 'Valide !' },
   invalidQR: { ar: 'كود غير صالح', en: 'Invalid QR', fr: 'QR Invalide' },
   scanWithCamera: { ar: 'الكاميرا', en: 'Camera', fr: 'Caméra' },
-  uploadQRImage: { ar: 'رفع صورة QR', en: 'Upload QR', fr: 'Télécharger QR' },
+  uploadQRImage: { ar: 'رفع صورة من الملفات', en: 'Upload QR File', fr: 'Importer Fichier QR' },
   messageLabel: { ar: 'نص الإعلان...', en: 'Ad text...', fr: 'Texte pub...' },
   sendButton: { ar: 'إرسال', en: 'Send', fr: 'Envoyer' },
-  requestSent: { ar: 'تم الإرسال', en: 'Sent', fr: 'Envoyé' },
+  requestSent: { ar: 'تم استلام طلبك. سيقوم الأدمن بمراجعة الإعلان والاتصال بكم.', en: 'Request received. Admin will review and contact you.', fr: 'Reçu. L\'admin vous contactera.' },
   uploadError: { ar: 'خطأ', en: 'Error', fr: 'Erreur' },
   providerDirectory: { ar: 'دليل المهنيين', en: 'Provider Directory', fr: 'Annuaire Pro' },
-  paidAdDesc: { ar: 'خدمة مدفوعة (50 درهم/أسبوع). إعلانك سيظهر في الشريط الرئيسي للتطبيق.', en: 'Paid Service (50DH/Week). Ad appears in Main Slider.', fr: 'Service Payant (50DH/Semaine). Pub dans le Slider.' },
+  paidAdDesc: { ar: 'خدمة مدفوعة (50 درهم/أسبوع). إعلانك سيظهر في قائمة المحادثات.', en: 'Paid Service (50DH/Week). Ad appears in chat list.', fr: 'Service Payant (50DH/Semaine). Pub dans la liste.' },
   
   // --- NEW FEATURES ---
   offers: { ar: 'العروض', en: 'Offers', fr: 'Offres' },

@@ -5,7 +5,7 @@ import { getChatResponse } from '../services/geminiService';
 import { useLocalization } from '../hooks/useLocalization';
 import { supabase } from '../services/supabaseClient';
 import QRCodeDisplay from './QRCodeDisplay';
-import { Send, Mic, Paperclip, Camera, Loader2, X, Globe, Search, ArrowLeft, MoreVertical, Calendar, Info, Phone, MapPin, Instagram, Facebook, Tag, UserPlus, UserCheck } from 'lucide-react';
+import { Send, Mic, Paperclip, Camera, Loader2, X, Globe, Search, ArrowLeft, MoreVertical, Calendar, Info, Phone, MapPin, Instagram, Facebook, Tag, UserPlus, UserCheck, Megaphone, Star } from 'lucide-react';
 
 // --- SUB-COMPONENTS ---
 
@@ -30,51 +30,6 @@ const UrgentTicker: React.FC = () => {
     );
 }
 
-// HEADER CAROUSEL SLIDER (PAID ADS)
-const HeaderSlider: React.FC<{ onOpenProvider: (p: any) => void }> = ({ onOpenProvider }) => {
-    const [ads, setAds] = useState<SystemAnnouncement[]>([]);
-    const [currentIndex, setCurrentIndex] = useState(0);
-
-    useEffect(() => {
-        const fetch = async () => {
-            const { data } = await supabase.from('system_announcements').select('*').eq('is_active', true);
-            setAds(data || []);
-        }
-        fetch();
-    }, []);
-
-    useEffect(() => {
-        if(ads.length <= 1) return;
-        const timer = setInterval(() => setCurrentIndex(prev => (prev + 1) % ads.length), 3000); // 3 seconds
-        return () => clearInterval(timer);
-    }, [ads]);
-
-    if(ads.length === 0) return null;
-    
-    // In a real app, you'd fetch the provider details associated with the ad to open their chat
-    // For now, we mock the click behavior or just show the ad.
-    
-    const currentAd = ads[currentIndex];
-
-    return (
-        <div className="w-full h-40 bg-gray-100 relative overflow-hidden border-b">
-            <img src={currentAd.image_url} className="w-full h-full object-cover transition-opacity duration-500" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex flex-col justify-end p-4">
-                <span className="bg-orange-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full w-max mb-1">Sponsored</span>
-                <h3 className="text-white font-bold text-sm">{currentAd.title}</h3>
-                <p className="text-white/80 text-xs truncate">{currentAd.message}</p>
-            </div>
-            {ads.length > 1 && (
-                <div className="absolute bottom-2 right-2 flex gap-1">
-                    {ads.map((_, i) => (
-                        <div key={i} className={`w-1.5 h-1.5 rounded-full ${i === currentIndex ? 'bg-white' : 'bg-white/50'}`}/>
-                    ))}
-                </div>
-            )}
-        </div>
-    )
-}
-
 const ChatProfileModal: React.FC<{ provider: any; onClose: () => void; currentUser: AuthenticatedUser | null }> = ({ provider, onClose, currentUser }) => {
     const { t } = useLocalization();
     const [offers, setOffers] = useState<Offer[]>([]);
@@ -97,7 +52,6 @@ const ChatProfileModal: React.FC<{ provider: any; onClose: () => void; currentUs
         if(!currentUser) return alert(t('loginRequired'));
         if(isFollowing) {
             await supabase.from('follows').delete().eq('client_id', currentUser.id).eq('provider_id', provider.id);
-            // Decrement count locally (in real app, use RPC or trigger)
         } else {
             await supabase.from('follows').insert({ client_id: currentUser.id, provider_id: provider.id });
         }
@@ -181,14 +135,32 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
     const fileRef = useRef<HTMLInputElement>(null);
     const [preview, setPreview] = useState<string | null>(null);
     const [showProfile, setShowProfile] = useState(false);
+    const [systemAds, setSystemAds] = useState<SystemAnnouncement[]>([]);
+    
+    // Ads Slider State
+    const [currentAdIndex, setCurrentAdIndex] = useState(0);
 
     useEffect(() => {
         const fetchProviders = async () => {
             const { data } = await supabase.from('providers').select('*').eq('is_active', true);
             setProviders(data || []);
         }
+        const fetchAds = async () => {
+             const { data } = await supabase.from('system_announcements').select('*').eq('is_active', true);
+             setSystemAds(data || []);
+        }
         fetchProviders();
+        fetchAds();
     }, []);
+
+    // Cycle Ads every 4 seconds
+    useEffect(() => {
+        if(systemAds.length <= 1) return;
+        const timer = setInterval(() => {
+            setCurrentAdIndex(prev => (prev + 1) % systemAds.length);
+        }, 4000);
+        return () => clearInterval(timer);
+    }, [systemAds]);
 
     // HIDE BOTTOM NAV WHEN CHATTING
     useEffect(() => {
@@ -254,15 +226,26 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
     if (view === 'LIST') {
         const filteredProviders = providers.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.service_type.toLowerCase().includes(searchTerm.toLowerCase()));
         
+        // Get Current Ad
+        const currentAd = systemAds[currentAdIndex];
+
+        // Helper to open chat for an Ad
+        const handleAdClick = async () => {
+            if(!currentAd) return;
+            // Try to find the provider linked to this ad title (assuming title is provider name as per earlier logic)
+            // In a real app, system_announcements would have a provider_id FK.
+            // For now, we search providers by name match to open their chat
+            const p = providers.find(prov => prov.name === currentAd.title);
+            if(p) openChat(p);
+            else openChat(null); // Fallback to Tanger IA
+        }
+
         return (
             <div className="flex flex-col h-full bg-white relative">
                 <UrgentTicker />
                 
-                {/* Header Slider (Paid Ads) */}
-                {!searchTerm && <HeaderSlider onOpenProvider={openChat}/>}
-
                 {/* Search Bar */}
-                <div className="p-4 border-b">
+                <div className="p-4 pb-2">
                     <div className="bg-gray-100 rounded-full flex items-center px-4 py-2">
                         <Search size={18} className="text-gray-400"/>
                         <input 
@@ -274,13 +257,38 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto">
+                <div className="flex-1 overflow-y-auto pb-20">
+                    
+                    {/* PAID ADS SLIDER (CONTACT ROW STYLE) */}
+                    {!searchTerm && currentAd && (
+                        <div 
+                            onClick={handleAdClick} 
+                            className="flex items-center gap-4 p-4 cursor-pointer bg-yellow-50/50 hover:bg-yellow-50 border-b border-yellow-100 transition-all duration-500"
+                        >
+                            <div className="w-14 h-14 rounded-full p-0.5 bg-gradient-to-tr from-yellow-400 to-orange-500 relative shrink-0">
+                                <img src={currentAd.image_url} className="w-full h-full rounded-full border-2 border-white object-cover"/>
+                                <div className="absolute -bottom-1 -right-1 bg-yellow-400 text-white rounded-full p-1 border border-white">
+                                    <Star size={10} fill="white"/>
+                                </div>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <div className="flex justify-between items-center mb-1">
+                                    <h3 className="font-bold text-gray-900 truncate">{currentAd.title}</h3>
+                                    <span className="text-[10px] font-bold text-yellow-600 bg-yellow-100 px-2 py-0.5 rounded-full uppercase tracking-wide">{t('sponsored')}</span>
+                                </div>
+                                <p className="text-sm text-gray-600 line-clamp-1 flex items-center gap-1 animate-fade-in">
+                                    {currentAd.message}
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Tanger IA */}
                     <div onClick={() => openChat(null)} className="flex items-center gap-4 p-4 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
-                        <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white shadow-md">
+                        <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white shadow-md shrink-0">
                             <Globe size={28}/>
                         </div>
-                        <div className="flex-1">
+                        <div className="flex-1 min-w-0">
                             <div className="flex justify-between items-center mb-1">
                                 <h3 className="font-bold text-gray-900">Tanger IA</h3>
                                 <span className="text-[10px] text-gray-400">Now</span>
@@ -292,16 +300,16 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
                     {/* Providers */}
                     {filteredProviders.map(p => (
                         <div key={p.id} onClick={() => openChat(p)} className="flex items-center gap-4 p-4 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
-                            <div className="w-14 h-14 rounded-full bg-gray-200 overflow-hidden border border-gray-100 relative">
+                            <div className="w-14 h-14 rounded-full bg-gray-200 overflow-hidden border border-gray-100 relative shrink-0">
                                 <img src={p.profile_image_url || `https://ui-avatars.com/api/?name=${p.name}`} className="w-full h-full object-cover"/>
                                 <span className="absolute bottom-1 right-1 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></span>
                             </div>
-                            <div className="flex-1">
+                            <div className="flex-1 min-w-0">
                                 <div className="flex justify-between items-center mb-1">
-                                    <h3 className="font-bold text-gray-900">{p.name}</h3>
+                                    <h3 className="font-bold text-gray-900 truncate">{p.name}</h3>
                                     <span className="text-[10px] text-gray-400">Online</span>
                                 </div>
-                                <p className="text-sm text-gray-500 flex items-center gap-1">
+                                <p className="text-sm text-gray-500 flex items-center gap-1 truncate">
                                     <span className="font-semibold text-blue-600">{p.service_type}</span>
                                 </p>
                             </div>
