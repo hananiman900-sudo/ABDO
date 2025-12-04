@@ -282,7 +282,7 @@ const AdsView: React.FC<{ providerId: number; onClose: () => void }> = ({ provid
         setNewAd({ message: '', image: '' });
         
         // SPECIFIC ARABIC FEEDBACK MESSAGE
-        alert('تم استلام طلبك. سيقوم الأدمن بمراجعة الإعلان والاتصال بكم');
+        alert('تم استلام طلبك. طلبك في طور الإنجاز. سيظهر الإعلان لمدة 7 أيام بعد الموافقة.');
         
         fetchRequests();
         setLoading(false);
@@ -309,7 +309,9 @@ const AdsView: React.FC<{ providerId: number; onClose: () => void }> = ({ provid
                              {r.image_url && <img src={r.image_url} className="w-10 h-10 rounded object-cover"/>}
                              <p className="text-sm font-semibold">{r.message}</p>
                          </div>
-                         <span className="text-[10px] bg-yellow-100 px-2 py-1 rounded-full">{r.status}</span>
+                         <span className={`text-[10px] px-2 py-1 rounded-full ${r.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                            {r.status === 'pending' ? 'في طور الإنجاز' : 'مقبول'}
+                         </span>
                      </div>
                  ))}
             </div>
@@ -455,7 +457,7 @@ const QRScannerView: React.FC<{ providerId: number; onClose: () => void }> = ({ 
     );
 }
 
-const EditProfileModal: React.FC<{ provider: AuthenticatedUser; onClose: () => void }> = ({ provider, onClose }) => {
+const EditProfileModal: React.FC<{ provider: AuthenticatedUser; onClose: () => void; onUpdateUser: (updates: Partial<AuthenticatedUser>) => void }> = ({ provider, onClose, onUpdateUser }) => {
     const { t } = useLocalization();
     const [form, setForm] = useState({ 
         bio: provider.bio || '', 
@@ -475,19 +477,30 @@ const EditProfileModal: React.FC<{ provider: AuthenticatedUser; onClose: () => v
             const fileName = `avatar_${provider.id}_${Date.now()}`;
             await supabase.storage.from('profiles').upload(fileName, file);
             const { data } = supabase.storage.from('profiles').getPublicUrl(fileName);
-            setForm(prev => ({ ...prev, image: data.publicUrl }));
-        } catch(e) {} finally { setLoading(false); }
+            const publicUrl = data.publicUrl;
+            setForm(prev => ({ ...prev, image: publicUrl }));
+            
+            // Immediately update the provider record and app state
+            await supabase.from('providers').update({ profile_image_url: publicUrl }).eq('id', provider.id);
+            onUpdateUser({ profile_image_url: publicUrl });
+
+        } catch(e) { console.error(e); } finally { setLoading(false); }
     }
 
     const handleSave = async () => {
         setLoading(true);
-        const { error } = await supabase.from('providers').update({ 
+        const updates = { 
             bio: form.bio, 
             social_links: { instagram: form.instagram, facebook: form.facebook, gps: form.gps },
             profile_image_url: form.image
-        }).eq('id', provider.id);
+        };
+        const { error } = await supabase.from('providers').update(updates).eq('id', provider.id);
         setLoading(false);
-        if(!error) { alert(t('success')); onClose(); }
+        if(!error) { 
+            onUpdateUser(updates);
+            alert(t('success')); 
+            onClose(); 
+        }
         else alert(t('errorMessage'));
     }
 
@@ -499,6 +512,7 @@ const EditProfileModal: React.FC<{ provider: AuthenticatedUser; onClose: () => v
                 <div className="flex justify-center mb-2">
                     <div className="w-20 h-20 rounded-full bg-gray-200 overflow-hidden relative cursor-pointer" onClick={() => fileRef.current?.click()}>
                         {form.image ? <img src={form.image} className="w-full h-full object-cover"/> : <Camera className="absolute inset-0 m-auto text-gray-400"/>}
+                        {loading && <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white"><Loader2 className="animate-spin"/></div>}
                     </div>
                     <input type="file" ref={fileRef} hidden onChange={handleImageUpload} />
                 </div>
@@ -520,13 +534,27 @@ const EditProfileModal: React.FC<{ provider: AuthenticatedUser; onClose: () => v
 }
 
 // --- INSTAGRAM STYLE PORTAL ---
-const ProviderPortal: React.FC<{ provider: AuthenticatedUser; onLogout: () => void }> = ({ provider, onLogout }) => {
+const ProviderPortal: React.FC<{ provider: AuthenticatedUser; onLogout: () => void; onUpdateUser: (updates: Partial<AuthenticatedUser>) => void }> = ({ provider, onLogout, onUpdateUser }) => {
     const { t } = useLocalization();
     const [view, setView] = useState<'scan' | 'notifications' | 'history' | 'ads' | 'offers' | 'urgent' | null>(null);
     const [editMode, setEditMode] = useState(false);
-    
-    // In a real app, these would come from database counts. For now using props if available, else 0
-    const postsCount = 0; // Would be offers count
+    const [stats, setStats] = useState({ followers: 0, posts: 0, visits: 0 });
+
+    useEffect(() => {
+        const fetchStats = async () => {
+            // Count Offers (Posts)
+            const { count: offersCount } = await supabase.from('provider_offers').select('id', { count: 'exact' }).eq('provider_id', provider.id);
+            // Count Followers
+            const { count: followersCount } = await supabase.from('follows').select('id', { count: 'exact' }).eq('provider_id', provider.id);
+            // Visits
+            setStats({ 
+                followers: followersCount || 0, 
+                posts: offersCount || 0, 
+                visits: provider.visits_count || 0 
+            });
+        }
+        fetchStats();
+    }, [provider, view]); // Re-fetch when view changes (e.g. added offer)
 
     const handleShare = () => {
         const text = `Chat with me on TangerConnect: ${provider.name}`;
@@ -561,9 +589,9 @@ const ProviderPortal: React.FC<{ provider: AuthenticatedUser; onLogout: () => vo
                         <img src={provider.profile_image_url || `https://ui-avatars.com/api/?name=${provider.name}`} className="w-full h-full rounded-full border-2 border-white object-cover"/>
                     </div>
                     <div className="flex-1 flex justify-around text-center">
-                        <div><div className="font-bold text-lg">{postsCount}</div><div className="text-xs text-gray-500">{t('posts')}</div></div>
-                        <div><div className="font-bold text-lg">{provider.followers_count || 0}</div><div className="text-xs text-gray-500">{t('followers')}</div></div>
-                        <div><div className="font-bold text-lg">{provider.visits_count || 0}</div><div className="text-xs text-gray-500">{t('visits')}</div></div>
+                        <div><div className="font-bold text-lg">{stats.posts}</div><div className="text-xs text-gray-500">{t('posts')}</div></div>
+                        <div><div className="font-bold text-lg">{stats.followers}</div><div className="text-xs text-gray-500">{t('followers')}</div></div>
+                        <div><div className="font-bold text-lg">{stats.visits}</div><div className="text-xs text-gray-500">{t('visits')}</div></div>
                     </div>
                 </div>
                 <div>
@@ -607,7 +635,7 @@ const ProviderPortal: React.FC<{ provider: AuthenticatedUser; onLogout: () => vo
             {view === 'offers' && <OffersView providerId={provider.id} onClose={() => setView(null)} />}
             {view === 'urgent' && <UrgentAdsView providerId={provider.id} onClose={() => setView(null)} />}
             
-            {editMode && <EditProfileModal provider={provider} onClose={() => setEditMode(false)} />}
+            {editMode && <EditProfileModal provider={provider} onClose={() => setEditMode(false)} onUpdateUser={onUpdateUser} />}
         </div>
     );
 };

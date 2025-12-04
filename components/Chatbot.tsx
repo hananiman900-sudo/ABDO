@@ -5,7 +5,7 @@ import { getChatResponse } from '../services/geminiService';
 import { useLocalization } from '../hooks/useLocalization';
 import { supabase } from '../services/supabaseClient';
 import QRCodeDisplay from './QRCodeDisplay';
-import { Send, Mic, Paperclip, Camera, Loader2, X, Globe, Search, ArrowLeft, MoreVertical, Calendar, Info, Phone, MapPin, Instagram, Facebook, Tag, UserPlus, UserCheck, Megaphone, Star } from 'lucide-react';
+import { Send, Mic, Paperclip, Camera, Loader2, X, Globe, Search, ArrowLeft, MoreVertical, Calendar, Info, Phone, MapPin, Instagram, Facebook, Tag, UserPlus, UserCheck, Megaphone, Star, Check, ChevronDown, CheckCircle } from 'lucide-react';
 
 // --- SUB-COMPONENTS ---
 
@@ -30,15 +30,128 @@ const UrgentTicker: React.FC = () => {
     );
 }
 
-const ChatProfileModal: React.FC<{ provider: any; onClose: () => void; currentUser: AuthenticatedUser | null }> = ({ provider, onClose, currentUser }) => {
+const BookingModal: React.FC<{ provider: any; onClose: () => void; currentUser: AuthenticatedUser; onBooked: (details: any) => void; initialOffer?: Offer | null }> = ({ provider, onClose, currentUser, onBooked, initialOffer }) => {
+    const { t } = useLocalization();
+    const [offers, setOffers] = useState<Offer[]>([]);
+    const [selectedOffer, setSelectedOffer] = useState<Offer | null>(null);
+    const [date, setDate] = useState('');
+    const [time, setTime] = useState('');
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        const fetchOffers = async () => {
+             const { data } = await supabase.from('provider_offers').select('*').eq('provider_id', provider.id);
+             setOffers(data || []);
+        }
+        fetchOffers();
+    }, [provider]);
+
+    // Set initial offer if passed from Profile
+    useEffect(() => {
+        if(initialOffer) {
+            setSelectedOffer(initialOffer);
+        }
+    }, [initialOffer]);
+
+    const handleConfirm = async () => {
+        if(!date || !time) return alert("Please select date and time");
+        setLoading(true);
+
+        const appointmentId = Date.now(); // Simple ID for demo
+        
+        // In a real app, insert into 'appointments' table here
+        await supabase.from('appointments').insert({
+            client_id: currentUser.id,
+            provider_id: provider.id,
+            created_at: new Date().toISOString() // Simply marking creation time
+        });
+
+        // Add Notification for Provider
+        await supabase.from('provider_notifications').insert({
+            provider_id: provider.id,
+            message: `New Booking: ${currentUser.name} for ${selectedOffer?.title || 'General Visit'} on ${date} at ${time}`,
+            type: 'BOOKING',
+            status: 'pending'
+        });
+
+        const bookingDetails = {
+            appointmentId,
+            provider: provider.name,
+            service: provider.service_type,
+            date: date,
+            time: time,
+            offerTitle: selectedOffer?.title,
+            price: selectedOffer?.discount_price,
+            message: `Booking Confirmed for ${date} at ${time}`
+        };
+
+        onBooked(bookingDetails);
+        setLoading(false);
+    }
+
+    return (
+        <div className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-4 animate-fade-in">
+            <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden">
+                <div className="p-4 border-b flex justify-between items-center bg-gray-50">
+                    <h3 className="font-bold text-lg flex items-center gap-2"><Calendar className="text-blue-600"/> Book Appointment</h3>
+                    <button onClick={onClose}><X/></button>
+                </div>
+                <div className="p-4 space-y-4">
+                    <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Select Offer (Optional)</label>
+                        <div className="space-y-2 max-h-40 overflow-y-auto">
+                            {offers.map(offer => (
+                                <div 
+                                    key={offer.id} 
+                                    onClick={() => setSelectedOffer(offer === selectedOffer ? null : offer)}
+                                    className={`p-3 border rounded-lg cursor-pointer flex justify-between items-center transition-all ${selectedOffer?.id === offer.id ? 'border-blue-500 bg-blue-50' : 'hover:bg-gray-50'}`}
+                                >
+                                    <div>
+                                        <p className="font-bold text-sm">{offer.title}</p>
+                                        <p className="text-xs text-red-500 font-bold">{offer.discount_price} DH</p>
+                                    </div>
+                                    {selectedOffer?.id === offer.id && <CheckCircle size={16} className="text-blue-600"/>}
+                                </div>
+                            ))}
+                            {offers.length === 0 && <p className="text-xs text-gray-400 italic">No special offers available.</p>}
+                        </div>
+                    </div>
+
+                    <div className="flex gap-2">
+                         <div className="flex-1">
+                             <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Date</label>
+                             <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full p-2 border rounded-lg text-sm"/>
+                         </div>
+                         <div className="flex-1">
+                             <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Time</label>
+                             <input type="time" value={time} onChange={e => setTime(e.target.value)} className="w-full p-2 border rounded-lg text-sm"/>
+                         </div>
+                    </div>
+
+                    <button onClick={handleConfirm} disabled={loading} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow-lg flex justify-center items-center gap-2">
+                        {loading ? <Loader2 className="animate-spin"/> : <><Tag size={16}/> Confirm Booking</>}
+                    </button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+const ChatProfileModal: React.FC<{ provider: any; onClose: () => void; currentUser: AuthenticatedUser | null; onBookOffer: (offer: Offer) => void }> = ({ provider, onClose, currentUser, onBookOffer }) => {
     const { t } = useLocalization();
     const [offers, setOffers] = useState<Offer[]>([]);
     const [isFollowing, setIsFollowing] = useState(false);
+    const [stats, setStats] = useState({ followers: 0, posts: 0 });
     
     useEffect(() => {
         const fetch = async () => {
             const { data } = await supabase.from('provider_offers').select('*').eq('provider_id', provider.id);
             setOffers(data || []);
+            setStats(prev => ({ ...prev, posts: data?.length || 0 }));
+
+            // Live Follower Count
+            const { count } = await supabase.from('follows').select('id', { count: 'exact' }).eq('provider_id', provider.id);
+            setStats(prev => ({ ...prev, followers: count || 0 }));
             
             if(currentUser) {
                 const { data: follow } = await supabase.from('follows').select('*').eq('client_id', currentUser.id).eq('provider_id', provider.id).single();
@@ -52,8 +165,10 @@ const ChatProfileModal: React.FC<{ provider: any; onClose: () => void; currentUs
         if(!currentUser) return alert(t('loginRequired'));
         if(isFollowing) {
             await supabase.from('follows').delete().eq('client_id', currentUser.id).eq('provider_id', provider.id);
+            setStats(prev => ({ ...prev, followers: prev.followers - 1 }));
         } else {
             await supabase.from('follows').insert({ client_id: currentUser.id, provider_id: provider.id });
+            setStats(prev => ({ ...prev, followers: prev.followers + 1 }));
         }
         setIsFollowing(!isFollowing);
     }
@@ -74,17 +189,24 @@ const ChatProfileModal: React.FC<{ provider: any; onClose: () => void; currentUs
                      
                      <button 
                         onClick={handleFollow}
-                        className={`mt-3 px-6 py-2 rounded-full font-bold text-sm flex items-center gap-2 ${isFollowing ? 'bg-gray-100 text-black' : 'bg-blue-600 text-white'}`}
+                        className={`mt-3 px-8 py-2 rounded-full font-bold text-sm flex items-center gap-2 shadow-sm transition-all ${isFollowing ? 'bg-gray-100 text-black border border-gray-300' : 'bg-blue-600 text-white'}`}
                      >
                         {isFollowing ? <UserCheck size={16}/> : <UserPlus size={16}/>}
                         {isFollowing ? t('unfollow') : t('follow')}
                      </button>
                  </div>
 
-                 <div className="grid grid-cols-3 gap-2 mb-6 text-center">
-                     <div className="bg-gray-50 p-2 rounded-lg"><div className="font-bold">{offers.length}</div><div className="text-[10px] text-gray-500">{t('offers')}</div></div>
-                     <div className="bg-gray-50 p-2 rounded-lg"><div className="font-bold">{provider.followers_count || 0}</div><div className="text-[10px] text-gray-500">{t('followers')}</div></div>
-                     <div className="bg-gray-50 p-2 rounded-lg"><div className="font-bold">{provider.visits_count || 0}</div><div className="text-[10px] text-gray-500">{t('visits')}</div></div>
+                 {/* STATS - VISIT COUNT REMOVED FOR CLIENTS */}
+                 <div className="flex justify-center gap-8 mb-6 text-center">
+                     <div className="flex flex-col items-center">
+                        <div className="font-black text-xl">{stats.followers}</div>
+                        <div className="text-xs text-gray-500 font-bold uppercase tracking-wide">{t('followers')}</div>
+                     </div>
+                     <div className="w-px bg-gray-200 h-10"></div>
+                     <div className="flex flex-col items-center">
+                        <div className="font-black text-xl">{stats.posts}</div>
+                        <div className="text-xs text-gray-500 font-bold uppercase tracking-wide">{t('offers')}</div>
+                     </div>
                  </div>
 
                  <div className="space-y-4 mb-6">
@@ -92,29 +214,42 @@ const ChatProfileModal: React.FC<{ provider: any; onClose: () => void; currentUs
                      <p className="text-sm text-gray-600 whitespace-pre-line">{provider.bio || "No bio available."}</p>
                      
                      <h3 className="font-bold border-b pb-2">{t('socialLinks')}</h3>
-                     <div className="flex gap-4">
-                        {provider.social_links?.instagram && <a href={`https://instagram.com/${provider.social_links.instagram}`} className="text-pink-600"><Instagram/></a>}
-                        {provider.social_links?.facebook && <a href={`https://facebook.com/${provider.social_links.facebook}`} className="text-blue-600"><Facebook/></a>}
-                        {provider.social_links?.gps && <a href={`https://maps.google.com/?q=${provider.social_links.gps}`} className="text-green-600"><MapPin/></a>}
+                     <div className="flex gap-4 justify-center">
+                        {provider.social_links?.instagram && <a href={`https://instagram.com/${provider.social_links.instagram}`} className="text-pink-600 bg-pink-50 p-2 rounded-full"><Instagram/></a>}
+                        {provider.social_links?.facebook && <a href={`https://facebook.com/${provider.social_links.facebook}`} className="text-blue-600 bg-blue-50 p-2 rounded-full"><Facebook/></a>}
+                        {provider.social_links?.gps && <a href={`https://maps.google.com/?q=${provider.social_links.gps}`} className="text-green-600 bg-green-50 p-2 rounded-full"><MapPin/></a>}
                      </div>
                  </div>
 
-                 <h3 className="font-bold border-b pb-2 mb-4">{t('offers')}</h3>
-                 <div className="grid grid-cols-2 gap-3">
-                    {offers.map(o => (
-                        <div key={o.id} className="border rounded-xl overflow-hidden shadow-sm">
-                            {o.image_url && <img src={o.image_url} className="w-full h-24 object-cover"/>}
-                            <div className="p-2">
-                                <h4 className="font-bold text-xs truncate">{o.title}</h4>
-                                <div className="flex gap-2 text-[10px]">
-                                    <span className="line-through text-gray-400">{o.original_price}</span>
-                                    <span className="text-red-600 font-bold">{o.discount_price} DH</span>
+                 <h3 className="font-bold border-b pb-2 mb-4 flex items-center gap-2"><Tag size={18}/> {t('offers')}</h3>
+                 
+                 {offers.length === 0 ? (
+                     <div className="text-center py-8 text-gray-400 bg-gray-50 rounded-xl border border-dashed">
+                         <Tag className="mx-auto mb-2 opacity-50"/>
+                         <p className="text-sm">No active offers currently.</p>
+                     </div>
+                 ) : (
+                    <div className="grid grid-cols-2 gap-3">
+                        {offers.map(o => (
+                            <div key={o.id} className="border rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                                {o.image_url && <div className="h-24 bg-gray-100"><img src={o.image_url} className="w-full h-full object-cover"/></div>}
+                                <div className="p-3">
+                                    <h4 className="font-bold text-sm truncate mb-1">{o.title}</h4>
+                                    <div className="flex gap-2 text-xs mb-3 items-center">
+                                        <span className="line-through text-gray-400">{o.original_price}</span>
+                                        <span className="text-red-600 font-black text-sm">{o.discount_price} DH</span>
+                                    </div>
+                                    <button 
+                                        onClick={() => onBookOffer(o)} 
+                                        className="w-full bg-black text-white py-2 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 active:scale-95 transition-transform"
+                                    >
+                                        <Calendar size={12}/> Book Now
+                                    </button>
                                 </div>
-                                <button className="w-full mt-2 bg-black text-white py-1 rounded text-[10px] font-bold">Book</button>
                             </div>
-                        </div>
-                    ))}
-                 </div>
+                        ))}
+                    </div>
+                 )}
              </div>
         </div>
     )
@@ -135,10 +270,14 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
     const fileRef = useRef<HTMLInputElement>(null);
     const [preview, setPreview] = useState<string | null>(null);
     const [showProfile, setShowProfile] = useState(false);
+    const [showBooking, setShowBooking] = useState(false);
     const [systemAds, setSystemAds] = useState<SystemAnnouncement[]>([]);
     
     // Ads Slider State
     const [currentAdIndex, setCurrentAdIndex] = useState(0);
+
+    // Offers Booking Logic
+    const [preSelectedOffer, setPreSelectedOffer] = useState<Offer | null>(null);
 
     useEffect(() => {
         const fetchProviders = async () => {
@@ -174,6 +313,7 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
         setMessages([]); 
         setView('CHAT');
         setShowProfile(false);
+        setShowBooking(false);
     };
 
     const handleSend = async () => {
@@ -222,6 +362,17 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
         }
     }
 
+    const handleBookingConfirmed = (details: any) => {
+        setShowBooking(false);
+        setMessages(prev => [...prev, { role: Role.BOT, text: details.message, bookingDetails: details, isComponent: true }]);
+    }
+
+    const handleBookFromProfile = (offer: Offer) => {
+        setPreSelectedOffer(offer);
+        setShowProfile(false);
+        setShowBooking(true);
+    }
+
     // --- VIEW 1: CHAT LIST ---
     if (view === 'LIST') {
         const filteredProviders = providers.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.service_type.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -232,12 +383,9 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
         // Helper to open chat for an Ad
         const handleAdClick = async () => {
             if(!currentAd) return;
-            // Try to find the provider linked to this ad title (assuming title is provider name as per earlier logic)
-            // In a real app, system_announcements would have a provider_id FK.
-            // For now, we search providers by name match to open their chat
             const p = providers.find(prov => prov.name === currentAd.title);
             if(p) openChat(p);
-            else openChat(null); // Fallback to Tanger IA
+            else openChat(null); 
         }
 
         return (
@@ -325,7 +473,8 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
         <div className="flex flex-col h-full bg-[#EFE7DD] relative">
             <UrgentTicker />
 
-            <div className="bg-white p-2 border-b flex items-center gap-2 shadow-sm z-20">
+            {/* UPDATED HEADER: More padding, explicit styling as main header */}
+            <div className="bg-white py-3 px-2 border-b flex items-center gap-2 shadow-sm z-20">
                 <button onClick={() => setView('LIST')} className="p-2"><ArrowLeft size={20}/></button>
                 
                 <div onClick={() => selectedChat && setShowProfile(true)} className="flex items-center gap-3 flex-1 cursor-pointer">
@@ -344,7 +493,9 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
 
                 <div className="flex gap-1 text-blue-600">
                     <button onClick={() => selectedChat && setShowProfile(true)} className="p-2 hover:bg-gray-100 rounded-full"><Info size={20}/></button>
-                    <button onClick={() => handleSend()} className="p-2 hover:bg-gray-100 rounded-full"><Calendar size={20}/></button>
+                    {selectedChat && (
+                        <button onClick={() => { setPreSelectedOffer(null); setShowBooking(true); }} className="p-2 hover:bg-blue-50 rounded-full bg-blue-100 text-blue-600"><Calendar size={20}/></button>
+                    )}
                 </div>
             </div>
 
@@ -424,7 +575,11 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
             )}
 
             {showProfile && selectedChat && (
-                <ChatProfileModal provider={selectedChat} onClose={() => setShowProfile(false)} currentUser={currentUser} />
+                <ChatProfileModal provider={selectedChat} onClose={() => setShowProfile(false)} currentUser={currentUser} onBookOffer={handleBookFromProfile} />
+            )}
+            
+            {showBooking && selectedChat && currentUser && (
+                <BookingModal provider={selectedChat} onClose={() => setShowBooking(false)} currentUser={currentUser} onBooked={handleBookingConfirmed} initialOffer={preSelectedOffer} />
             )}
         </div>
     );

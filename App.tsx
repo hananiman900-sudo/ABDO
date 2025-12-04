@@ -253,6 +253,14 @@ const AppContent: React.FC = () => {
         fetchNotifications(u.id);
     };
 
+    // New function to update user state (e.g., when profile pic changes)
+    const handleUpdateUser = (updates: Partial<AuthenticatedUser>) => {
+        if (!user) return;
+        const updatedUser = { ...user, ...updates };
+        setUser(updatedUser);
+        localStorage.setItem('tanger_user', JSON.stringify(updatedUser));
+    };
+
     const handleLogout = () => { setUser(null); localStorage.removeItem('tanger_user'); setUserView(UserView.CLIENT); };
     const toggleProviderView = () => setUserView(prev => prev === UserView.PROVIDER ? UserView.CLIENT : UserView.PROVIDER);
 
@@ -271,44 +279,50 @@ const AppContent: React.FC = () => {
     if(showSplash) return <SplashScreen />;
 
     if (user?.accountType === AccountType.PROVIDER && userView === UserView.PROVIDER) {
-        return <ProviderPortal provider={user} onLogout={toggleProviderView} />;
+        return <ProviderPortal provider={user} onLogout={toggleProviderView} onUpdateUser={handleUpdateUser} />;
     }
 
     return (
         <div className={`flex flex-col h-screen bg-white ${language === 'ar' ? 'font-arabic' : 'font-sans'}`} dir={language === 'ar' ? 'rtl' : 'ltr'}>
             
-            {/* NEW CLEAN HEADER */}
-            <div className="bg-white/90 backdrop-blur-md border-b border-gray-100 p-3 flex justify-between items-center z-20 h-16 sticky top-0 shadow-sm">
-                
-                {/* Notification Bell */}
-                <div className="w-10">
-                   <div className="relative inline-block">
-                       <Bell size={24} className="text-gray-700"/>
-                       {unreadNotifs > 0 && <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center animate-pulse">{unreadNotifs}</span>}
-                   </div>
-                </div>
-
-                {/* Logo */}
-                <div className="flex items-center gap-2">
-                    <div className="w-9 h-9 bg-gradient-to-tr from-blue-600 to-cyan-400 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-500/20 transform rotate-3">
-                         <Sparkles size={20} className="text-white fill-white"/>
+            {/* NEW CLEAN HEADER - CONDITIONAL RENDERING */}
+            {!hideBottomNav && (
+                <div className="bg-white/90 backdrop-blur-md border-b border-gray-100 p-3 flex justify-between items-center z-20 h-16 sticky top-0 shadow-sm animate-fade-in">
+                    
+                    {/* Notification Bell */}
+                    <div className="w-10">
+                    <div className="relative inline-block">
+                        <Bell size={24} className="text-gray-700"/>
+                        {unreadNotifs > 0 && <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center animate-pulse">{unreadNotifs}</span>}
                     </div>
-                    <div className="flex flex-col leading-none">
-                        <h1 className="font-black text-xl tracking-tight bg-gradient-to-r from-blue-700 to-cyan-500 bg-clip-text text-transparent">
-                            Tanger<span className="font-light text-gray-400">IA</span>
-                        </h1>
+                    </div>
+
+                    {/* Logo */}
+                    <div className="flex items-center gap-2">
+                        <div className="w-9 h-9 bg-gradient-to-tr from-blue-600 to-cyan-400 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-500/20 transform rotate-3">
+                            <Sparkles size={20} className="text-white fill-white"/>
+                        </div>
+                        <div className="flex flex-col leading-none">
+                            <h1 className="font-black text-xl tracking-tight bg-gradient-to-r from-blue-700 to-cyan-500 bg-clip-text text-transparent">
+                                Tanger<span className="font-light text-gray-400">IA</span>
+                            </h1>
+                        </div>
+                    </div>
+
+                    {/* Login Button or User Avatar */}
+                    <div className="w-10 flex justify-end">
+                        {!user ? (
+                            <button onClick={() => setShowAuth(true)} className="w-9 h-9 bg-black text-white rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-transform">
+                                <LogIn size={16}/>
+                            </button>
+                        ) : (
+                            <div className="w-9 h-9 rounded-full overflow-hidden border border-gray-200">
+                                <img src={user.profile_image_url || `https://ui-avatars.com/api/?name=${user.name}`} className="w-full h-full object-cover"/>
+                            </div>
+                        )}
                     </div>
                 </div>
-
-                {/* Login Button */}
-                <div className="w-10 flex justify-end">
-                    {!user && (
-                         <button onClick={() => setShowAuth(true)} className="w-9 h-9 bg-black text-white rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-transform">
-                             <LogIn size={16}/>
-                         </button>
-                    )}
-                </div>
-            </div>
+            )}
 
             {/* MAIN CONTENT AREA */}
             <div className="flex-1 overflow-hidden relative bg-white">
