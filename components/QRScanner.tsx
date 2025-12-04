@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useLocalization } from '../hooks/useLocalization';
 import { AuthenticatedUser, ProviderNotification, AdRequest, Offer, UrgentAd } from '../types';
 import { supabase } from '../services/supabaseClient';
-import { CheckCircle, XCircle, Camera, Loader2, Upload, MessageCircle, History, Users, Megaphone, Settings, ArrowLeft, Image as ImageIcon, QrCode, Bell, User, LayoutGrid, FileText, Lock, LogOut, Grid, Bookmark, Heart, Plus, Zap, Tag, Instagram, Facebook, MapPin, Edit3 } from 'lucide-react';
+import { CheckCircle, XCircle, Camera, Loader2, Upload, MessageCircle, History, Users, Megaphone, Settings, ArrowLeft, Image as ImageIcon, QrCode, Bell, User, LayoutGrid, FileText, Lock, LogOut, Grid, Bookmark, Heart, Plus, Zap, Tag, Instagram, Facebook, MapPin, Edit3, Share2 } from 'lucide-react';
 import jsQR from 'jsqr';
 
 // --- SUB-COMPONENTS (FULL SCREEN VIEWS) ---
@@ -59,11 +59,11 @@ const HistoryView: React.FC<{ providerId: number; onClose: () => void }> = ({ pr
             <div className="p-4">
                 <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
                     <table className="w-full text-sm">
-                        <thead className="bg-gray-50">
+                        <thead className="bg-gray-50 text-gray-500">
                             <tr>
                                 <th className="p-3 text-right">{t('clientName')}</th>
                                 <th className="p-3 text-right">{t('visitDate')}</th>
-                                <th className="p-3 text-right">Status</th>
+                                <th className="p-3 text-right">Details</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -71,7 +71,9 @@ const HistoryView: React.FC<{ providerId: number; onClose: () => void }> = ({ pr
                                 <tr key={i} className="border-t">
                                     <td className="p-3 font-bold">{h.client_name}</td>
                                     <td className="p-3 text-gray-500">{new Date(h.created_at).toLocaleDateString()}</td>
-                                    <td className="p-3 text-green-600"><CheckCircle size={14}/></td>
+                                    <td className="p-3 text-xs">
+                                        <span className="block">{h.client_phone}</span>
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>
@@ -171,6 +173,11 @@ const OffersView: React.FC<{ providerId: number; onClose: () => void }> = ({ pro
         fetchOffers();
         setLoading(false);
     }
+    
+    const handleDelete = async (id: number) => {
+        await supabase.from('provider_offers').delete().eq('id', id);
+        fetchOffers();
+    }
 
     return (
         <div className="fixed inset-0 bg-white z-50 flex flex-col animate-slide-up">
@@ -192,7 +199,8 @@ const OffersView: React.FC<{ providerId: number; onClose: () => void }> = ({ pro
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                     {offers.map(o => (
-                        <div key={o.id} className="border rounded-lg p-2 bg-white shadow-sm">
+                        <div key={o.id} className="border rounded-lg p-2 bg-white shadow-sm relative group">
+                            <button onClick={() => handleDelete(o.id)} className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1"><XCircle size={12}/></button>
                             {o.image_url && <img src={o.image_url} className="w-full h-24 object-cover rounded mb-2"/>}
                             <h4 className="font-bold text-sm">{o.title}</h4>
                             <div className="flex gap-2 text-xs">
@@ -250,6 +258,7 @@ const AdsView: React.FC<{ providerId: number; onClose: () => void }> = ({ provid
             </div>
             <div className="p-4 space-y-4">
                  <div className="bg-purple-50 p-4 rounded-xl border border-purple-100">
+                     <p className="text-sm text-purple-800 font-bold mb-3">{t('paidAdDesc')}</p>
                      <textarea value={newAd.message} onChange={e => setNewAd({...newAd, message: e.target.value})} placeholder={t('messageLabel')} className="w-full p-2 rounded-lg border mb-2"/>
                      <button onClick={() => fileRef.current?.click()} className="w-full py-2 border border-dashed rounded-lg mb-2 bg-white flex justify-center gap-2 text-gray-500"><ImageIcon size={18}/> {t('uploadQRImage')}</button>
                      <input type="file" ref={fileRef} hidden onChange={handleUpload}/>
@@ -273,38 +282,66 @@ const AdsView: React.FC<{ providerId: number; onClose: () => void }> = ({ provid
 const QRScannerView: React.FC<{ providerId: number; onClose: () => void }> = ({ providerId, onClose }) => {
     const { t } = useLocalization();
     const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
-    const fileRef = useRef<HTMLInputElement>(null);
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const [scanning, setScanning] = useState(true);
 
-    const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if(!file) return;
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-            const img = new Image();
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                canvas.width = img.width; canvas.height = img.height;
-                const ctx = canvas.getContext('2d');
-                if(ctx) {
-                    ctx.drawImage(img, 0, 0);
-                    const imageData = ctx.getImageData(0,0, canvas.width, canvas.height);
-                    const code = jsQR(imageData.data, imageData.width, imageData.height);
-                    if(code) processCode(code.data); else setStatus('error');
+    useEffect(() => {
+        if (!scanning) return;
+        const startVideo = async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                if (videoRef.current) {
+                    videoRef.current.srcObject = stream;
+                    videoRef.current.setAttribute("playsinline", "true");
+                    videoRef.current.play();
+                    requestAnimationFrame(tick);
                 }
-            };
-            img.src = ev.target?.result as string;
+            } catch (err) {
+                console.error("Camera error", err);
+            }
         };
-        reader.readAsDataURL(file);
-    }
+        startVideo();
+        return () => { 
+            // Cleanup stream
+            if(videoRef.current?.srcObject) {
+                const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
+                tracks.forEach(track => track.stop());
+            }
+        }
+    }, [scanning]);
+
+    const tick = () => {
+        if (videoRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
+            const canvas = canvasRef.current;
+            if (canvas) {
+                canvas.height = videoRef.current.videoHeight;
+                canvas.width = videoRef.current.videoWidth;
+                const ctx = canvas.getContext('2d');
+                if (ctx) {
+                    ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'dontInvert' });
+                    if (code) {
+                        processCode(code.data);
+                        return; // Stop loop
+                    }
+                }
+            }
+        }
+        if (scanning) requestAnimationFrame(tick);
+    };
 
     const processCode = async (data: string) => {
+        setScanning(false);
         try {
             const parsed = JSON.parse(data);
             if(!parsed.appointmentId) throw new Error();
             
             // Log visit logic
             await supabase.from('scan_history').insert({ provider_id: providerId, client_name: "Client #" + parsed.appointmentId, client_phone: "Verified" });
-            // Increment Stats
+            
+            // Update provider Visits Count
             const { data: p } = await supabase.from('providers').select('visits_count').eq('id', providerId).single();
             await supabase.from('providers').update({ visits_count: (p?.visits_count || 0) + 1 }).eq('id', providerId);
 
@@ -314,27 +351,24 @@ const QRScannerView: React.FC<{ providerId: number; onClose: () => void }> = ({ 
 
     return (
         <div className="fixed inset-0 bg-black text-white z-50 flex flex-col animate-slide-up">
-            <div className="p-4 flex justify-between items-center">
+            <div className="p-4 flex justify-between items-center bg-black">
                 <button onClick={onClose}><ArrowLeft/></button>
                 <span className="font-bold">{t('qrScannerTitle')}</span>
                 <div/>
             </div>
-            <div className="flex-1 flex flex-col items-center justify-center p-6 gap-6">
+            <div className="flex-1 flex flex-col items-center justify-center p-6 gap-6 relative">
                 {status === 'success' ? (
-                    <div className="text-center"><CheckCircle size={80} className="text-green-500 mx-auto"/><h2 className="text-2xl font-bold mt-4">{t('verificationSuccess')}</h2><button onClick={() => setStatus('idle')} className="mt-6 bg-white text-black px-6 py-2 rounded-full font-bold">Next</button></div>
+                    <div className="text-center"><CheckCircle size={80} className="text-green-500 mx-auto"/><h2 className="text-2xl font-bold mt-4">{t('verificationSuccess')}</h2><button onClick={() => { setStatus('idle'); setScanning(true); }} className="mt-6 bg-white text-black px-6 py-2 rounded-full font-bold">Next</button></div>
                 ) : status === 'error' ? (
-                     <div className="text-center"><XCircle size={80} className="text-red-500 mx-auto"/><h2 className="text-2xl font-bold mt-4">{t('invalidQR')}</h2><button onClick={() => setStatus('idle')} className="mt-6 bg-white text-black px-6 py-2 rounded-full font-bold">Try Again</button></div>
+                     <div className="text-center"><XCircle size={80} className="text-red-500 mx-auto"/><h2 className="text-2xl font-bold mt-4">{t('invalidQR')}</h2><button onClick={() => { setStatus('idle'); setScanning(true); }} className="mt-6 bg-white text-black px-6 py-2 rounded-full font-bold">Try Again</button></div>
                 ) : (
                     <>
                         <div className="w-full aspect-square border-2 border-white/20 rounded-xl relative overflow-hidden flex items-center justify-center bg-gray-900">
-                             <div className="absolute inset-0 animate-pulse bg-green-500/10"></div>
-                             <p className="text-gray-400 text-sm">Camera Active</p>
+                             <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover"/>
+                             <canvas ref={canvasRef} hidden />
+                             <div className="absolute inset-0 border-2 border-green-500/50 m-12 rounded-lg animate-pulse"></div>
                         </div>
                         <p className="text-center text-gray-400 text-sm">Align QR code within frame</p>
-                        <div className="w-full pt-10 border-t border-gray-800">
-                            <button onClick={() => fileRef.current?.click()} className="w-full bg-white text-black py-4 rounded-xl font-bold flex items-center justify-center gap-2"><ImageIcon/> {t('uploadQRImage')}</button>
-                            <input type="file" ref={fileRef} hidden accept="image/*" onChange={handleFile}/>
-                        </div>
                     </>
                 )}
             </div>
@@ -348,15 +382,30 @@ const EditProfileModal: React.FC<{ provider: AuthenticatedUser; onClose: () => v
         bio: provider.bio || '', 
         instagram: provider.social_links?.instagram || '', 
         facebook: provider.social_links?.facebook || '', 
-        gps: provider.social_links?.gps || '' 
+        gps: provider.social_links?.gps || '',
+        image: provider.profile_image_url || ''
     });
     const [loading, setLoading] = useState(false);
+    const fileRef = useRef<HTMLInputElement>(null);
+
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if(!file) return;
+        setLoading(true);
+        try {
+            const fileName = `avatar_${provider.id}_${Date.now()}`;
+            await supabase.storage.from('profiles').upload(fileName, file);
+            const { data } = supabase.storage.from('profiles').getPublicUrl(fileName);
+            setForm(prev => ({ ...prev, image: data.publicUrl }));
+        } catch(e) {} finally { setLoading(false); }
+    }
 
     const handleSave = async () => {
         setLoading(true);
         const { error } = await supabase.from('providers').update({ 
             bio: form.bio, 
-            social_links: { instagram: form.instagram, facebook: form.facebook, gps: form.gps } 
+            social_links: { instagram: form.instagram, facebook: form.facebook, gps: form.gps },
+            profile_image_url: form.image
         }).eq('id', provider.id);
         setLoading(false);
         if(!error) { alert(t('success')); onClose(); }
@@ -367,7 +416,15 @@ const EditProfileModal: React.FC<{ provider: AuthenticatedUser; onClose: () => v
         <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl w-full max-w-sm p-6 space-y-4">
                 <h2 className="font-bold text-lg">{t('editProfile')}</h2>
-                <textarea value={form.bio} onChange={e => setForm({...form, bio: e.target.value})} placeholder={t('bioLabel')} className="w-full p-2 border rounded-lg h-24"/>
+                
+                <div className="flex justify-center mb-2">
+                    <div className="w-20 h-20 rounded-full bg-gray-200 overflow-hidden relative cursor-pointer" onClick={() => fileRef.current?.click()}>
+                        {form.image ? <img src={form.image} className="w-full h-full object-cover"/> : <Camera className="absolute inset-0 m-auto text-gray-400"/>}
+                    </div>
+                    <input type="file" ref={fileRef} hidden onChange={handleImageUpload} />
+                </div>
+
+                <textarea value={form.bio} onChange={e => setForm({...form, bio: e.target.value})} placeholder={t('bioLabel')} className="w-full p-2 border rounded-lg h-24 text-sm"/>
                 <div className="space-y-2">
                     <h4 className="font-bold text-xs uppercase text-gray-400">{t('socialLinks')}</h4>
                     <div className="flex items-center gap-2 border rounded-lg p-2"><Instagram size={16}/><input value={form.instagram} onChange={e => setForm({...form, instagram: e.target.value})} placeholder="Instagram Username" className="flex-1 outline-none text-sm"/></div>
@@ -388,12 +445,17 @@ const ProviderPortal: React.FC<{ provider: AuthenticatedUser; onLogout: () => vo
     const { t } = useLocalization();
     const [view, setView] = useState<'scan' | 'notifications' | 'history' | 'ads' | 'offers' | 'urgent' | null>(null);
     const [editMode, setEditMode] = useState(false);
+    
+    const handleShare = () => {
+        const text = `Chat with me on TangerConnect: ${provider.name}`;
+        window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+    }
 
     const GridItem = ({ icon: Icon, label, onClick, badge }: any) => (
         <div onClick={onClick} className="aspect-square bg-gray-50 relative group cursor-pointer border border-white hover:bg-gray-100 transition-colors">
             <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-600">
                 <Icon size={28} strokeWidth={1.5} className="mb-2 text-gray-700"/>
-                <span className="text-[10px] font-bold uppercase tracking-wide">{label}</span>
+                <span className="text-[10px] font-bold uppercase tracking-wide text-center px-1">{label}</span>
                 {badge > 0 && <span className="absolute top-2 right-2 bg-red-500 text-white text-[9px] w-4 h-4 rounded-full flex items-center justify-center">{badge}</span>}
             </div>
         </div>
@@ -436,7 +498,7 @@ const ProviderPortal: React.FC<{ provider: AuthenticatedUser; onLogout: () => vo
                 </div>
                 <div className="flex gap-2 mt-4 mb-6">
                     <button onClick={() => setEditMode(true)} className="flex-1 bg-gray-100 py-1.5 rounded-lg font-bold text-sm">{t('editProfile')}</button>
-                    <button className="flex-1 bg-gray-100 py-1.5 rounded-lg font-bold text-sm">{t('share')}</button>
+                    <button onClick={handleShare} className="flex-1 bg-gray-100 py-1.5 rounded-lg font-bold text-sm">{t('share')}</button>
                 </div>
 
                 {/* Grid Tabs */}

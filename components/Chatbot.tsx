@@ -5,11 +5,10 @@ import { getChatResponse } from '../services/geminiService';
 import { useLocalization } from '../hooks/useLocalization';
 import { supabase } from '../services/supabaseClient';
 import QRCodeDisplay from './QRCodeDisplay';
-import { Send, Mic, Paperclip, Camera, Loader2, X, Globe, Search, ArrowLeft, MoreVertical, Calendar, Info, Phone, MapPin, Instagram, Facebook, Tag } from 'lucide-react';
+import { Send, Mic, Paperclip, Camera, Loader2, X, Globe, Search, ArrowLeft, MoreVertical, Calendar, Info, Phone, MapPin, Instagram, Facebook, Tag, UserPlus, UserCheck } from 'lucide-react';
 
 // --- SUB-COMPONENTS ---
 
-// 1. URGENT TICKER
 const UrgentTicker: React.FC = () => {
     const [ads, setAds] = useState<UrgentAd[]>([]);
     useEffect(() => {
@@ -31,29 +30,79 @@ const UrgentTicker: React.FC = () => {
     );
 }
 
-// 2. SYSTEM ADS BANNER
-const SystemAdCard: React.FC<{ ad: SystemAnnouncement; onDismiss: () => void }> = ({ ad, onDismiss }) => (
-    <div className="w-full mb-4 px-4 relative mt-2">
-        <div className="bg-white rounded-lg shadow-sm border overflow-hidden relative">
-            <button onClick={onDismiss} className="absolute top-1 right-1 bg-black/50 text-white rounded-full p-1 z-10"><X size={12}/></button>
-            <img src={ad.image_url} className="w-full h-32 object-cover"/>
-            <div className="p-2"><h4 className="font-bold text-sm">{ad.title}</h4><p className="text-xs text-gray-500">{ad.message}</p></div>
-        </div>
-    </div>
-);
+// HEADER CAROUSEL SLIDER (PAID ADS)
+const HeaderSlider: React.FC<{ onOpenProvider: (p: any) => void }> = ({ onOpenProvider }) => {
+    const [ads, setAds] = useState<SystemAnnouncement[]>([]);
+    const [currentIndex, setCurrentIndex] = useState(0);
 
-// 3. PROFILE DETAILS MODAL (Inside Chat)
-const ChatProfileModal: React.FC<{ provider: any; onClose: () => void }> = ({ provider, onClose }) => {
+    useEffect(() => {
+        const fetch = async () => {
+            const { data } = await supabase.from('system_announcements').select('*').eq('is_active', true);
+            setAds(data || []);
+        }
+        fetch();
+    }, []);
+
+    useEffect(() => {
+        if(ads.length <= 1) return;
+        const timer = setInterval(() => setCurrentIndex(prev => (prev + 1) % ads.length), 3000); // 3 seconds
+        return () => clearInterval(timer);
+    }, [ads]);
+
+    if(ads.length === 0) return null;
+    
+    // In a real app, you'd fetch the provider details associated with the ad to open their chat
+    // For now, we mock the click behavior or just show the ad.
+    
+    const currentAd = ads[currentIndex];
+
+    return (
+        <div className="w-full h-40 bg-gray-100 relative overflow-hidden border-b">
+            <img src={currentAd.image_url} className="w-full h-full object-cover transition-opacity duration-500" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex flex-col justify-end p-4">
+                <span className="bg-orange-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full w-max mb-1">Sponsored</span>
+                <h3 className="text-white font-bold text-sm">{currentAd.title}</h3>
+                <p className="text-white/80 text-xs truncate">{currentAd.message}</p>
+            </div>
+            {ads.length > 1 && (
+                <div className="absolute bottom-2 right-2 flex gap-1">
+                    {ads.map((_, i) => (
+                        <div key={i} className={`w-1.5 h-1.5 rounded-full ${i === currentIndex ? 'bg-white' : 'bg-white/50'}`}/>
+                    ))}
+                </div>
+            )}
+        </div>
+    )
+}
+
+const ChatProfileModal: React.FC<{ provider: any; onClose: () => void; currentUser: AuthenticatedUser | null }> = ({ provider, onClose, currentUser }) => {
     const { t } = useLocalization();
     const [offers, setOffers] = useState<Offer[]>([]);
+    const [isFollowing, setIsFollowing] = useState(false);
     
     useEffect(() => {
         const fetch = async () => {
             const { data } = await supabase.from('provider_offers').select('*').eq('provider_id', provider.id);
             setOffers(data || []);
+            
+            if(currentUser) {
+                const { data: follow } = await supabase.from('follows').select('*').eq('client_id', currentUser.id).eq('provider_id', provider.id).single();
+                setIsFollowing(!!follow);
+            }
         }
         fetch();
-    }, [provider]);
+    }, [provider, currentUser]);
+
+    const handleFollow = async () => {
+        if(!currentUser) return alert(t('loginRequired'));
+        if(isFollowing) {
+            await supabase.from('follows').delete().eq('client_id', currentUser.id).eq('provider_id', provider.id);
+            // Decrement count locally (in real app, use RPC or trigger)
+        } else {
+            await supabase.from('follows').insert({ client_id: currentUser.id, provider_id: provider.id });
+        }
+        setIsFollowing(!isFollowing);
+    }
 
     return (
         <div className="absolute inset-0 bg-white z-[60] flex flex-col animate-slide-up overflow-y-auto">
@@ -68,6 +117,14 @@ const ChatProfileModal: React.FC<{ provider: any; onClose: () => void }> = ({ pr
                      </div>
                      <h2 className="font-bold text-xl">{provider.name}</h2>
                      <p className="text-gray-500">{provider.service_type}</p>
+                     
+                     <button 
+                        onClick={handleFollow}
+                        className={`mt-3 px-6 py-2 rounded-full font-bold text-sm flex items-center gap-2 ${isFollowing ? 'bg-gray-100 text-black' : 'bg-blue-600 text-white'}`}
+                     >
+                        {isFollowing ? <UserCheck size={16}/> : <UserPlus size={16}/>}
+                        {isFollowing ? t('unfollow') : t('follow')}
+                     </button>
                  </div>
 
                  <div className="grid grid-cols-3 gap-2 mb-6 text-center">
@@ -78,7 +135,7 @@ const ChatProfileModal: React.FC<{ provider: any; onClose: () => void }> = ({ pr
 
                  <div className="space-y-4 mb-6">
                      <h3 className="font-bold border-b pb-2">{t('bioLabel')}</h3>
-                     <p className="text-sm text-gray-600">{provider.bio || "No bio available."}</p>
+                     <p className="text-sm text-gray-600 whitespace-pre-line">{provider.bio || "No bio available."}</p>
                      
                      <h3 className="font-bold border-b pb-2">{t('socialLinks')}</h3>
                      <div className="flex gap-4">
@@ -99,6 +156,7 @@ const ChatProfileModal: React.FC<{ provider: any; onClose: () => void }> = ({ pr
                                     <span className="line-through text-gray-400">{o.original_price}</span>
                                     <span className="text-red-600 font-bold">{o.discount_price} DH</span>
                                 </div>
+                                <button className="w-full mt-2 bg-black text-white py-1 rounded text-[10px] font-bold">Book</button>
                             </div>
                         </div>
                     ))}
@@ -110,27 +168,18 @@ const ChatProfileModal: React.FC<{ provider: any; onClose: () => void }> = ({ pr
 
 // --- MAIN CHATBOT COMPONENT ---
 
-const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () => void; onDiscover: () => void }> = ({ currentUser, onOpenAuth, onDiscover }) => {
+const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () => void; onDiscover: () => void; onToggleNav: (hidden: boolean) => void }> = ({ currentUser, onOpenAuth, onDiscover, onToggleNav }) => {
     const { t, language } = useLocalization();
-    
-    // VIEW STATE: 'LIST' (WhatsApp Home) or 'CHAT' (Conversation)
     const [view, setView] = useState<'LIST' | 'CHAT'>('LIST');
-    const [selectedChat, setSelectedChat] = useState<any | null>(null); // null = Tanger IA (General) or Provider Object
-    
-    // Data
+    const [selectedChat, setSelectedChat] = useState<any | null>(null); 
     const [providers, setProviders] = useState<any[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
-    const [systemAds, setSystemAds] = useState<SystemAnnouncement[]>([]);
-
-    // Chat Logic
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const fileRef = useRef<HTMLInputElement>(null);
     const [preview, setPreview] = useState<string | null>(null);
-
-    // Profile Modal Inside Chat
     const [showProfile, setShowProfile] = useState(false);
 
     useEffect(() => {
@@ -138,20 +187,19 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
             const { data } = await supabase.from('providers').select('*').eq('is_active', true);
             setProviders(data || []);
         }
-        const fetchAds = async () => {
-            const { data } = await supabase.from('system_announcements').select('*').eq('is_active', true);
-            if(data) setSystemAds(data);
-        }
         fetchProviders();
-        fetchAds();
     }, []);
+
+    // HIDE BOTTOM NAV WHEN CHATTING
+    useEffect(() => {
+        onToggleNav(view === 'CHAT');
+    }, [view]);
 
     useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, view]);
 
-    // Handle opening a chat
     const openChat = (provider: any | null) => {
         setSelectedChat(provider);
-        setMessages([]); // Reset messages for new session (In a real app, fetch history)
+        setMessages([]); 
         setView('CHAT');
         setShowProfile(false);
     };
@@ -166,7 +214,6 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
         try {
             const history = messages.filter(m => !m.isComponent).map(m => ({ role: m.role === Role.USER ? 'user' : 'model', parts: [{ text: m.text }] }));
             
-            // Pass selectedChat (provider) to AI service
             const responseText = await getChatResponse(
                 history, 
                 userMsg.text, 
@@ -175,10 +222,9 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
                 undefined, 
                 currentUser?.id, 
                 currentUser?.name,
-                selectedChat // This is the KEY update: Passing the provider context
+                selectedChat // Pass Provider Context (Bio)
             );
             
-            // Check for JSON booking
             try {
                 const jsonMatch = responseText.match(/\{[\s\S]*\}/);
                 if(jsonMatch) {
@@ -204,7 +250,7 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
         }
     }
 
-    // --- VIEW 1: WHATSAPP STYLE CHAT LIST ---
+    // --- VIEW 1: CHAT LIST ---
     if (view === 'LIST') {
         const filteredProviders = providers.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.service_type.toLowerCase().includes(searchTerm.toLowerCase()));
         
@@ -212,6 +258,9 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
             <div className="flex flex-col h-full bg-white relative">
                 <UrgentTicker />
                 
+                {/* Header Slider (Paid Ads) */}
+                {!searchTerm && <HeaderSlider onOpenProvider={openChat}/>}
+
                 {/* Search Bar */}
                 <div className="p-4 border-b">
                     <div className="bg-gray-100 rounded-full flex items-center px-4 py-2">
@@ -226,7 +275,7 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
                 </div>
 
                 <div className="flex-1 overflow-y-auto">
-                    {/* Tanger IA (Pinned) */}
+                    {/* Tanger IA */}
                     <div onClick={() => openChat(null)} className="flex items-center gap-4 p-4 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
                         <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white shadow-md">
                             <Globe size={28}/>
@@ -240,7 +289,7 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
                         </div>
                     </div>
 
-                    {/* Providers List */}
+                    {/* Providers */}
                     {filteredProviders.map(p => (
                         <div key={p.id} onClick={() => openChat(p)} className="flex items-center gap-4 p-4 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
                             <div className="w-14 h-14 rounded-full bg-gray-200 overflow-hidden border border-gray-100 relative">
@@ -253,15 +302,11 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
                                     <span className="text-[10px] text-gray-400">Online</span>
                                 </div>
                                 <p className="text-sm text-gray-500 flex items-center gap-1">
-                                    <span className="font-semibold text-blue-600">{p.service_type}:</span> 
-                                    Tap to chat
+                                    <span className="font-semibold text-blue-600">{p.service_type}</span>
                                 </p>
                             </div>
                         </div>
                     ))}
-                    {filteredProviders.length === 0 && searchTerm && (
-                        <p className="text-center text-gray-400 py-10">No providers found.</p>
-                    )}
                 </div>
             </div>
         );
@@ -269,10 +314,9 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
 
     // --- VIEW 2: CONVERSATION WINDOW ---
     return (
-        <div className="flex flex-col h-full bg-[#EFE7DD] relative"> {/* WhatsApp Background Color */}
+        <div className="flex flex-col h-full bg-[#EFE7DD] relative">
             <UrgentTicker />
 
-            {/* Chat Header */}
             <div className="bg-white p-2 border-b flex items-center gap-2 shadow-sm z-20">
                 <button onClick={() => setView('LIST')} className="p-2"><ArrowLeft size={20}/></button>
                 
@@ -296,19 +340,13 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
                 </div>
             </div>
 
-            {/* Messages Area */}
             <div className="flex-1 overflow-y-auto p-4 bg-[#EFE7DD] relative">
-                {/* Background Pattern Overlay if needed, but solid color is cleaner */}
-                
-                {systemAds.map(ad => <SystemAdCard key={ad.id} ad={ad} onDismiss={() => setSystemAds(prev => prev.filter(a => a.id !== ad.id))}/>)}
-
-                {/* Empty State for New Chat */}
                 {messages.length === 0 && (
                     <div className="flex flex-col items-center justify-center h-64 text-center opacity-60">
                          <div className="bg-[#DCF8C6] p-4 rounded-full mb-2"><Globe className="text-green-600"/></div>
                          <p className="text-xs bg-[#FFF5C4] p-2 rounded shadow-sm text-gray-700">
                              {selectedChat 
-                                ? `You are now chatting with ${selectedChat.name}. Ask about appointments or services.`
+                                ? `You are now chatting with ${selectedChat.name}.`
                                 : t('welcomeMessage')
                              }
                          </p>
@@ -343,7 +381,6 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
                 <div ref={messagesEndRef}/>
             </div>
 
-            {/* Input Area */}
             <div className="p-2 bg-white flex items-end gap-2 pb-safe border-t">
                 <div className="flex-1 bg-gray-100 rounded-3xl flex items-center p-1.5 px-3">
                     <button onClick={() => fileRef.current?.click()} className="p-2 text-gray-400 hover:text-gray-600"><Paperclip size={20}/></button>
@@ -378,9 +415,8 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
                 </div>
             )}
 
-            {/* Profile Overlay Modal */}
             {showProfile && selectedChat && (
-                <ChatProfileModal provider={selectedChat} onClose={() => setShowProfile(false)} />
+                <ChatProfileModal provider={selectedChat} onClose={() => setShowProfile(false)} currentUser={currentUser} />
             )}
         </div>
     );

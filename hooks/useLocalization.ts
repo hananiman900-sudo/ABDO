@@ -60,11 +60,14 @@ export const translations: Translations = {
   followers: { ar: 'المتابعين', en: 'Followers', fr: 'Abonnés' },
   visits: { ar: 'زيارات اليوم', en: 'Visits Today', fr: 'Visites' },
   following: { ar: 'أتابع', en: 'Following', fr: 'Abonnements' },
+  follow: { ar: 'متابعة', en: 'Follow', fr: 'Suivre' },
+  unfollow: { ar: 'إلغاء المتابعة', en: 'Unfollow', fr: 'Ne plus suivre' },
   editProfile: { ar: 'تعديل الملف', en: 'Edit Profile', fr: 'Modifier Profil' },
   saveProfile: { ar: 'حفظ التعديلات', en: 'Save Profile', fr: 'Enregistrer' },
   bioLabel: { ar: 'الوصف (Bio)', en: 'Bio', fr: 'Bio' },
   socialLinks: { ar: 'روابط التواصل', en: 'Social Links', fr: 'Réseaux Sociaux' },
   gpsLink: { ar: 'موقع GPS', en: 'GPS Location', fr: 'Position GPS' },
+  uploadPhoto: { ar: 'تغيير الصورة', en: 'Change Photo', fr: 'Changer Photo' },
   
   // --- STORE SPECIFIC ---
   storeWelcomeTitle: { ar: 'مرحبا بك!', en: 'Welcome!', fr: 'Bienvenue !' },
@@ -142,6 +145,7 @@ export const translations: Translations = {
   requestSent: { ar: 'تم الإرسال', en: 'Sent', fr: 'Envoyé' },
   uploadError: { ar: 'خطأ', en: 'Error', fr: 'Erreur' },
   providerDirectory: { ar: 'دليل المهنيين', en: 'Provider Directory', fr: 'Annuaire Pro' },
+  paidAdDesc: { ar: 'خدمة مدفوعة (50 درهم/أسبوع). إعلانك سيظهر في الشريط الرئيسي للتطبيق.', en: 'Paid Service (50DH/Week). Ad appears in Main Slider.', fr: 'Service Payant (50DH/Semaine). Pub dans le Slider.' },
   
   // --- NEW FEATURES ---
   offers: { ar: 'العروض', en: 'Offers', fr: 'Offres' },

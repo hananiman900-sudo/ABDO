@@ -23,11 +23,11 @@ export interface AuthenticatedUser {
   visits_count?: number;
 }
 
-export interface BookingDetails { name: string; phone: string; service: string; provider: string; location: string; discount: string; appointmentId: number; }
+export interface BookingDetails { name: string; phone: string; service: string; provider: string; location: string; discount: string; appointmentId: number; offerTitle?: string; price?: number; }
 export interface ProviderRegistrationDetails { name: string; service: string; location: string; username: string; phone: string; }
 export interface FollowUp { id: number; client_id: number; provider_id: number; next_appointment_date: string; notes: string; medication_image_url?: string; clients: { full_name: string; phone: string; }; }
 export interface Announcement { id: number; provider_id: number; message: string; created_at: string; providers: { name: string }; }
-export interface SystemAnnouncement { id: number; title: string; message: string; image_url?: string; images?: string[]; is_active: boolean; created_at: string; }
+export interface SystemAnnouncement { id: number; title: string; message: string; image_url?: string; images?: string[]; is_active: boolean; created_at: string; provider_id?: number; }
 export interface AppointmentForDisplay { id: number; created_at: string; providers: { name: string; service_type: string; location: string; }; }
 export interface ProviderService { id: number; provider_id: number; name: string; price: number; discount_price?: number; }
 export interface ProviderNotification { id: number; provider_id: number; message: string; created_at: string; is_read: boolean; type: 'BOOKING' | 'SYSTEM' | 'FOLLOW'; status: 'pending' | 'completed'; booking_id?: number; client_details?: any; }
