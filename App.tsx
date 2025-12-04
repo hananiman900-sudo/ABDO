@@ -10,7 +10,7 @@ import { RealEstate } from './components/RealEstate';
 import { JobBoard } from './components/JobBoard';
 import { useLocalization, LocalizationProvider } from './hooks/useLocalization';
 import { supabase } from './services/supabaseClient';
-import { LogIn, User, MapPin, ShoppingBag, Home, Briefcase, Settings, X, Phone, Globe, LayoutGrid, Heart, List, LogOut, CheckCircle, Edit, Share2, Grid, Bookmark, Menu, Users, Database, Instagram, Facebook, Tag } from 'lucide-react';
+import { LogIn, User, MapPin, ShoppingBag, Home, Briefcase, Settings, X, Phone, Globe, LayoutGrid, Heart, List, LogOut, CheckCircle, Edit, Share2, Grid, Bookmark, Menu, Users, Database, Instagram, Facebook, Tag, Sparkles, MessageCircle, Calendar } from 'lucide-react';
 
 // --- AUTH MODAL ---
 const AuthModal: React.FC<{ isOpen: boolean; onClose: () => void; onLogin: (user: AuthenticatedUser) => void }> = ({ isOpen, onClose, onLogin }) => {
@@ -88,6 +88,7 @@ const AuthModal: React.FC<{ isOpen: boolean; onClose: () => void; onLogin: (user
 };
 
 // --- PUBLIC PROVIDER PROFILE (INSTAGRAM STYLE FOR CLIENTS) ---
+// Note: This is now mostly handled inside Chatbot.tsx but kept for Directory usage
 const PublicProviderProfile: React.FC<{ provider: AuthenticatedUser; onClose: () => void }> = ({ provider, onClose }) => {
     const { t } = useLocalization();
     const [offers, setOffers] = useState<Offer[]>([]);
@@ -200,98 +201,149 @@ const ProviderDirectory: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
     );
 };
 
-// --- CLIENT PROFILE / MENU ---
-const ClientProfile: React.FC<{ 
-    user: AuthenticatedUser | null; 
-    onClose: () => void; 
-    onLogout: () => void;
-    onNav: (target: string) => void;
-    isAdmin: boolean;
-}> = ({ user, onClose, onLogout, onNav, isAdmin }) => {
+// --- SERVICES HUB (NEW EXPLORE TAB) ---
+const ServicesHub: React.FC<{ onNav: (target: string) => void }> = ({ onNav }) => {
     const { t } = useLocalization();
-
-    const MenuBtn = ({ icon: Icon, label, onClick, color }: any) => (
-        <button onClick={onClick} className="w-full bg-gray-50 dark:bg-gray-800 p-3 rounded-xl flex items-center gap-4 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors border border-gray-100 dark:border-gray-700">
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${color || 'bg-blue-100 text-blue-600'}`}>
-                <Icon size={16}/>
+    
+    const ServiceCard = ({ icon: Icon, title, color, bg, onClick }: any) => (
+        <button onClick={onClick} className={`${bg} border border-transparent hover:border-${color.split('-')[1]}-200 p-6 rounded-2xl flex flex-col items-center justify-center gap-3 shadow-sm active:scale-95 transition-all`}>
+            <div className={`w-14 h-14 rounded-full ${color} text-white flex items-center justify-center shadow-md`}>
+                <Icon size={28}/>
             </div>
-            <span className="font-bold text-sm dark:text-white">{label}</span>
+            <span className="font-bold text-gray-800 text-sm">{title}</span>
         </button>
     );
 
     return (
-        <div className="fixed inset-0 bg-white dark:bg-gray-900 z-50 animate-slide-up flex flex-col overflow-y-auto">
-            <div className="flex justify-between items-center p-4 border-b sticky top-0 bg-white dark:bg-gray-900 z-10">
-                <button onClick={onClose}><X className="dark:text-white"/></button>
-                <span className="font-bold dark:text-white">{t('menu')}</span>
-                {user && <button onClick={onLogout}><LogOut className="text-red-500" size={20}/></button>}
+        <div className="flex-1 overflow-y-auto p-4 bg-gray-50 pb-20">
+            <div className="mb-6">
+                <h2 className="text-2xl font-black text-gray-900">{t('servicesHubTitle')}</h2>
+                <p className="text-gray-500 text-sm">{t('servicesHubDesc')}</p>
             </div>
-            <div className="p-4">
-                {user ? (
-                    <>
-                        <div className="flex items-center gap-6 mb-6">
-                            <div className="w-20 h-20 rounded-full bg-gray-200 overflow-hidden border-2 border-white shadow-lg">
-                                <img src={user.profile_image_url || `https://ui-avatars.com/api/?name=${user.name}`} className="w-full h-full object-cover"/>
-                            </div>
-                            <div className="flex-1">
-                                <h1 className="font-bold text-lg dark:text-white">{user.name}</h1>
-                                <p className="text-gray-500 text-sm">{user.accountType === 'PROVIDER' ? t('provider') : t('client')}</p>
-                                <div className="flex gap-4 mt-2 text-center">
-                                    <div><div className="font-bold dark:text-white">0</div><div className="text-[10px] text-gray-500">{t('posts')}</div></div>
-                                    <div><div className="font-bold dark:text-white">0</div><div className="text-[10px] text-gray-500">{t('following')}</div></div>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="flex gap-2 mb-8">
-                            <button className="flex-1 bg-gray-100 dark:bg-gray-800 dark:text-white py-2 rounded-lg font-bold text-xs">{t('edit')}</button>
-                            <button className="flex-1 bg-gray-100 dark:bg-gray-800 dark:text-white py-2 rounded-lg font-bold text-xs">{t('share')}</button>
-                        </div>
-                    </>
-                ) : (
-                    <div className="text-center mb-8">
-                         <div className="w-20 h-20 bg-gray-100 rounded-full mx-auto mb-2 flex items-center justify-center"><User size={32} className="text-gray-400"/></div>
-                         <h3 className="font-bold dark:text-white">{t('guest')}</h3>
-                         <button onClick={() => onNav('LOGIN')} className="mt-2 text-blue-600 font-bold text-sm underline">{t('loginTitle')}</button>
+            <div className="grid grid-cols-2 gap-4">
+                <ServiceCard icon={Home} title={t('realEstateTitle')} color="bg-purple-500" bg="bg-white" onClick={() => onNav('REAL_ESTATE')}/>
+                <ServiceCard icon={Briefcase} title={t('jobBoardTitle')} color="bg-green-500" bg="bg-white" onClick={() => onNav('JOBS')}/>
+                <ServiceCard icon={Users} title={t('providerDirectory')} color="bg-blue-500" bg="bg-white" onClick={() => onNav('DIRECTORY')}/>
+                <ServiceCard icon={Calendar} title={t('myAppointments')} color="bg-teal-500" bg="bg-white" onClick={() => onNav('APPOINTMENTS')}/>
+            </div>
+        </div>
+    );
+}
+
+// --- PROFILE TAB ---
+const ProfileTab: React.FC<{ 
+    user: AuthenticatedUser | null; 
+    onLogin: () => void; 
+    onLogout: () => void;
+    isAdmin: boolean;
+    onNav: (target: string) => void;
+}> = ({ user, onLogin, onLogout, isAdmin, onNav }) => {
+    const { t } = useLocalization();
+
+    if (!user) {
+        return (
+            <div className="flex-1 flex flex-col items-center justify-center p-6 bg-gray-50 pb-20">
+                <div className="w-24 h-24 bg-gray-200 rounded-full flex items-center justify-center mb-4 shadow-inner">
+                    <User size={48} className="text-gray-400"/>
+                </div>
+                <h2 className="text-xl font-bold mb-2">{t('guest')}</h2>
+                <p className="text-gray-500 text-center mb-6 max-w-xs">{t('appDesc')}</p>
+                <button onClick={onLogin} className="px-8 py-3 bg-black text-white rounded-full font-bold shadow-lg active:scale-95 transition-transform">{t('loginRegister')}</button>
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex-1 overflow-y-auto bg-gray-50 pb-20">
+            <div className="bg-white p-6 border-b shadow-sm mb-4">
+                <div className="flex items-center gap-4">
+                     <div className="w-20 h-20 rounded-full bg-gray-200 overflow-hidden border-2 border-white shadow-lg">
+                        <img src={user.profile_image_url || `https://ui-avatars.com/api/?name=${user.name}`} className="w-full h-full object-cover"/>
                     </div>
-                )}
-                
-                <h3 className="font-bold text-sm text-gray-400 mb-3 uppercase">{t('menu')}</h3>
-                <div className="grid grid-cols-1 gap-3">
-                    <MenuBtn icon={ShoppingBag} label={t('shop')} onClick={() => onNav('STORE')} color="bg-orange-100 text-orange-600"/>
-                    <MenuBtn icon={Home} label={t('realEstateTitle')} onClick={() => onNav('REAL_ESTATE')} color="bg-purple-100 text-purple-600"/>
-                    <MenuBtn icon={Briefcase} label={t('jobBoardTitle')} onClick={() => onNav('JOBS')} color="bg-green-100 text-green-600"/>
-                    <MenuBtn icon={Users} label={t('providerDirectory')} onClick={() => onNav('DIRECTORY')} color="bg-blue-100 text-blue-600"/>
-                    {user && <MenuBtn icon={CheckCircle} label={t('myAppointments')} onClick={() => onNav('APPOINTMENTS')} color="bg-teal-100 text-teal-600"/>}
-                    {isAdmin && <MenuBtn icon={Database} label={t('databaseSetupTitle')} onClick={() => onNav('DB')} color="bg-red-100 text-red-600"/>}
+                    <div>
+                        <h2 className="font-bold text-xl">{user.name}</h2>
+                        <p className="text-sm text-gray-500">{user.accountType === 'PROVIDER' ? t('provider') : t('client')}</p>
+                        <p className="text-xs text-gray-400 mt-1">{user.phone}</p>
+                    </div>
+                </div>
+                <div className="flex gap-2 mt-6">
+                    <button className="flex-1 py-2 bg-gray-100 rounded-lg font-bold text-xs">{t('editProfile')}</button>
+                    <button onClick={onLogout} className="flex-1 py-2 bg-red-50 text-red-500 rounded-lg font-bold text-xs flex items-center justify-center gap-1"><LogOut size={14}/> {t('logout')}</button>
+                </div>
+            </div>
+
+            <div className="p-4">
+                <h3 className="font-bold text-gray-400 text-xs uppercase mb-3">{t('menu')}</h3>
+                <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+                    {user.accountType === 'PROVIDER' && (
+                         <div className="p-4 border-b flex items-center justify-between cursor-pointer hover:bg-gray-50" onClick={() => onNav('ROOM')}>
+                             <div className="flex items-center gap-3">
+                                 <div className="p-2 bg-black text-white rounded-lg"><LayoutGrid size={18}/></div>
+                                 <span className="font-bold">{t('controlRoom')}</span>
+                             </div>
+                             <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                         </div>
+                    )}
+                    {isAdmin && (
+                        <div className="p-4 border-b flex items-center justify-between cursor-pointer hover:bg-gray-50" onClick={() => onNav('DB')}>
+                             <div className="flex items-center gap-3">
+                                 <div className="p-2 bg-red-100 text-red-600 rounded-lg"><Database size={18}/></div>
+                                 <span className="font-bold">{t('databaseSetupTitle')}</span>
+                             </div>
+                         </div>
+                    )}
+                    <div className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-gray-100 text-gray-600 rounded-lg"><Settings size={18}/></div>
+                            <span className="font-bold">App Settings</span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     );
-};
+}
+
+// --- SPLASH SCREEN ---
+const SplashScreen: React.FC = () => {
+    return (
+        <div className="fixed inset-0 bg-white z-[100] flex flex-col items-center justify-center animate-fade-in">
+             <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white shadow-xl mb-6 animate-slide-up">
+                 <Globe size={48} className="animate-spin-slow"/>
+             </div>
+             <h1 className="text-2xl font-black text-gray-900 tracking-tight animate-pulse">Tanger IA</h1>
+             <p className="text-gray-400 text-sm mt-2">Connect. Smart. Easy.</p>
+        </div>
+    );
+}
 
 // --- MAIN APP CONTENT ---
 const AppContent: React.FC = () => {
     const { t, language, setLanguage } = useLocalization();
     const [user, setUser] = useState<AuthenticatedUser | null>(null);
     const [userView, setUserView] = useState<UserView>(UserView.CLIENT);
+    const [showSplash, setShowSplash] = useState(true);
+    const [activeTab, setActiveTab] = useState<'CHAT' | 'STORE' | 'SERVICES' | 'PROFILE'>('CHAT');
     
-    // Modals
+    // Modals (Still used for sub-features)
     const [showAuth, setShowAuth] = useState(false);
-    const [showStore, setShowStore] = useState(false);
     const [showRealEstate, setShowRealEstate] = useState(false);
     const [showJobBoard, setShowJobBoard] = useState(false);
     const [showAppointments, setShowAppointments] = useState(false);
     const [showDB, setShowDB] = useState(false);
-    const [showClientProfile, setShowClientProfile] = useState(false);
     const [showDirectory, setShowDirectory] = useState(false);
 
     useEffect(() => {
+        // Splash Timer
+        const timer = setTimeout(() => setShowSplash(false), 2500);
+
         const stored = localStorage.getItem('tanger_user');
         if (stored) {
             const u = JSON.parse(stored);
             setUser(u);
             if(u.accountType === AccountType.PROVIDER) setUserView(UserView.PROVIDER);
         }
+        return () => clearTimeout(timer);
     }, []);
 
     const handleLogin = (u: AuthenticatedUser) => {
@@ -301,85 +353,105 @@ const AppContent: React.FC = () => {
         if(u.accountType === AccountType.PROVIDER) setUserView(UserView.PROVIDER);
     };
 
-    const handleLogout = () => { setUser(null); localStorage.removeItem('tanger_user'); setUserView(UserView.CLIENT); setShowClientProfile(false); };
+    const handleLogout = () => { setUser(null); localStorage.removeItem('tanger_user'); setUserView(UserView.CLIENT); };
 
     // This allows providers to "Exit" the control room and see the app as a client
     const toggleProviderView = () => setUserView(prev => prev === UserView.PROVIDER ? UserView.CLIENT : UserView.PROVIDER);
 
     // Navigation Handler
     const handleNav = (target: string) => {
-        setShowClientProfile(false); // Close menu
         switch(target) {
-            case 'STORE': setShowStore(true); break;
+            case 'STORE': setActiveTab('STORE'); break; // Switch to Store Tab
             case 'REAL_ESTATE': setShowRealEstate(true); break;
             case 'JOBS': setShowJobBoard(true); break;
             case 'APPOINTMENTS': setShowAppointments(true); break;
             case 'DB': setShowDB(true); break;
             case 'DIRECTORY': setShowDirectory(true); break;
-            case 'LOGIN': setShowAuth(true); break;
+            case 'ROOM': toggleProviderView(); break;
         }
     }
 
-    // RENDER PROVIDER CONTROL ROOM
+    if(showSplash) return <SplashScreen />;
+
+    // RENDER PROVIDER CONTROL ROOM (Full Screen Override)
     if (user?.accountType === AccountType.PROVIDER && userView === UserView.PROVIDER) {
         return <ProviderPortal provider={user} onLogout={toggleProviderView} />;
     }
 
-    // RENDER CLIENT APP
+    // RENDER CLIENT APP (Bottom Nav Layout)
     return (
-        <div className={`flex flex-col h-screen ${language === 'ar' ? 'font-arabic' : 'font-sans'}`} dir={language === 'ar' ? 'rtl' : 'ltr'}>
-            <div className="bg-white dark:bg-gray-900 border-b dark:border-gray-800 p-3 flex justify-between items-center z-20 shadow-sm h-16">
+        <div className={`flex flex-col h-screen bg-white ${language === 'ar' ? 'font-arabic' : 'font-sans'}`} dir={language === 'ar' ? 'rtl' : 'ltr'}>
+            
+            {/* NEW CLEAN HEADER */}
+            <div className="bg-white/90 backdrop-blur-md border-b border-gray-100 p-3 flex justify-between items-center z-20 h-16 sticky top-0 shadow-sm">
+                
+                {/* Language Switcher */}
+                <div className="w-10">
+                    <button onClick={() => setLanguage(language === Language.AR ? Language.FR : Language.AR)} className="w-9 h-9 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center text-xs font-bold text-gray-700 hover:bg-gray-100 transition-all">{language.toUpperCase()}</button>
+                </div>
+
+                {/* Styled Professional Logo */}
                 <div className="flex items-center gap-2">
-                    {/* NEW SPLASH LOGO */}
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white shadow-lg ring-2 ring-white">
-                        <Globe size={20} className="animate-spin-slow"/>
+                    <div className="w-9 h-9 bg-gradient-to-tr from-blue-600 to-cyan-400 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-500/20 transform rotate-3">
+                         <Sparkles size={20} className="text-white fill-white"/>
                     </div>
-                    <h1 className="font-bold text-lg dark:text-white hidden sm:block">Tanger<span className="text-cyan-600">Connect</span></h1>
+                    <div className="flex flex-col leading-none">
+                        <h1 className="font-black text-xl tracking-tight bg-gradient-to-r from-blue-700 to-cyan-500 bg-clip-text text-transparent">
+                            Tanger<span className="font-light text-gray-400">IA</span>
+                        </h1>
+                    </div>
                 </div>
 
-                <div className="flex items-center gap-3">
-                    <button onClick={() => setLanguage(language === Language.AR ? Language.FR : Language.AR)} className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center text-xs font-bold bg-gray-50">{language.toUpperCase()}</button>
-                    {user?.accountType === AccountType.PROVIDER && (
-                        <button onClick={toggleProviderView} className="px-3 py-1.5 bg-black text-white rounded-full text-xs font-bold shadow-md flex items-center gap-1"><LayoutGrid size={12}/> {t('controlRoom')}</button>
+                {/* Login Button (Icon Only) */}
+                <div className="w-10 flex justify-end">
+                    {!user && (
+                         <button onClick={() => setShowAuth(true)} className="w-9 h-9 bg-black text-white rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-transform">
+                             <LogIn size={16}/>
+                         </button>
                     )}
-                    
-                    {/* UPDATED PROFILE BUTTON WITH NAME AND IMAGE */}
-                    <button onClick={() => setShowClientProfile(true)} className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-full pl-1 pr-3 py-1 border border-gray-200 dark:border-gray-700 hover:bg-gray-200 transition-colors">
-                        <div className="w-8 h-8 rounded-full bg-white dark:bg-gray-700 flex items-center justify-center overflow-hidden shadow-sm">
-                            {user?.profile_image_url ? (
-                                <img src={user.profile_image_url} className="w-full h-full object-cover"/>
-                            ) : (
-                                <User size={18} className="text-gray-500 dark:text-gray-400"/>
-                            )}
-                        </div>
-                        <span className="text-xs font-bold text-gray-700 dark:text-gray-200 max-w-[80px] truncate">
-                            {user?.name?.split(' ')[0] || t('guest')}
-                        </span>
-                    </button>
                 </div>
             </div>
 
-            <div className="flex-1 relative overflow-hidden">
-                <Chatbot currentUser={user} onOpenAuth={() => setShowAuth(true)} />
+            {/* MAIN CONTENT AREA */}
+            <div className="flex-1 overflow-hidden relative bg-white">
+                {activeTab === 'CHAT' && <Chatbot currentUser={user} onOpenAuth={() => setShowAuth(true)} onDiscover={() => setActiveTab('SERVICES')} />}
+                {/* We render Store as a modal-like view but inside the tab structure */}
+                {activeTab === 'STORE' && <div className="absolute inset-0 z-0"><Store isOpen={true} onClose={() => setActiveTab('CHAT')} currentUser={user} onOpenAuth={() => setShowAuth(true)} /></div>}
+                {activeTab === 'SERVICES' && <ServicesHub onNav={handleNav} />}
+                {activeTab === 'PROFILE' && <ProfileTab user={user} onLogin={() => setShowAuth(true)} onLogout={handleLogout} isAdmin={user?.phone === '0617774846'} onNav={handleNav}/>}
             </div>
 
+            {/* BOTTOM NAVIGATION BAR */}
+            <div className="bg-white border-t border-gray-100 pb-safe z-30 flex justify-around items-center h-16 shadow-[0_-5px_20px_-5px_rgba(0,0,0,0.05)]">
+                <button onClick={() => setActiveTab('CHAT')} className={`flex flex-col items-center justify-center w-full h-full gap-1 ${activeTab === 'CHAT' ? 'text-blue-600' : 'text-gray-400'}`}>
+                    <MessageCircle size={24} className={activeTab === 'CHAT' ? 'fill-blue-100' : ''} />
+                    <span className="text-[10px] font-bold">{t('navChat')}</span>
+                </button>
+                <button onClick={() => setActiveTab('STORE')} className={`flex flex-col items-center justify-center w-full h-full gap-1 ${activeTab === 'STORE' ? 'text-orange-600' : 'text-gray-400'}`}>
+                    <ShoppingBag size={24} className={activeTab === 'STORE' ? 'fill-orange-100' : ''} />
+                    <span className="text-[10px] font-bold">{t('navStore')}</span>
+                </button>
+                <button onClick={() => setActiveTab('SERVICES')} className={`flex flex-col items-center justify-center w-full h-full gap-1 ${activeTab === 'SERVICES' ? 'text-purple-600' : 'text-gray-400'}`}>
+                    <LayoutGrid size={24} className={activeTab === 'SERVICES' ? 'fill-purple-100' : ''} />
+                    <span className="text-[10px] font-bold">{t('navExplore')}</span>
+                </button>
+                <button onClick={() => setActiveTab('PROFILE')} className={`flex flex-col items-center justify-center w-full h-full gap-1 ${activeTab === 'PROFILE' ? 'text-black' : 'text-gray-400'}`}>
+                    {user?.profile_image_url ? (
+                        <img src={user.profile_image_url} className={`w-6 h-6 rounded-full object-cover border-2 ${activeTab === 'PROFILE' ? 'border-black' : 'border-transparent'}`}/>
+                    ) : (
+                        <User size={24} className={activeTab === 'PROFILE' ? 'fill-gray-200' : ''} />
+                    )}
+                    <span className="text-[10px] font-bold">{t('navProfile')}</span>
+                </button>
+            </div>
+
+            {/* OVERLAY MODALS (Launched from Services Hub) */}
             <AuthModal isOpen={showAuth} onClose={() => setShowAuth(false)} onLogin={handleLogin} />
-            <Store isOpen={showStore} onClose={() => setShowStore(false)} currentUser={user} onOpenAuth={() => setShowAuth(true)} />
             <RealEstate isOpen={showRealEstate} onClose={() => setShowRealEstate(false)} currentUser={user} />
             <JobBoard isOpen={showJobBoard} onClose={() => setShowJobBoard(false)} currentUser={user} />
             <AppointmentsDrawer isOpen={showAppointments} onClose={() => setShowAppointments(false)} user={user} />
             <DatabaseSetup isOpen={showDB} onClose={() => setShowDB(false)} />
             <ProviderDirectory isOpen={showDirectory} onClose={() => setShowDirectory(false)} />
-            
-            {showClientProfile && (
-                <ClientProfile 
-                    user={user} 
-                    onClose={() => setShowClientProfile(false)} 
-                    onLogout={handleLogout} 
-                    onNav={handleNav}
-                    isAdmin={user?.phone === '0617774846'}
-                />
-            )}
         </div>
     );
 };

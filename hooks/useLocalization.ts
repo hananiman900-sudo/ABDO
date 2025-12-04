@@ -7,7 +7,24 @@ interface Translations {
 }
 
 export const translations: Translations = {
-  appName: { ar: 'طنجة كونكت', en: 'TangerConnect', fr: 'TangerConnect' },
+  appName: { ar: 'طنجة IA', en: 'Tanger IA', fr: 'Tanger IA' },
+  appDesc: { 
+    ar: 'مساعدك الذكي في طنجة. يمكنني مساعدتك في العثور على الأطباء، العقارات، فرص العمل، والمزيد.', 
+    en: 'Your AI assistant in Tangier. I can help you find doctors, real estate, jobs, and more.', 
+    fr: 'Votre assistant IA à Tanger. Je peux vous aider à trouver des médecins, de l\'immobilier, des emplois, et plus.' 
+  },
+  discoverServices: { ar: 'اكتشف المزيد من الخدمات', en: 'Discover More Services', fr: 'Découvrir plus de services' },
+  
+  // --- BOTTOM NAV ---
+  navChat: { ar: 'الرئيسية', en: 'Chat', fr: 'Chat' },
+  navStore: { ar: 'المتجر', en: 'Store', fr: 'Boutique' },
+  navExplore: { ar: 'خدمات', en: 'Services', fr: 'Services' },
+  navProfile: { ar: 'حسابي', en: 'Profile', fr: 'Profil' },
+
+  // --- SERVICES HUB ---
+  servicesHubTitle: { ar: 'جميع الخدمات', en: 'All Services', fr: 'Tous les Services' },
+  servicesHubDesc: { ar: 'كل ما تحتاجه في طنجة في مكان واحد', en: 'Everything you need in Tangier', fr: 'Tout ce dont vous avez besoin à Tanger' },
+  
   // --- GENERAL ---
   search: { ar: 'بحث', en: 'Search', fr: 'Rechercher' },
   loading: { ar: 'جاري التحميل...', en: 'Loading...', fr: 'Chargement...' },
@@ -25,7 +42,7 @@ export const translations: Translations = {
   // --- AUTH ---
   loginRegister: { ar: 'دخول / تسجيل', en: 'Login / Register', fr: 'Connexion / S\'inscrire' },
   loginTitle: { ar: 'تسجيل الدخول', en: 'Login', fr: 'Connexion' },
-  registerTitle: { ar: 'إنشاء حساب', en: 'Register', fr: 'S\'inscrire' },
+  registerTitle: { ar: 'إنشاء حساب', en: 'Sign Up', fr: 'S\'inscrire' },
   logout: { ar: 'خروج', en: 'Logout', fr: 'Déconnexion' },
   username: { ar: 'إسم المستخدم', en: 'Username', fr: 'Nom d\'utilisateur' },
   password: { ar: 'كلمة السر', en: 'Password', fr: 'Mot de passe' },
