@@ -88,7 +88,7 @@ const AuthModal: React.FC<{ isOpen: boolean; onClose: () => void; onLogin: (user
 };
 
 // --- SERVICES HUB (NEW EXPLORE TAB) ---
-const ServicesHub: React.FC<{ onNav: (target: string) => void }> = ({ onNav }) => {
+const ServicesHub: React.FC<{ onNav: (target: string) => void; isAdmin: boolean }> = ({ onNav, isAdmin }) => {
     const { t } = useLocalization();
     
     const ServiceCard = ({ icon: Icon, title, color, bg, onClick }: any) => (
@@ -111,6 +111,11 @@ const ServicesHub: React.FC<{ onNav: (target: string) => void }> = ({ onNav }) =
                 <ServiceCard icon={Briefcase} title={t('jobBoardTitle')} color="bg-green-500" bg="bg-white" onClick={() => onNav('JOBS')}/>
                 <ServiceCard icon={Users} title={t('providerDirectory')} color="bg-blue-500" bg="bg-white" onClick={() => onNav('DIRECTORY')}/>
                 <ServiceCard icon={Calendar} title={t('myAppointments')} color="bg-teal-500" bg="bg-white" onClick={() => onNav('APPOINTMENTS')}/>
+                
+                {/* ADMIN DB BUTTON */}
+                {isAdmin && (
+                    <ServiceCard icon={Database} title={t('databaseSetupTitle')} color="bg-red-500" bg="bg-white" onClick={() => onNav('DB')}/>
+                )}
             </div>
         </div>
     );
@@ -282,6 +287,8 @@ const AppContent: React.FC = () => {
         return <ProviderPortal provider={user} onLogout={toggleProviderView} onUpdateUser={handleUpdateUser} />;
     }
 
+    const isAdmin = user?.phone === '0617774846';
+
     return (
         <div className={`flex flex-col h-screen bg-white ${language === 'ar' ? 'font-arabic' : 'font-sans'}`} dir={language === 'ar' ? 'rtl' : 'ltr'}>
             
@@ -328,8 +335,8 @@ const AppContent: React.FC = () => {
             <div className="flex-1 overflow-hidden relative bg-white">
                 {activeTab === 'CHAT' && <Chatbot currentUser={user} onOpenAuth={() => setShowAuth(true)} onDiscover={() => setActiveTab('SERVICES')} onToggleNav={setHideBottomNav} />}
                 {activeTab === 'STORE' && <div className="absolute inset-0 z-0"><Store isOpen={true} onClose={() => setActiveTab('CHAT')} currentUser={user} onOpenAuth={() => setShowAuth(true)} /></div>}
-                {activeTab === 'SERVICES' && <ServicesHub onNav={handleNav} />}
-                {activeTab === 'PROFILE' && <ProfileTab user={user} onLogin={() => setShowAuth(true)} onLogout={handleLogout} isAdmin={user?.phone === '0617774846'} onNav={handleNav}/>}
+                {activeTab === 'SERVICES' && <ServicesHub onNav={handleNav} isAdmin={isAdmin} />}
+                {activeTab === 'PROFILE' && <ProfileTab user={user} onLogin={() => setShowAuth(true)} onLogout={handleLogout} isAdmin={isAdmin} onNav={handleNav}/>}
             </div>
 
             {/* BOTTOM NAVIGATION BAR */}

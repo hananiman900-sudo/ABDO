@@ -72,21 +72,36 @@ export const getChatResponse = async (
 
     const contents = [...history, { role: 'user', parts: userParts }];
 
-    // ROUND ROBIN / FAILOVER LOGIC
+    // LOAD BALANCING & FAILOVER LOGIC
+    // 1. Pick a RANDOM start index to distribute load across all 5 keys
+    // This prevents Key #1 from hitting the rate limit while Key #5 is idle.
+    const startIndex = Math.floor(Math.random() * apiKeys.length);
+
     for (let i = 0; i < apiKeys.length; i++) {
-        const apiKey = apiKeys[i];
+        // Calculate the actual index using modulo to wrap around
+        const index = (startIndex + i) % apiKeys.length;
+        const apiKey = apiKeys[index];
+
         try {
-            console.log(`Attempting with Key #${i + 1}`);
+            console.log(`[AI System] Attempting with Key #${index + 1} (Start: ${startIndex})`);
+            
             const ai = new GoogleGenAI({ apiKey });
             const response = await ai.models.generateContent({
                 model: "gemini-2.5-flash",
                 contents: contents,
                 config: { systemInstruction },
             });
-            return response.text; // Success, return immediately
-        } catch (error) {
-            console.warn(`Key #${i + 1} failed. Trying next...`, error);
-            if (i === apiKeys.length - 1) return "Error: All AI services are currently busy. Please try again later.";
+            
+            // If successful, return immediately
+            return response.text; 
+
+        } catch (error: any) {
+            console.warn(`[AI System] Key #${index + 1} failed. Trying next...`, error);
+            
+            // If this was the last key to try, return error
+            if (i === apiKeys.length - 1) {
+                return "⚠️ Server Busy: All AI models are currently at capacity. Please try again in a few seconds.";
+            }
         }
     }
     return "Error: Connection failure.";
