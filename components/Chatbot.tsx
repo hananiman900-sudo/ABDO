@@ -30,12 +30,13 @@ const UrgentTicker: React.FC = () => {
     );
 }
 
-const BookingModal: React.FC<{ provider: any; onClose: () => void; currentUser: AuthenticatedUser; onBooked: (details: any) => void; initialOffer?: Offer | null }> = ({ provider, onClose, currentUser, onBooked, initialOffer }) => {
+const BookingModal: React.FC<{ provider: any; onClose: () => void; currentUser: AuthenticatedUser | null; onBooked: (details: any) => void; initialOffer?: Offer | null }> = ({ provider, onClose, currentUser, onBooked, initialOffer }) => {
     const { t } = useLocalization();
     const [offers, setOffers] = useState<Offer[]>([]);
     const [selectedOffer, setSelectedOffer] = useState<Offer | null>(null);
     const [date, setDate] = useState('');
     const [time, setTime] = useState('');
+    const [guestName, setGuestName] = useState(''); // New State for Guest Name
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
@@ -54,28 +55,36 @@ const BookingModal: React.FC<{ provider: any; onClose: () => void; currentUser: 
     }, [initialOffer]);
 
     const handleConfirm = async () => {
+        // Validation: If no user, Name is required
+        if(!currentUser && !guestName.trim()) return alert("Please enter your name to book.");
         if(!date || !time) return alert("Please select date and time");
+        
         setLoading(true);
 
         const appointmentId = Date.now(); // Simple ID for demo
+        const clientName = currentUser ? currentUser.name : guestName; // Determine Name
         
         // In a real app, insert into 'appointments' table here
-        await supabase.from('appointments').insert({
-            client_id: currentUser.id,
-            provider_id: provider.id,
-            created_at: new Date().toISOString() // Simply marking creation time
-        });
+        // If guest, we might pass null for client_id, or handle guest logic
+        if (currentUser) {
+            await supabase.from('appointments').insert({
+                client_id: currentUser.id,
+                provider_id: provider.id,
+                created_at: new Date().toISOString()
+            });
+        }
 
         // Add Notification for Provider
         await supabase.from('provider_notifications').insert({
             provider_id: provider.id,
-            message: `New Booking: ${currentUser.name} for ${selectedOffer?.title || 'General Visit'} on ${date} at ${time}`,
+            message: `New Booking: ${clientName} for ${selectedOffer?.title || 'General Visit'} on ${date} at ${time}`,
             type: 'BOOKING',
             status: 'pending'
         });
 
         const bookingDetails = {
             appointmentId,
+            clientName: clientName, // Pass Name to QR
             provider: provider.name,
             service: provider.service_type,
             date: date,
@@ -97,6 +106,21 @@ const BookingModal: React.FC<{ provider: any; onClose: () => void; currentUser: 
                     <button onClick={onClose}><X/></button>
                 </div>
                 <div className="p-4 space-y-4">
+                    
+                    {/* GUEST NAME INPUT */}
+                    {!currentUser && (
+                        <div>
+                             <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Your Name</label>
+                             <input 
+                                type="text" 
+                                placeholder="Enter full name" 
+                                value={guestName} 
+                                onChange={e => setGuestName(e.target.value)} 
+                                className="w-full p-2 border border-red-200 bg-red-50 rounded-lg text-sm outline-none focus:border-red-500"
+                             />
+                        </div>
+                    )}
+
                     <div>
                         <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Select Offer (Optional)</label>
                         <div className="space-y-2 max-h-40 overflow-y-auto">
@@ -521,7 +545,7 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
                             {m.bookingDetails && (
                                 <div className="mt-2 bg-gray-50 p-2 rounded border border-gray-200">
                                     <p className="font-bold text-xs text-center">Booking ID: {m.bookingDetails.appointmentId}</p>
-                                    <div className="mt-2 flex justify-center"><QRCodeDisplay appointmentId={m.bookingDetails.appointmentId}/></div>
+                                    <div className="mt-2 flex justify-center"><QRCodeDisplay appointmentId={m.bookingDetails.appointmentId} bookingData={m.bookingDetails} /></div>
                                 </div>
                             )}
 
@@ -578,7 +602,7 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
                 <ChatProfileModal provider={selectedChat} onClose={() => setShowProfile(false)} currentUser={currentUser} onBookOffer={handleBookFromProfile} />
             )}
             
-            {showBooking && selectedChat && currentUser && (
+            {showBooking && selectedChat && (
                 <BookingModal provider={selectedChat} onClose={() => setShowBooking(false)} currentUser={currentUser} onBooked={handleBookingConfirmed} initialOffer={preSelectedOffer} />
             )}
         </div>

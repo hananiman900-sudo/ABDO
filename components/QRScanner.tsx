@@ -322,6 +322,7 @@ const AdsView: React.FC<{ providerId: number; onClose: () => void }> = ({ provid
 const QRScannerView: React.FC<{ providerId: number; onClose: () => void }> = ({ providerId, onClose }) => {
     const { t } = useLocalization();
     const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
+    const [scannedClientName, setScannedClientName] = useState(''); // Store name of scanned client
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [scanning, setScanning] = useState(true);
@@ -378,12 +379,13 @@ const QRScannerView: React.FC<{ providerId: number; onClose: () => void }> = ({ 
             const parsed = JSON.parse(data);
             if(!parsed.appointmentId) throw new Error();
             
-            await supabase.from('scan_history').insert({ provider_id: providerId, client_name: "Client #" + parsed.appointmentId, client_phone: "Verified" });
+            const clientName = parsed.clientName || `Client #${parsed.appointmentId}`;
+            setScannedClientName(clientName);
+
+            // SAVE CLIENT NAME TO HISTORY
+            await supabase.from('scan_history').insert({ provider_id: providerId, client_name: clientName, client_phone: "Verified" });
             const { data: p } = await supabase.from('providers').select('visits_count').eq('id', providerId).single();
             await supabase.from('providers').update({ visits_count: (p?.visits_count || 0) + 1 }).eq('id', providerId);
-            
-            // Mark notification as completed if it exists
-            // (Assuming logic exists to link notification to appointmentId, but simplified here)
             
             setStatus('success');
         } catch(e) { setStatus('error'); }
@@ -426,7 +428,12 @@ const QRScannerView: React.FC<{ providerId: number; onClose: () => void }> = ({ 
                  
                  <div className="p-6 flex flex-col items-center gap-6">
                     {status === 'success' ? (
-                        <div className="text-center py-10"><CheckCircle size={80} className="text-green-500 mx-auto"/><h2 className="text-2xl font-bold mt-4">{t('verificationSuccess')}</h2><button onClick={() => { setStatus('idle'); setScanning(true); }} className="mt-6 bg-black text-white px-6 py-2 rounded-full font-bold">Next</button></div>
+                        <div className="text-center py-10">
+                            <CheckCircle size={80} className="text-green-500 mx-auto"/>
+                            <h2 className="text-2xl font-bold mt-4">{t('verificationSuccess')}</h2>
+                            <p className="text-lg font-semibold mt-2 text-gray-700">{scannedClientName}</p>
+                            <button onClick={() => { setStatus('idle'); setScanning(true); }} className="mt-6 bg-black text-white px-6 py-2 rounded-full font-bold">Next</button>
+                        </div>
                     ) : status === 'error' ? (
                          <div className="text-center py-10"><XCircle size={80} className="text-red-500 mx-auto"/><h2 className="text-2xl font-bold mt-4">{t('invalidQR')}</h2><button onClick={() => { setStatus('idle'); setScanning(true); }} className="mt-6 bg-black text-white px-6 py-2 rounded-full font-bold">Try Again</button></div>
                     ) : (

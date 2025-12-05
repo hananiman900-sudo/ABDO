@@ -16,9 +16,18 @@ export const getChatResponse = async (
     
     // FAILOVER SYSTEM: Get Keys from Config
     const config = (window as any).TANGER_CONFIG || {};
-    const apiKeys: string[] = config.API_KEYS || [];
+    let apiKeys: string[] = config.API_KEYS || [];
     
-    if (!apiKeys || apiKeys.length === 0) return "System Error: No API Keys configured.";
+    // Fallback if config is missing (using the keys you provided to ensure they work)
+    if (!apiKeys || apiKeys.length === 0) {
+        apiKeys = [
+          'AIzaSyD0WW8wQ9IXKwPqENLJfUwiiL0NCWnDb48',
+          'AIzaSyDPzeKphFk1yHnztG1RJ8nm4CBRbG_ILDU',
+          'AIzaSyA9HwY4o-ecSguVOixMuo7vNZgWzFJZTSA',
+          'AIzaSyB1-FA-Cuk1mxwU8sVE_LYyi_pqjcOqK94',
+          'AIzaSyBRMjMrd5mfGDWLZSF-tEA7u_s3NG-bVvk'
+        ];
+    }
 
     // Fetch Providers List (only if we are in general mode, otherwise we know who we are talking to)
     let providersContext = "No data";
@@ -72,18 +81,15 @@ export const getChatResponse = async (
 
     const contents = [...history, { role: 'user', parts: userParts }];
 
-    // LOAD BALANCING & FAILOVER LOGIC
-    // 1. Pick a RANDOM start index to distribute load across all 5 keys
-    // This prevents Key #1 from hitting the rate limit while Key #5 is idle.
-    const startIndex = Math.floor(Math.random() * apiKeys.length);
+    // LOAD BALANCING LOGIC: Shuffle keys to distribute load
+    // This creates a random order for this specific request
+    const shuffledKeys = [...apiKeys].sort(() => 0.5 - Math.random());
 
-    for (let i = 0; i < apiKeys.length; i++) {
-        // Calculate the actual index using modulo to wrap around
-        const index = (startIndex + i) % apiKeys.length;
-        const apiKey = apiKeys[index];
-
+    for (let i = 0; i < shuffledKeys.length; i++) {
+        const apiKey = shuffledKeys[i];
+        
         try {
-            console.log(`[AI System] Attempting with Key #${index + 1} (Start: ${startIndex})`);
+            // console.log(`[AI System] Attempting with Key ID: ...${apiKey.slice(-4)}`);
             
             const ai = new GoogleGenAI({ apiKey });
             const response = await ai.models.generateContent({
@@ -96,12 +102,13 @@ export const getChatResponse = async (
             return response.text; 
 
         } catch (error: any) {
-            console.warn(`[AI System] Key #${index + 1} failed. Trying next...`, error);
+            console.warn(`[AI System] Key failed. Trying next...`, error.message);
             
             // If this was the last key to try, return error
-            if (i === apiKeys.length - 1) {
+            if (i === shuffledKeys.length - 1) {
                 return "⚠️ Server Busy: All AI models are currently at capacity. Please try again in a few seconds.";
             }
+            // Otherwise loop continues to next key
         }
     }
     return "Error: Connection failure.";

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import QRCode from 'qrcode';
 import { useLocalization } from '../hooks/useLocalization';
@@ -5,9 +6,10 @@ import { Download, Loader2 } from 'lucide-react';
 
 interface QRCodeDisplayProps {
   appointmentId: number;
+  bookingData?: any; // New prop to pass full booking data to QR
 }
 
-const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({ appointmentId }) => {
+const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({ appointmentId, bookingData }) => {
   const { t } = useLocalization();
   const [qrCodeUrl, setQrCodeUrl] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -17,8 +19,16 @@ const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({ appointmentId }) => {
       setIsLoading(true);
       if (!appointmentId) return;
       try {
-        const qrPayload = JSON.stringify({ appointmentId: appointmentId });
-        const url = await QRCode.toDataURL(qrPayload, {
+        // Construct Payload with Client Name if available
+        const payload = {
+            appointmentId: appointmentId,
+            clientName: bookingData?.clientName || 'Guest',
+            date: bookingData?.date,
+            time: bookingData?.time
+        };
+        const qrPayloadStr = JSON.stringify(payload);
+        
+        const url = await QRCode.toDataURL(qrPayloadStr, {
           width: 256,
           margin: 2,
           color: {
@@ -34,7 +44,7 @@ const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({ appointmentId }) => {
       }
     };
     generateQR();
-  }, [appointmentId]);
+  }, [appointmentId, bookingData]);
 
   const handleDownload = () => {
     if (!qrCodeUrl) return;
