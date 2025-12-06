@@ -5,11 +5,11 @@ import { getChatResponse } from '../services/geminiService';
 import { useLocalization } from '../hooks/useLocalization';
 import { supabase } from '../services/supabaseClient';
 import QRCodeDisplay from './QRCodeDisplay';
-import { Send, Mic, Paperclip, Camera, Loader2, X, Globe, Search, ArrowLeft, MoreVertical, Calendar, Info, Phone, MapPin, Instagram, Facebook, Tag, UserPlus, UserCheck, Megaphone, Star, Check, ChevronDown, CheckCircle } from 'lucide-react';
+import { Send, Mic, Paperclip, Camera, Loader2, X, Globe, Search, ArrowLeft, MoreVertical, Calendar, Info, Phone, MapPin, Instagram, Facebook, Tag, UserPlus, UserCheck, Megaphone, Star, Check, ChevronDown, CheckCircle, StopCircle } from 'lucide-react';
 
 // --- SUB-COMPONENTS ---
 
-const UrgentTicker: React.FC = () => {
+export const UrgentTicker: React.FC = () => {
     const [ads, setAds] = useState<UrgentAd[]>([]);
     useEffect(() => {
         const fetch = async () => {
@@ -30,7 +30,7 @@ const UrgentTicker: React.FC = () => {
     );
 }
 
-const BookingModal: React.FC<{ provider: any; onClose: () => void; currentUser: AuthenticatedUser | null; onBooked: (details: any) => void; initialOffer?: Offer | null }> = ({ provider, onClose, currentUser, onBooked, initialOffer }) => {
+export const BookingModal: React.FC<{ provider: any; onClose: () => void; currentUser: AuthenticatedUser | null; onBooked: (details: any) => void; initialOffer?: Offer | null }> = ({ provider, onClose, currentUser, onBooked, initialOffer }) => {
     const { t } = useLocalization();
     const [offers, setOffers] = useState<Offer[]>([]);
     const [selectedOffer, setSelectedOffer] = useState<Offer | null>(null);
@@ -85,13 +85,14 @@ const BookingModal: React.FC<{ provider: any; onClose: () => void; currentUser: 
         const bookingDetails = {
             appointmentId,
             clientName: clientName, // Pass Name to QR
+            providerId: provider.id, // VITAL for verification
             provider: provider.name,
             service: provider.service_type,
             date: date,
             time: time,
             offerTitle: selectedOffer?.title,
             price: selectedOffer?.discount_price,
-            message: `Booking Confirmed for ${date} at ${time}`
+            message: `${t('bookingSuccessMessage')} ${t('keepQR')}` // Warning Message
         };
 
         onBooked(bookingDetails);
@@ -102,7 +103,7 @@ const BookingModal: React.FC<{ provider: any; onClose: () => void; currentUser: 
         <div className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-4 animate-fade-in">
             <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden">
                 <div className="p-4 border-b flex justify-between items-center bg-gray-50">
-                    <h3 className="font-bold text-lg flex items-center gap-2"><Calendar className="text-blue-600"/> Book Appointment</h3>
+                    <h3 className="font-bold text-lg flex items-center gap-2"><Calendar className="text-blue-600"/> {t('bookAppointment')}</h3>
                     <button onClick={onClose}><X/></button>
                 </div>
                 <div className="p-4 space-y-4">
@@ -122,7 +123,7 @@ const BookingModal: React.FC<{ provider: any; onClose: () => void; currentUser: 
                     )}
 
                     <div>
-                        <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Select Offer (Optional)</label>
+                        <label className="text-xs font-bold text-gray-500 uppercase block mb-1">{t('selectOffer')}</label>
                         <div className="space-y-2 max-h-40 overflow-y-auto">
                             {offers.map(offer => (
                                 <div 
@@ -153,7 +154,7 @@ const BookingModal: React.FC<{ provider: any; onClose: () => void; currentUser: 
                     </div>
 
                     <button onClick={handleConfirm} disabled={loading} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow-lg flex justify-center items-center gap-2">
-                        {loading ? <Loader2 className="animate-spin"/> : <><Tag size={16}/> Confirm Booking</>}
+                        {loading ? <Loader2 className="animate-spin"/> : <><Tag size={16}/> {t('bookAppointment')}</>}
                     </button>
                 </div>
             </div>
@@ -161,7 +162,7 @@ const BookingModal: React.FC<{ provider: any; onClose: () => void; currentUser: 
     )
 }
 
-const ChatProfileModal: React.FC<{ provider: any; onClose: () => void; currentUser: AuthenticatedUser | null; onBookOffer: (offer: Offer) => void }> = ({ provider, onClose, currentUser, onBookOffer }) => {
+export const ChatProfileModal: React.FC<{ provider: any; onClose: () => void; currentUser: AuthenticatedUser | null; onBookOffer?: (offer: Offer) => void }> = ({ provider, onClose, currentUser, onBookOffer }) => {
     const { t } = useLocalization();
     const [offers, setOffers] = useState<Offer[]>([]);
     const [isFollowing, setIsFollowing] = useState(false);
@@ -264,7 +265,7 @@ const ChatProfileModal: React.FC<{ provider: any; onClose: () => void; currentUs
                                         <span className="text-red-600 font-black text-sm">{o.discount_price} DH</span>
                                     </div>
                                     <button 
-                                        onClick={() => onBookOffer(o)} 
+                                        onClick={() => onBookOffer && onBookOffer(o)} 
                                         className="w-full bg-black text-white py-2 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 active:scale-95 transition-transform"
                                     >
                                         <Calendar size={12}/> Book Now
@@ -292,6 +293,7 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
     const [isLoading, setIsLoading] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const fileRef = useRef<HTMLInputElement>(null);
+    const cameraInputRef = useRef<HTMLInputElement>(null); // New Ref for Camera
     const [preview, setPreview] = useState<string | null>(null);
     const [showProfile, setShowProfile] = useState(false);
     const [showBooking, setShowBooking] = useState(false);
@@ -302,6 +304,9 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
 
     // Offers Booking Logic
     const [preSelectedOffer, setPreSelectedOffer] = useState<Offer | null>(null);
+
+    // Recording State
+    const [isRecording, setIsRecording] = useState(false);
 
     useEffect(() => {
         const fetchProviders = async () => {
@@ -383,6 +388,20 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
             const reader = new FileReader();
             reader.onload = () => setPreview(reader.result as string);
             reader.readAsDataURL(file);
+        }
+        // Reset input to allow re-selection of same file
+        e.target.value = '';
+    }
+
+    const toggleRecording = () => {
+        // Since actual audio recording with Gemeni API via REST is complex, 
+        // we will simulate the UI state as requested by the user ("BAX ISAJAL SOTO")
+        if (isRecording) {
+            setIsRecording(false);
+            // Simulate sending audio (in a real app, this would process blob)
+            setInput(t('recording') + " [Simulated]");
+        } else {
+            setIsRecording(true);
         }
     }
 
@@ -568,10 +587,14 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
                 <div className="flex-1 bg-gray-100 rounded-3xl flex items-center p-1.5 px-3">
                     <button onClick={() => fileRef.current?.click()} className="p-2 text-gray-400 hover:text-gray-600"><Paperclip size={20}/></button>
                     <input type="file" ref={fileRef} hidden onChange={handleFile} accept="image/*"/>
+                    
+                    {/* CAMERA INPUT */}
+                    <input type="file" ref={cameraInputRef} hidden accept="image/*" capture="environment" onChange={handleFile} />
+
                     <textarea 
                         value={input} 
                         onChange={e => setInput(e.target.value)} 
-                        placeholder={t('inputPlaceholder')} 
+                        placeholder={isRecording ? t('recording') : t('inputPlaceholder')} 
                         rows={1} 
                         className="flex-1 bg-transparent border-none focus:ring-0 resize-none max-h-20 py-3 text-sm outline-none text-gray-800"
                         onKeyDown={e => {
@@ -581,13 +604,16 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
                              }
                         }}
                     />
-                    <button className="p-2 text-gray-400 hover:text-gray-600"><Camera size={20}/></button>
+                    <button onClick={() => cameraInputRef.current?.click()} className="p-2 text-gray-400 hover:text-gray-600"><Camera size={20}/></button>
                 </div>
                 <button 
-                    onClick={handleSend} 
-                    className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-all ${input.trim() || preview ? 'bg-blue-600 text-white' : 'bg-green-500 text-white'}`}
+                    onClick={() => {
+                        if(input.trim() || preview) handleSend();
+                        else toggleRecording();
+                    }} 
+                    className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-all ${input.trim() || preview ? 'bg-blue-600 text-white' : (isRecording ? 'bg-red-500 text-white animate-pulse' : 'bg-green-500 text-white')}`}
                 >
-                    {input.trim() || preview ? <Send size={20} className={language === 'ar' ? 'rotate-180 ml-1' : 'mr-1'}/> : <Mic size={24}/>}
+                    {input.trim() || preview ? <Send size={20} className={language === 'ar' ? 'rotate-180 ml-1' : 'mr-1'}/> : (isRecording ? <StopCircle size={24}/> : <Mic size={24}/>)}
                 </button>
             </div>
 

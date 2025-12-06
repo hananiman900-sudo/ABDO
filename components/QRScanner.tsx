@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useLocalization } from '../hooks/useLocalization';
 import { AuthenticatedUser, ProviderNotification, AdRequest, Offer, UrgentAd } from '../types';
 import { supabase } from '../services/supabaseClient';
-import { CheckCircle, XCircle, Camera, Loader2, Upload, MessageCircle, History, Users, Megaphone, Settings, ArrowLeft, Image as ImageIcon, QrCode, Bell, User, LayoutGrid, FileText, Lock, LogOut, Grid, Bookmark, Heart, Plus, Zap, Tag, Instagram, Facebook, MapPin, Edit3, Share2, Info, Trash2, Edit } from 'lucide-react';
+import { CheckCircle, XCircle, Camera, Loader2, Upload, MessageCircle, History, Users, Megaphone, Settings, ArrowLeft, Image as ImageIcon, QrCode, Bell, User, LayoutGrid, FileText, Lock, LogOut, Grid, Bookmark, Heart, Plus, Zap, Tag, Instagram, Facebook, MapPin, Edit3, Share2, Info, Trash2, Edit, ShieldAlert, Save, X, Database } from 'lucide-react';
 import jsQR from 'jsqr';
 
 // --- SUB-COMPONENTS (FULL SCREEN VIEWS) ---
@@ -95,6 +95,7 @@ const UrgentAdsView: React.FC<{ providerId: number; onClose: () => void }> = ({ 
     const [ads, setAds] = useState<UrgentAd[]>([]);
     const [message, setMessage] = useState('');
     const [loading, setLoading] = useState(false);
+    const [editingId, setEditingId] = useState<number | null>(null);
 
     useEffect(() => { fetchAds(); }, []);
     const fetchAds = async () => {
@@ -102,23 +103,46 @@ const UrgentAdsView: React.FC<{ providerId: number; onClose: () => void }> = ({ 
         setAds(data || []);
     }
 
-    const handleCreate = async () => {
+    const handleCreateOrUpdate = async () => {
         if(!message.trim()) return;
         setLoading(true);
-        const { error } = await supabase.from('urgent_ads').insert({ provider_id: providerId, message, is_active: true });
-        if(!error) {
-            setMessage('');
-            fetchAds();
-            alert(t('success'));
+
+        if (editingId) {
+            // Update
+            const { error } = await supabase.from('urgent_ads').update({ message }).eq('id', editingId);
+            if(!error) {
+                setMessage('');
+                setEditingId(null);
+                fetchAds();
+                alert(t('success'));
+            }
+        } else {
+            // Create
+            const { error } = await supabase.from('urgent_ads').insert({ provider_id: providerId, message, is_active: true });
+            if(!error) {
+                setMessage('');
+                fetchAds();
+                alert(t('success'));
+            }
         }
         setLoading(false);
     }
 
+    const handleEdit = (ad: UrgentAd) => {
+        setMessage(ad.message);
+        setEditingId(ad.id);
+    }
+    
     const handleDelete = async (id: number) => {
         if(confirm(t('delete') + '?')) {
             await supabase.from('urgent_ads').delete().eq('id', id);
             fetchAds();
         }
+    }
+
+    const cancelEdit = () => {
+        setMessage('');
+        setEditingId(null);
     }
 
     return (
@@ -134,16 +158,25 @@ const UrgentAdsView: React.FC<{ providerId: number; onClose: () => void }> = ({ 
                     <p className="text-sm text-yellow-800">{t('urgentAdsDesc')}</p>
                 </div>
 
-                <div className="flex gap-2">
-                    <input value={message} onChange={e => setMessage(e.target.value)} placeholder="Urgent message for ticker..." className="flex-1 border p-2 rounded-lg outline-none"/>
-                    <button onClick={handleCreate} disabled={loading} className="bg-red-500 text-white px-4 py-2 rounded-lg font-bold">{t('postAd')}</button>
+                <div className="flex flex-col gap-2">
+                    <div className="flex gap-2">
+                        <input value={message} onChange={e => setMessage(e.target.value)} placeholder="Urgent message for ticker..." className="flex-1 border p-2 rounded-lg outline-none focus:border-yellow-500"/>
+                        {editingId && <button onClick={cancelEdit} className="bg-gray-200 text-gray-700 px-3 rounded-lg"><X/></button>}
+                    </div>
+                    <button onClick={handleCreateOrUpdate} disabled={loading} className={`w-full text-white px-4 py-3 rounded-lg font-bold shadow-sm ${editingId ? 'bg-blue-600' : 'bg-red-500'}`}>
+                        {loading ? <Loader2 className="animate-spin mx-auto"/> : (editingId ? t('save') : t('postAd'))}
+                    </button>
                 </div>
-                <div className="space-y-2">
+
+                <div className="space-y-3 mt-4">
+                    <h3 className="font-bold text-gray-700 text-sm uppercase">Active Ads History</h3>
+                    {ads.length === 0 && <p className="text-gray-400 text-sm text-center">No urgent ads posted.</p>}
                     {ads.map(ad => (
-                        <div key={ad.id} className="p-3 bg-white shadow-sm border rounded-lg flex justify-between items-center">
-                            <span className="text-sm font-bold">{ad.message}</span>
-                            <div className="flex gap-2">
-                                <button onClick={() => handleDelete(ad.id)} className="p-2 bg-gray-100 rounded-full text-red-500"><Trash2 size={16}/></button>
+                        <div key={ad.id} className="p-3 bg-white shadow-sm border border-gray-100 rounded-lg flex justify-between items-center hover:bg-gray-50">
+                            <span className="text-sm font-bold text-gray-800 line-clamp-2 flex-1">{ad.message}</span>
+                            <div className="flex gap-2 ml-2">
+                                <button onClick={() => handleEdit(ad)} className="p-2 bg-blue-50 rounded-full text-blue-600 hover:bg-blue-100"><Edit size={16}/></button>
+                                <button onClick={() => handleDelete(ad.id)} className="p-2 bg-red-50 rounded-full text-red-500 hover:bg-red-100"><Trash2 size={16}/></button>
                             </div>
                         </div>
                     ))}
@@ -156,13 +189,14 @@ const UrgentAdsView: React.FC<{ providerId: number; onClose: () => void }> = ({ 
 const OffersView: React.FC<{ providerId: number; onClose: () => void }> = ({ providerId, onClose }) => {
     const { t } = useLocalization();
     const [offers, setOffers] = useState<Offer[]>([]);
-    const [newOffer, setNewOffer] = useState({ title: '', original_price: '', discount_price: '', image: '' });
+    const [form, setForm] = useState({ title: '', original_price: '', discount_price: '', image: '' });
     const [loading, setLoading] = useState(false);
+    const [editingId, setEditingId] = useState<number | null>(null);
     const fileRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => { fetchOffers(); }, []);
     const fetchOffers = async () => {
-        const { data } = await supabase.from('provider_offers').select('*').eq('provider_id', providerId);
+        const { data } = await supabase.from('provider_offers').select('*').eq('provider_id', providerId).order('created_at', { ascending: false });
         setOffers(data || []);
     }
 
@@ -174,24 +208,43 @@ const OffersView: React.FC<{ providerId: number; onClose: () => void }> = ({ pro
             const fileName = `offer_${providerId}_${Date.now()}`;
             await supabase.storage.from('product-images').upload(fileName, file);
             const { data } = supabase.storage.from('product-images').getPublicUrl(fileName);
-            setNewOffer(prev => ({ ...prev, image: data.publicUrl }));
+            setForm(prev => ({ ...prev, image: data.publicUrl }));
         } catch(e) {} finally { setLoading(false); }
     }
 
-    const handleCreate = async () => {
-        if(!newOffer.title) return;
+    const handleCreateOrUpdate = async () => {
+        if(!form.title) return;
         setLoading(true);
-        await supabase.from('provider_offers').insert({ 
+        
+        const payload = { 
             provider_id: providerId, 
-            title: newOffer.title, 
-            original_price: parseFloat(newOffer.original_price), 
-            discount_price: parseFloat(newOffer.discount_price),
-            image_url: newOffer.image
-        });
-        setNewOffer({ title: '', original_price: '', discount_price: '', image: '' });
+            title: form.title, 
+            original_price: parseFloat(form.original_price || '0'), 
+            discount_price: parseFloat(form.discount_price || '0'),
+            image_url: form.image
+        };
+
+        if (editingId) {
+            await supabase.from('provider_offers').update(payload).eq('id', editingId);
+        } else {
+            await supabase.from('provider_offers').insert(payload);
+        }
+        
+        setForm({ title: '', original_price: '', discount_price: '', image: '' });
+        setEditingId(null);
         fetchOffers();
         setLoading(false);
         alert(t('success'));
+    }
+
+    const handleEdit = (o: Offer) => {
+        setForm({
+            title: o.title,
+            original_price: o.original_price?.toString() || '',
+            discount_price: o.discount_price?.toString() || '',
+            image: o.image_url || ''
+        });
+        setEditingId(o.id);
     }
     
     const handleDelete = async (id: number) => {
@@ -199,6 +252,11 @@ const OffersView: React.FC<{ providerId: number; onClose: () => void }> = ({ pro
             await supabase.from('provider_offers').delete().eq('id', id);
             fetchOffers();
         }
+    }
+
+    const cancelEdit = () => {
+        setForm({ title: '', original_price: '', discount_price: '', image: '' });
+        setEditingId(null);
     }
 
     return (
@@ -215,32 +273,39 @@ const OffersView: React.FC<{ providerId: number; onClose: () => void }> = ({ pro
                 </div>
 
                 <div className="bg-white p-4 rounded-xl border shadow-sm space-y-3">
-                    <h3 className="font-bold text-gray-700">{t('createOffer')}</h3>
-                    <input placeholder={t('titleLabel')} value={newOffer.title} onChange={e => setNewOffer({...newOffer, title: e.target.value})} className="w-full p-2 rounded border outline-none"/>
-                    <div className="flex gap-2">
-                         <input type="number" placeholder={t('originalPrice')} value={newOffer.original_price} onChange={e => setNewOffer({...newOffer, original_price: e.target.value})} className="flex-1 p-2 rounded border outline-none"/>
-                         <input type="number" placeholder={t('discountPrice')} value={newOffer.discount_price} onChange={e => setNewOffer({...newOffer, discount_price: e.target.value})} className="flex-1 p-2 rounded border outline-none"/>
+                    <div className="flex justify-between items-center">
+                        <h3 className="font-bold text-gray-700">{editingId ? t('edit') : t('createOffer')}</h3>
+                        {editingId && <button onClick={cancelEdit} className="text-gray-400"><X size={18}/></button>}
                     </div>
-                    <button onClick={() => fileRef.current?.click()} className="w-full py-2 bg-gray-50 border border-dashed rounded flex justify-center text-gray-500"><ImageIcon size={18}/> Image</button>
+                    
+                    <input placeholder={t('titleLabel')} value={form.title} onChange={e => setForm({...form, title: e.target.value})} className="w-full p-2 rounded border outline-none focus:border-blue-500"/>
+                    <div className="flex gap-2">
+                         <input type="number" placeholder={t('originalPrice')} value={form.original_price} onChange={e => setForm({...form, original_price: e.target.value})} className="flex-1 p-2 rounded border outline-none focus:border-blue-500"/>
+                         <input type="number" placeholder={t('discountPrice')} value={form.discount_price} onChange={e => setForm({...form, discount_price: e.target.value})} className="flex-1 p-2 rounded border outline-none focus:border-blue-500"/>
+                    </div>
+                    <button onClick={() => fileRef.current?.click()} className="w-full py-2 bg-gray-50 border border-dashed rounded flex justify-center text-gray-500 hover:bg-gray-100"><ImageIcon size={18}/> Image</button>
                     <input type="file" ref={fileRef} hidden onChange={handleUpload}/>
-                    {newOffer.image && <img src={newOffer.image} className="h-20 object-cover rounded"/>}
-                    <button onClick={handleCreate} disabled={loading} className="w-full bg-blue-600 text-white py-2 rounded font-bold">{loading ? t('loading') : t('save')}</button>
+                    {form.image && <img src={form.image} className="h-20 object-cover rounded w-full"/>}
+                    
+                    <button onClick={handleCreateOrUpdate} disabled={loading} className={`w-full text-white py-2 rounded font-bold shadow-sm ${editingId ? 'bg-green-600' : 'bg-blue-600'}`}>
+                        {loading ? <Loader2 className="animate-spin mx-auto"/> : (editingId ? t('save') : t('save'))}
+                    </button>
                 </div>
 
                 <div className="grid grid-cols-1 gap-3">
                     {offers.map(o => (
-                        <div key={o.id} className="border rounded-xl p-3 bg-white shadow-sm flex gap-3 relative">
+                        <div key={o.id} className="border rounded-xl p-3 bg-white shadow-sm flex gap-3 relative hover:shadow-md transition-shadow">
                             {o.image_url && <img src={o.image_url} className="w-20 h-20 object-cover rounded-lg bg-gray-100"/>}
                             <div className="flex-1">
                                 <h4 className="font-bold text-sm">{o.title}</h4>
                                 <div className="flex gap-2 text-xs mt-1">
-                                    <span className="line-through text-gray-400">{o.original_price} DH</span>
+                                    {o.original_price > 0 && <span className="line-through text-gray-400">{o.original_price} DH</span>}
                                     <span className="text-red-500 font-bold">{o.discount_price} DH</span>
                                 </div>
                             </div>
-                            <div className="flex flex-col gap-2">
-                                <button className="p-1.5 bg-gray-100 rounded-full text-blue-500"><Edit size={16}/></button>
-                                <button onClick={() => handleDelete(o.id)} className="p-1.5 bg-red-100 rounded-full text-red-500"><Trash2 size={16}/></button>
+                            <div className="flex flex-col gap-2 justify-center">
+                                <button onClick={() => handleEdit(o)} className="p-1.5 bg-gray-100 rounded-full text-blue-500 hover:bg-blue-100"><Edit size={16}/></button>
+                                <button onClick={() => handleDelete(o.id)} className="p-1.5 bg-red-100 rounded-full text-red-500 hover:bg-red-100"><Trash2 size={16}/></button>
                             </div>
                         </div>
                     ))}
@@ -282,7 +347,7 @@ const AdsView: React.FC<{ providerId: number; onClose: () => void }> = ({ provid
         setNewAd({ message: '', image: '' });
         
         // SPECIFIC ARABIC FEEDBACK MESSAGE
-        alert('تم استلام طلبك. طلبك في طور الإنجاز. سيظهر الإعلان لمدة 7 أيام بعد الموافقة.');
+        alert('تم استلام طلبك. طلبك في طور الإنجاز. سيقوم الأدمن بمراجعة الإعلان والاتصال بكم.');
         
         fetchRequests();
         setLoading(false);
@@ -294,26 +359,36 @@ const AdsView: React.FC<{ providerId: number; onClose: () => void }> = ({ provid
                 <button onClick={onClose}><ArrowLeft/></button>
                 <h2 className="font-bold text-xl">{t('requestBoost')}</h2>
             </div>
-            <div className="p-4 space-y-4">
+            <div className="p-4 space-y-4 overflow-y-auto pb-20">
                  <div className="bg-purple-50 p-4 rounded-xl border border-purple-100">
                      <p className="text-sm text-purple-800 font-bold mb-3">{t('paidAdDesc')}</p>
                      <textarea value={newAd.message} onChange={e => setNewAd({...newAd, message: e.target.value})} placeholder={t('messageLabel')} className="w-full p-2 rounded-lg border mb-2"/>
-                     <button onClick={() => fileRef.current?.click()} className="w-full py-2 border border-dashed rounded-lg mb-2 bg-white flex justify-center gap-2 text-gray-500"><ImageIcon size={18}/> {t('uploadQRImage')}</button>
+                     <button onClick={() => fileRef.current?.click()} className="w-full py-2 border border-dashed rounded-lg mb-2 bg-white flex justify-center gap-2 text-gray-500 hover:bg-gray-50"><ImageIcon size={18}/> {t('uploadQRImage')}</button>
                      <input type="file" ref={fileRef} hidden onChange={handleUpload}/>
-                     {newAd.image && <img src={newAd.image} className="h-20 w-full object-cover rounded-lg mb-2"/>}
-                     <button onClick={handleSubmit} disabled={loading} className="w-full bg-purple-600 text-white py-2 rounded-lg font-bold">{t('sendButton')}</button>
+                     {newAd.image && <img src={newAd.image} className="h-24 w-full object-cover rounded-lg mb-2"/>}
+                     <button onClick={handleSubmit} disabled={loading} className="w-full bg-purple-600 text-white py-2 rounded-lg font-bold shadow-md hover:bg-purple-700 transition-colors">
+                         {loading ? <Loader2 className="animate-spin mx-auto"/> : t('sendButton')}
+                     </button>
                  </div>
-                 {requests.map(r => (
-                     <div key={r.id} className="p-3 bg-gray-50 rounded-lg flex justify-between items-center">
-                         <div className="flex gap-2 items-center">
-                             {r.image_url && <img src={r.image_url} className="w-10 h-10 rounded object-cover"/>}
-                             <p className="text-sm font-semibold">{r.message}</p>
+                 
+                 <div className="space-y-3">
+                     <h3 className="font-bold text-gray-700 text-sm uppercase">Request History</h3>
+                     {requests.length === 0 && <p className="text-gray-400 text-sm text-center">No ad requests sent.</p>}
+                     {requests.map(r => (
+                         <div key={r.id} className="p-3 bg-gray-50 rounded-lg border flex justify-between items-center shadow-sm">
+                             <div className="flex gap-2 items-center">
+                                 {r.image_url && <img src={r.image_url} className="w-10 h-10 rounded object-cover bg-gray-200"/>}
+                                 <div>
+                                     <p className="text-sm font-semibold line-clamp-1">{r.message}</p>
+                                     <p className="text-[10px] text-gray-400">{new Date(r.created_at).toLocaleDateString()}</p>
+                                 </div>
+                             </div>
+                             <span className={`text-[10px] px-2 py-1 rounded-full font-bold ${r.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                {r.status === 'pending' ? 'في طور الإنجاز' : 'مقبول'}
+                             </span>
                          </div>
-                         <span className={`text-[10px] px-2 py-1 rounded-full ${r.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                            {r.status === 'pending' ? 'في طور الإنجاز' : 'مقبول'}
-                         </span>
-                     </div>
-                 ))}
+                     ))}
+                 </div>
             </div>
         </div>
     );
@@ -321,7 +396,7 @@ const AdsView: React.FC<{ providerId: number; onClose: () => void }> = ({ provid
 
 const QRScannerView: React.FC<{ providerId: number; onClose: () => void }> = ({ providerId, onClose }) => {
     const { t } = useLocalization();
-    const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
+    const [status, setStatus] = useState<'idle' | 'success' | 'error' | 'wrong_provider'>('idle');
     const [scannedClientName, setScannedClientName] = useState(''); // Store name of scanned client
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -379,6 +454,13 @@ const QRScannerView: React.FC<{ providerId: number; onClose: () => void }> = ({ 
             const parsed = JSON.parse(data);
             if(!parsed.appointmentId) throw new Error();
             
+            // VERIFY PROVIDER ID
+            // The QR code must contain providerId to verify ownership
+            if (parsed.providerId && parsed.providerId !== providerId) {
+                setStatus('wrong_provider');
+                return;
+            }
+
             const clientName = parsed.clientName || `Client #${parsed.appointmentId}`;
             setScannedClientName(clientName);
 
@@ -436,6 +518,8 @@ const QRScannerView: React.FC<{ providerId: number; onClose: () => void }> = ({ 
                         </div>
                     ) : status === 'error' ? (
                          <div className="text-center py-10"><XCircle size={80} className="text-red-500 mx-auto"/><h2 className="text-2xl font-bold mt-4">{t('invalidQR')}</h2><button onClick={() => { setStatus('idle'); setScanning(true); }} className="mt-6 bg-black text-white px-6 py-2 rounded-full font-bold">Try Again</button></div>
+                    ) : status === 'wrong_provider' ? (
+                        <div className="text-center py-10"><ShieldAlert size={80} className="text-orange-500 mx-auto"/><h2 className="text-xl font-bold mt-4 text-orange-600">{t('wrongProvider')}</h2><button onClick={() => { setStatus('idle'); setScanning(true); }} className="mt-6 bg-black text-white px-6 py-2 rounded-full font-bold">Try Again</button></div>
                     ) : (
                         <>
                             <div className="w-full aspect-square bg-black rounded-xl overflow-hidden relative">
@@ -541,11 +625,13 @@ const EditProfileModal: React.FC<{ provider: AuthenticatedUser; onClose: () => v
 }
 
 // --- INSTAGRAM STYLE PORTAL ---
-const ProviderPortal: React.FC<{ provider: AuthenticatedUser; onLogout: () => void; onUpdateUser: (updates: Partial<AuthenticatedUser>) => void }> = ({ provider, onLogout, onUpdateUser }) => {
+const ProviderPortal: React.FC<{ provider: AuthenticatedUser; onLogout: () => void; onUpdateUser: (updates: Partial<AuthenticatedUser>) => void; onNavTo?: (target: string) => void }> = ({ provider, onLogout, onUpdateUser, onNavTo }) => {
     const { t } = useLocalization();
     const [view, setView] = useState<'scan' | 'notifications' | 'history' | 'ads' | 'offers' | 'urgent' | null>(null);
     const [editMode, setEditMode] = useState(false);
     const [stats, setStats] = useState({ followers: 0, posts: 0, visits: 0 });
+
+    const isAdmin = provider.phone === '0617774846';
 
     useEffect(() => {
         const fetchStats = async () => {
@@ -568,15 +654,20 @@ const ProviderPortal: React.FC<{ provider: AuthenticatedUser; onLogout: () => vo
         window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
     }
 
-    const GridItem = ({ icon: Icon, label, onClick, badge }: any) => (
-        <div onClick={onClick} className="aspect-square bg-gray-50 relative group cursor-pointer border border-white hover:bg-gray-100 transition-colors">
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-600">
-                <Icon size={28} strokeWidth={1.5} className="mb-2 text-gray-700"/>
+    const GridItem = ({ icon: Icon, label, onClick, badge, color }: any) => (
+        <div onClick={onClick} className={`aspect-square relative group cursor-pointer border border-white transition-colors ${color ? color : 'bg-gray-50 hover:bg-gray-100'}`}>
+            <div className={`absolute inset-0 flex flex-col items-center justify-center ${color ? 'text-white' : 'text-gray-600'}`}>
+                <Icon size={28} strokeWidth={1.5} className="mb-2"/>
                 <span className="text-[10px] font-bold uppercase tracking-wide text-center px-1">{label}</span>
                 {badge > 0 && <span className="absolute top-2 right-2 bg-red-500 text-white text-[9px] w-4 h-4 rounded-full flex items-center justify-center">{badge}</span>}
             </div>
         </div>
     );
+
+    const handleAdminClick = () => {
+        if(onNavTo) onNavTo('ADMIN_DASHBOARD'); // UPDATED TARGET
+        else onLogout();
+    }
 
     return (
         <div className="h-screen bg-white overflow-y-auto" dir="rtl">
@@ -626,6 +717,9 @@ const ProviderPortal: React.FC<{ provider: AuthenticatedUser; onLogout: () => vo
 
                 {/* THE CONTROL GRID */}
                 <div className="grid grid-cols-3 gap-0.5 mt-0.5">
+                    {/* ADMIN BUTTON - Only for 0617774846 */}
+                    {isAdmin && <GridItem icon={ShieldAlert} label="الإدارة (Admin)" onClick={handleAdminClick} badge={0} color="bg-red-600 hover:bg-red-700" />}
+                    
                     <GridItem icon={QrCode} label={t('qrScannerTitle')} onClick={() => setView('scan')}/>
                     <GridItem icon={Megaphone} label={t('requestBoost')} onClick={() => setView('ads')}/>
                     <GridItem icon={Tag} label={t('offers')} onClick={() => setView('offers')}/>

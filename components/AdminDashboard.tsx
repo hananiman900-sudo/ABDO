@@ -1,0 +1,336 @@
+
+import React, { useState, useEffect, useRef } from 'react';
+import { supabase } from '../services/supabaseClient';
+import { useLocalization } from '../hooks/useLocalization';
+import { ArrowLeft, Loader2, Plus, Trash2, Edit, CheckCircle, XCircle, ShoppingBag, Users, Megaphone, Image as ImageIcon, Settings, Save, BarChart3, X } from 'lucide-react';
+import { Product, AdRequest } from '../types';
+
+interface AdminDashboardProps {
+    isOpen: boolean;
+    onClose: () => void;
+}
+
+export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
+    const { t } = useLocalization();
+    const [activeTab, setActiveTab] = useState<'PRODUCTS' | 'PROVIDERS' | 'ADS' | 'STATS'>('PRODUCTS');
+    const [loading, setLoading] = useState(false);
+
+    // Products State
+    const [products, setProducts] = useState<Product[]>([]);
+    const [newProduct, setNewProduct] = useState({ name: '', price: '', category: 'category_clothes', description: '', image: '' });
+    const [editingProductId, setEditingProductId] = useState<number | null>(null);
+    const fileRef = useRef<HTMLInputElement>(null);
+
+    // Providers State
+    const [pendingProviders, setPendingProviders] = useState<any[]>([]);
+
+    // Ads State
+    const [adRequests, setAdRequests] = useState<AdRequest[]>([]);
+
+    // Stats State
+    const [providerStats, setProviderStats] = useState<any[]>([]);
+
+    useEffect(() => {
+        if(isOpen) {
+            fetchData();
+        }
+    }, [isOpen, activeTab]);
+
+    const fetchData = async () => {
+        setLoading(true);
+        if (activeTab === 'PRODUCTS') {
+            const { data } = await supabase.from('products').select('*').order('created_at', { ascending: false });
+            setProducts(data || []);
+        } else if (activeTab === 'PROVIDERS') {
+            const { data } = await supabase.from('providers').select('*').eq('is_active', false);
+            setPendingProviders(data || []);
+        } else if (activeTab === 'ADS') {
+            const { data } = await supabase.from('provider_ad_requests').select('*, providers(name, phone)').eq('status', 'pending');
+            setAdRequests(data as any || []);
+        } else if (activeTab === 'STATS') {
+            const { data } = await supabase.from('providers').select('id, name, service_type, visits_count, profile_image_url').order('visits_count', { ascending: false });
+            setProviderStats(data || []);
+        }
+        setLoading(false);
+    };
+
+    // --- PRODUCT LOGIC ---
+    const handleSaveProduct = async () => {
+        if (!newProduct.name || !newProduct.price) return alert(t('errorMessage'));
+        setLoading(true);
+
+        const payload = {
+            name: newProduct.name,
+            price: parseFloat(newProduct.price),
+            category: newProduct.category,
+            description: newProduct.description,
+            image_url: newProduct.image
+        };
+
+        let error;
+        if (editingProductId) {
+            // Update Existing
+            const { error: err } = await supabase.from('products').update(payload).eq('id', editingProductId);
+            error = err;
+        } else {
+            // Create New
+            const { error: err } = await supabase.from('products').insert(payload);
+            error = err;
+        }
+
+        if (!error) {
+            alert(editingProductId ? t('success') : t('addProductSuccess'));
+            handleCancelEdit();
+            fetchData();
+        } else {
+            alert(t('errorMessage'));
+        }
+        setLoading(false);
+    };
+
+    const handleEditProduct = (p: Product) => {
+        setNewProduct({
+            name: p.name,
+            price: p.price.toString(),
+            category: p.category,
+            description: p.description || '',
+            image: p.image_url || ''
+        });
+        setEditingProductId(p.id);
+        // Scroll to top to see form
+        document.querySelector('.overflow-y-auto')?.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    const handleCancelEdit = () => {
+        setNewProduct({ name: '', price: '', category: 'category_clothes', description: '', image: '' });
+        setEditingProductId(null);
+    }
+
+    const handleDeleteProduct = async (id: number) => {
+        if(confirm(t('delete') + '?')) {
+            await supabase.from('products').delete().eq('id', id);
+            fetchData();
+        }
+    };
+
+    const handleProductImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if(!file) return;
+        setLoading(true);
+        try {
+            const fileName = `prod_${Date.now()}`;
+            await supabase.storage.from('product-images').upload(fileName, file);
+            const { data } = supabase.storage.from('product-images').getPublicUrl(fileName);
+            setNewProduct(prev => ({ ...prev, image: data.publicUrl }));
+        } catch(e) {} finally { setLoading(false); }
+    };
+
+    // --- PROVIDER LOGIC ---
+    const handleApproveProvider = async (id: number) => {
+        await supabase.from('providers').update({ is_active: true }).eq('id', id);
+        fetchData();
+    };
+
+    const handleRejectProvider = async (id: number) => {
+        if(confirm(t('reject') + '?')) {
+            await supabase.from('providers').delete().eq('id', id);
+            fetchData();
+        }
+    };
+
+    // --- AD LOGIC ---
+    const handleApproveAd = async (req: AdRequest) => {
+        await supabase.from('system_announcements').insert({ title: req.providers?.name || 'Offer', message: req.message, image_url: req.image_url, is_active: true });
+        await supabase.from('provider_ad_requests').update({ status: 'approved' }).eq('id', req.id);
+        fetchData();
+    };
+
+    const handleRejectAd = async (id: number) => {
+        await supabase.from('provider_ad_requests').update({ status: 'rejected' }).eq('id', id);
+        fetchData();
+    };
+
+    if(!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-white z-[80] flex flex-col animate-slide-up">
+            <div className="bg-black text-white p-4 flex justify-between items-center shadow-lg">
+                <button onClick={onClose}><ArrowLeft/></button>
+                <h2 className="font-bold text-lg flex items-center gap-2"><Settings/> {t('adminDashboard')}</h2>
+                <div className="w-6"/>
+            </div>
+
+            {/* TABS */}
+            <div className="flex border-b bg-gray-100 overflow-x-auto">
+                <button 
+                    onClick={() => setActiveTab('PRODUCTS')}
+                    className={`flex-1 py-4 px-2 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'PRODUCTS' ? 'bg-white text-orange-600 border-b-2 border-orange-600' : 'text-gray-500'}`}
+                >
+                    <ShoppingBag size={18}/> {t('manageProducts')}
+                </button>
+                <button 
+                    onClick={() => setActiveTab('PROVIDERS')}
+                    className={`flex-1 py-4 px-2 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'PROVIDERS' ? 'bg-white text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}
+                >
+                    <Users size={18}/> {t('manageProviders')}
+                </button>
+                <button 
+                    onClick={() => setActiveTab('ADS')}
+                    className={`flex-1 py-4 px-2 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'ADS' ? 'bg-white text-purple-600 border-b-2 border-purple-600' : 'text-gray-500'}`}
+                >
+                    <Megaphone size={18}/> {t('adRequests')}
+                </button>
+                <button 
+                    onClick={() => setActiveTab('STATS')}
+                    className={`flex-1 py-4 px-2 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'STATS' ? 'bg-white text-green-600 border-b-2 border-green-600' : 'text-gray-500'}`}
+                >
+                    <BarChart3 size={18}/> {t('globalStats')}
+                </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
+                
+                {/* PRODUCTS TAB */}
+                {activeTab === 'PRODUCTS' && (
+                    <div className="space-y-6">
+                        <div className="bg-white p-4 rounded-xl shadow-sm border">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="font-bold">{editingProductId ? t('updateProduct') : t('addProduct')}</h3>
+                                {editingProductId && <button onClick={handleCancelEdit} className="text-red-500 text-xs font-bold flex items-center gap-1"><X size={14}/> {t('cancelEdit')}</button>}
+                            </div>
+                            
+                            <div className="space-y-3">
+                                <input value={newProduct.name} onChange={e => setNewProduct({...newProduct, name: e.target.value})} placeholder={t('productName')} className="w-full p-2 border rounded"/>
+                                <div className="flex gap-2">
+                                    <input type="number" value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: e.target.value})} placeholder={t('productPrice')} className="flex-1 p-2 border rounded"/>
+                                    <select value={newProduct.category} onChange={e => setNewProduct({...newProduct, category: e.target.value})} className="flex-1 p-2 border rounded">
+                                        <option value="category_clothes">{t('category_clothes')}</option>
+                                        <option value="category_electronics">{t('category_electronics')}</option>
+                                        <option value="category_accessories">{t('category_accessories')}</option>
+                                        <option value="category_home">{t('category_home')}</option>
+                                    </select>
+                                </div>
+                                <textarea value={newProduct.description} onChange={e => setNewProduct({...newProduct, description: e.target.value})} placeholder={t('description')} className="w-full p-2 border rounded"/>
+                                
+                                <button onClick={() => fileRef.current?.click()} className="w-full py-2 border border-dashed rounded flex items-center justify-center gap-2 text-gray-500"><ImageIcon size={18}/> {t('productImage')}</button>
+                                <input type="file" ref={fileRef} hidden onChange={handleProductImageUpload} />
+                                {newProduct.image && <img src={newProduct.image} className="h-24 w-full object-cover rounded"/>}
+                                
+                                <button onClick={handleSaveProduct} disabled={loading} className={`w-full text-white py-2 rounded font-bold ${editingProductId ? 'bg-blue-600' : 'bg-orange-600'}`}>
+                                    {loading ? <Loader2 className="animate-spin mx-auto"/> : (editingProductId ? t('save') : t('save'))}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            {products.map(p => (
+                                <div key={p.id} className="bg-white p-2 rounded-lg border flex justify-between items-center shadow-sm">
+                                    <div className="flex items-center gap-3">
+                                        <img src={p.image_url} className="w-12 h-12 rounded bg-gray-100 object-cover"/>
+                                        <div>
+                                            <p className="font-bold text-sm">{p.name}</p>
+                                            <p className="text-xs text-orange-600 font-bold">{p.price} DH</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => handleEditProduct(p)} className="p-2 text-blue-500 hover:bg-blue-50 rounded"><Edit size={18}/></button>
+                                        <button onClick={() => handleDeleteProduct(p.id)} className="p-2 text-red-500 hover:bg-red-50 rounded"><Trash2 size={18}/></button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* PROVIDERS TAB */}
+                {activeTab === 'PROVIDERS' && (
+                    <div className="space-y-4">
+                        <div className="bg-blue-50 p-4 rounded-xl border border-blue-200">
+                             <h3 className="font-bold text-blue-800">{t('pendingProviders')}</h3>
+                             <p className="text-xs text-blue-600">Approve new registrations here.</p>
+                        </div>
+                        {pendingProviders.length === 0 && <p className="text-center text-gray-400 py-10">No pending requests.</p>}
+                        {pendingProviders.map(p => (
+                            <div key={p.id} className="bg-white p-4 rounded-xl border shadow-sm">
+                                <div className="flex justify-between items-start mb-2">
+                                    <div>
+                                        <h4 className="font-bold">{p.name}</h4>
+                                        <p className="text-sm text-gray-600">{p.phone}</p>
+                                        <p className="text-xs text-blue-500 font-bold">{p.service_type}</p>
+                                    </div>
+                                    <span className="text-[10px] bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full font-bold">Pending</span>
+                                </div>
+                                <div className="flex gap-2 mt-4">
+                                    <button onClick={() => handleRejectProvider(p.id)} className="flex-1 py-2 bg-red-50 text-red-600 rounded-lg font-bold text-xs flex items-center justify-center gap-1"><XCircle size={14}/> {t('reject')}</button>
+                                    <button onClick={() => handleApproveProvider(p.id)} className="flex-1 py-2 bg-green-600 text-white rounded-lg font-bold text-xs flex items-center justify-center gap-1"><CheckCircle size={14}/> {t('approve')}</button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* ADS TAB */}
+                {activeTab === 'ADS' && (
+                    <div className="space-y-4">
+                         {adRequests.length === 0 && <p className="text-center text-gray-400 py-10">No pending ads.</p>}
+                         {adRequests.map(r => (
+                             <div key={r.id} className="bg-white p-4 rounded-xl border shadow-sm">
+                                 <div className="flex gap-3 mb-3">
+                                     <img src={r.image_url} className="w-20 h-20 rounded bg-gray-100 object-cover"/>
+                                     <div>
+                                         <p className="font-bold text-sm">{r.providers?.name}</p>
+                                         <p className="text-sm text-gray-800">{r.message}</p>
+                                         <p className="text-xs text-gray-500 mt-1">{new Date(r.created_at).toLocaleDateString()}</p>
+                                     </div>
+                                 </div>
+                                 <div className="flex gap-2">
+                                     <button onClick={() => handleRejectAd(r.id)} className="flex-1 py-2 bg-red-50 text-red-600 rounded-lg font-bold text-xs">{t('reject')}</button>
+                                     <button onClick={() => handleApproveAd(r)} className="flex-1 py-2 bg-green-600 text-white rounded-lg font-bold text-xs">{t('approve')}</button>
+                                 </div>
+                             </div>
+                         ))}
+                    </div>
+                )}
+
+                {/* STATS TAB */}
+                {activeTab === 'STATS' && (
+                    <div className="space-y-4">
+                        <div className="bg-green-50 p-4 rounded-xl border border-green-200 mb-4">
+                             <h3 className="font-bold text-green-800 flex items-center gap-2"><BarChart3 size={20}/> {t('globalStats')}</h3>
+                             <p className="text-xs text-green-600">Top providers by QR scans.</p>
+                        </div>
+                        
+                        <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+                             <table className="w-full text-sm">
+                                 <thead className="bg-gray-100 text-gray-600 font-bold">
+                                     <tr>
+                                         <th className="p-3 text-right">#</th>
+                                         <th className="p-3 text-right">{t('provider')}</th>
+                                         <th className="p-3 text-right">{t('service')}</th>
+                                         <th className="p-3 text-center">{t('totalVisits')}</th>
+                                     </tr>
+                                 </thead>
+                                 <tbody>
+                                     {providerStats.length === 0 && (
+                                         <tr><td colSpan={4} className="text-center p-6 text-gray-400">No data available</td></tr>
+                                     )}
+                                     {providerStats.map((p, index) => (
+                                         <tr key={p.id} className="border-t hover:bg-gray-50">
+                                             <td className="p-3 font-bold text-gray-400">{index + 1}</td>
+                                             <td className="p-3 font-bold flex items-center gap-2">
+                                                 <img src={p.profile_image_url || `https://ui-avatars.com/api/?name=${p.name}`} className="w-8 h-8 rounded-full bg-gray-200 object-cover"/>
+                                                 <span className="truncate max-w-[100px]">{p.name}</span>
+                                             </td>
+                                             <td className="p-3 text-gray-600 text-xs">{p.service_type}</td>
+                                             <td className="p-3 text-center font-black text-blue-600">{p.visits_count || 0}</td>
+                                         </tr>
+                                     ))}
+                                 </tbody>
+                             </table>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};

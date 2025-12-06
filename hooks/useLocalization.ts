@@ -38,6 +38,7 @@ export const translations: Translations = {
   menu: { ar: 'القائمة', en: 'Menu', fr: 'Menu' },
   home: { ar: 'الرئيسية', en: 'Home', fr: 'Accueil' },
   guest: { ar: 'زائر', en: 'Guest', fr: 'Invité' },
+  suggestedProviders: { ar: 'اقتراحات لك', en: 'Suggested for You', fr: 'Suggestions' },
   
   // --- AUTH ---
   loginRegister: { ar: 'دخول / تسجيل', en: 'Login / Register', fr: 'Connexion / S\'inscrire' },
@@ -54,6 +55,26 @@ export const translations: Translations = {
   provider: { ar: 'مهني (Pro)', en: 'Provider', fr: 'Professionnel' },
   loginButton: { ar: 'دخول', en: 'Login', fr: 'Connexion' },
   registerButton: { ar: 'تسجيل', en: 'Register', fr: 'S\'inscrire' },
+  passwordError: { ar: 'كلمة السر غير صحيحة', en: 'Incorrect Password', fr: 'Mot de passe incorrect' },
+  accountPending: { ar: 'حسابك في طور المراجعة من طرف الإدارة.', en: 'Account pending approval.', fr: 'Compte en attente d\'approbation.' },
+  
+  // --- ADMIN DASHBOARD ---
+  adminDashboard: { ar: 'لوحة التحكم (المدير)', en: 'Admin Dashboard', fr: 'Tableau de Bord' },
+  manageProducts: { ar: 'إدارة المنتجات', en: 'Manage Products', fr: 'Gérer Produits' },
+  manageProviders: { ar: 'طلبات الانخراط', en: 'Provider Requests', fr: 'Demandes Pro' },
+  pendingProviders: { ar: 'مهنيين في الانتظار', en: 'Pending Providers', fr: 'Pros en attente' },
+  approve: { ar: 'قبول', en: 'Approve', fr: 'Approuver' },
+  reject: { ar: 'رفض', en: 'Reject', fr: 'Rejeter' },
+  productName: { ar: 'إسم المنتج', en: 'Product Name', fr: 'Nom Produit' },
+  productPrice: { ar: 'الثمن', en: 'Price', fr: 'Prix' },
+  productCategory: { ar: 'الصنف', en: 'Category', fr: 'Catégorie' },
+  productImage: { ar: 'صورة المنتج', en: 'Product Image', fr: 'Image Produit' },
+  addProductSuccess: { ar: 'تمت إضافة المنتج بنجاح', en: 'Product added', fr: 'Produit ajouté' },
+  globalStats: { ar: 'إحصائيات عامة', en: 'Global Stats', fr: 'Stats Globales' },
+  totalVisits: { ar: 'مجموع الزيارات', en: 'Total Visits', fr: 'Total Visites' },
+  ranking: { ar: 'الترتيب', en: 'Ranking', fr: 'Classement' },
+  updateProduct: { ar: 'تحديث المنتج', en: 'Update Product', fr: 'Mettre à jour' },
+  cancelEdit: { ar: 'إلغاء التعديل', en: 'Cancel Edit', fr: 'Annuler modif' },
   
   // --- PROFILE ---
   posts: { ar: 'الخدمات', en: 'Services', fr: 'Services' },
@@ -96,7 +117,10 @@ export const translations: Translations = {
   // --- CHATBOT ---
   inputPlaceholder: { ar: 'كتب رسالة...', en: 'Type a message...', fr: 'Écrivez un message...' },
   recording: { ar: 'جاري التسجيل...', en: 'Recording...', fr: 'Enregistrement...' },
-  bookingSuccessMessage: { ar: 'تم الحجز! ورّي هاد QR للكود.', en: 'Booked! Show QR.', fr: 'Réservé ! Montrez le QR.' },
+  bookingSuccessMessage: { ar: 'تم الحجز! احتفظ بهذا الكود لتقديمه للمهني.', en: 'Booked! Keep this code for the provider.', fr: 'Réservé ! Gardez ce code pour le pro.' },
+  bookAppointment: { ar: 'حجز موعد', en: 'Book Appointment', fr: 'Prendre RDV' },
+  selectOffer: { ar: 'اختر العرض (اختياري)', en: 'Select Offer (Optional)', fr: 'Choisir Offre' },
+  keepQR: { ar: 'مهم: احتفظ بهذا الكود. صالح فقط عند هذا المهني.', en: 'Important: Keep this code. Valid only for this provider.', fr: 'Important: Gardez ce code. Valide uniquement pour ce pro.' },
   welcomeMessage: { ar: 'مرحبا! أنا المساعد الذكي. باش نقدر نعاونك؟', en: 'Hello! How can I help?', fr: 'Bonjour ! Comment aider ?' },
   service: { ar: 'الخدمة', en: 'Service', fr: 'Service' },
   with: { ar: 'مع', en: 'With', fr: 'Avec' },
@@ -138,6 +162,7 @@ export const translations: Translations = {
   requestBoost: { ar: 'طلب إشهار', en: 'Request Ad', fr: 'Demande Pub' },
   verificationSuccess: { ar: 'كود صحيح!', en: 'Valid!', fr: 'Valide !' },
   invalidQR: { ar: 'كود غير صالح', en: 'Invalid QR', fr: 'QR Invalide' },
+  wrongProvider: { ar: 'خطأ: هذا الموعد ليس لك', en: 'Error: Appointment not for you', fr: 'Erreur: RDV pas pour vous' },
   scanWithCamera: { ar: 'الكاميرا', en: 'Camera', fr: 'Caméra' },
   uploadQRImage: { ar: 'رفع صورة من الملفات', en: 'Upload QR File', fr: 'Importer Fichier QR' },
   messageLabel: { ar: 'نص الإعلان...', en: 'Ad text...', fr: 'Texte pub...' },
@@ -204,7 +229,7 @@ export const translations: Translations = {
   propertyType: { ar: 'النوع', en: 'Type', fr: 'Type' },
   selectNeighborhood: { ar: 'الحي', en: 'Area', fr: 'Quartier' },
   submitAd: { ar: 'نشر', en: 'Submit', fr: 'Publier' },
-  noNotifications: { ar: 'والو', en: 'None', fr: 'Aucune' },
+  noNotifications: { ar: 'لا إشعارات', en: 'No notifications', fr: 'Aucune notif' },
 
   // Job Categories
   cat_security: { ar: 'أمن', en: 'Security', fr: 'Sécurité' },
