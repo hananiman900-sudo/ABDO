@@ -17,7 +17,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
 
     // Products State
     const [products, setProducts] = useState<Product[]>([]);
-    const [newProduct, setNewProduct] = useState({ name: '', price: '', category: 'category_clothes', description: '', image: '', images: [] as string[] });
+    const [newProduct, setNewProduct] = useState({ name: '', price: '', category: 'category_clothes', description: '', image: '', images: [] as string[], sizes: '' });
     const [editingProductId, setEditingProductId] = useState<number | null>(null);
     const fileRef = useRef<HTMLInputElement>(null);
 
@@ -65,13 +65,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
         if (!newProduct.name || !newProduct.price) return alert(t('errorMessage'));
         setLoading(true);
 
+        const sizesArray = newProduct.sizes ? newProduct.sizes.split(',').map(s => s.trim()).filter(s => s !== '') : [];
+
         const payload = {
             name: newProduct.name,
             price: parseFloat(newProduct.price),
             category: newProduct.category,
             description: newProduct.description,
             image_url: newProduct.image, // Main image
-            images: newProduct.images // Array of images
+            images: newProduct.images, // Array of images
+            sizes: sizesArray
         };
 
         let error;
@@ -102,7 +105,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
             category: p.category,
             description: p.description || '',
             image: p.image_url || '',
-            images: p.images || []
+            images: p.images || [],
+            sizes: p.sizes ? p.sizes.join(', ') : ''
         });
         setEditingProductId(p.id);
         // Scroll to top to see form
@@ -110,7 +114,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
     }
 
     const handleCancelEdit = () => {
-        setNewProduct({ name: '', price: '', category: 'category_clothes', description: '', image: '', images: [] });
+        setNewProduct({ name: '', price: '', category: 'category_clothes', description: '', image: '', images: [], sizes: '' });
         setEditingProductId(null);
     }
 
@@ -242,8 +246,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                                         <option value="category_electronics">{t('category_electronics')}</option>
                                         <option value="category_accessories">{t('category_accessories')}</option>
                                         <option value="category_home">{t('category_home')}</option>
+                                        <option value="category_beauty">{t('category_beauty')}</option>
                                     </select>
                                 </div>
+                                <input value={newProduct.sizes} onChange={e => setNewProduct({...newProduct, sizes: e.target.value})} placeholder={t('sizesLabel')} className="w-full p-2 border rounded"/>
                                 <textarea value={newProduct.description} onChange={e => setNewProduct({...newProduct, description: e.target.value})} placeholder={t('description')} className="w-full p-2 border rounded"/>
                                 
                                 <button onClick={() => fileRef.current?.click()} className="w-full py-2 border border-dashed rounded flex items-center justify-center gap-2 text-gray-500"><Plus size={18}/> Add Image</button>
@@ -323,7 +329,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                                     <ul className="space-y-1">
                                         {o.items.map((item: any, idx: number) => (
                                             <li key={idx} className="flex justify-between text-xs">
-                                                <span>{item.name} <span className="text-gray-500">x{item.quantity}</span></span>
+                                                <span>{item.name} <span className="text-gray-500">x{item.quantity}</span> {item.selectedSize && <span className="font-bold bg-white px-1 border rounded">{item.selectedSize}</span>}</span>
                                                 <span className="font-bold">{item.price * item.quantity} DH</span>
                                             </li>
                                         ))}

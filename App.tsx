@@ -330,13 +330,19 @@ const ProviderDirectory: React.FC<{ isOpen: boolean; onClose: () => void; curren
                     {loading ? <div className="flex justify-center p-10"><Loader2 className="animate-spin text-blue-500"/></div> : (
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                             {providers.map(p => (
-                                <div key={p.id} onClick={() => setSelectedProvider(p)} className="bg-white p-4 rounded-2xl shadow-sm border hover:shadow-md transition-all cursor-pointer flex flex-col items-center text-center">
-                                    <div className="w-16 h-16 rounded-full bg-gray-200 mb-3 overflow-hidden border">
+                                <div key={p.id} onClick={() => setSelectedProvider(p)} className="bg-white p-4 rounded-2xl shadow-sm border hover:shadow-md transition-all cursor-pointer flex flex-col items-center text-center h-full">
+                                    <div className="w-16 h-16 rounded-full bg-gray-200 mb-3 overflow-hidden border shrink-0">
                                         <img src={p.profile_image_url || `https://ui-avatars.com/api/?name=${p.name}`} className="w-full h-full object-cover"/>
                                     </div>
                                     <h3 className="font-bold text-sm truncate w-full">{p.name}</h3>
-                                    <span className="text-xs text-blue-500 font-medium">{p.service_type}</span>
-                                    <button className="mt-3 w-full py-1.5 bg-gray-100 rounded-lg text-xs font-bold text-gray-600 hover:bg-black hover:text-white transition-colors">{t('viewQRCode')}</button>
+                                    <span className="text-xs text-blue-500 font-medium mb-1 truncate w-full block">{p.service_type}</span>
+                                    
+                                    {/* Description / Bio Truncated to keep height uniform */}
+                                    <p className="text-[10px] text-gray-400 line-clamp-2 mb-2 flex-1 w-full text-center">
+                                        {p.bio || "No bio available."}
+                                    </p>
+
+                                    <button className="mt-auto w-full py-1.5 bg-gray-100 rounded-lg text-xs font-bold text-gray-600 hover:bg-black hover:text-white transition-colors">{t('viewQRCode')}</button>
                                 </div>
                             ))}
                         </div>

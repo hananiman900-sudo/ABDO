@@ -78,6 +78,7 @@ export const translations: Translations = {
   cancelEdit: { ar: 'إلغاء التعديل', en: 'Cancel Edit', fr: 'Annuler modif' },
   markDelivered: { ar: 'تأكيد التسليم', en: 'Confirm Delivery', fr: 'Confirmer Livraison' },
   customerInfo: { ar: 'معلومات الزبون', en: 'Customer Info', fr: 'Infos Client' },
+  sizesLabel: { ar: 'المقاسات (افصل بفاصلة)', en: 'Sizes (comma separated)', fr: 'Tailles (séparées par virgule)' },
   
   // --- PROFILE ---
   posts: { ar: 'الخدمات', en: 'Services', fr: 'Services' },
@@ -104,6 +105,7 @@ export const translations: Translations = {
   cartEmpty: { ar: 'السلة فارغة', en: 'Cart is empty', fr: 'Panier vide' },
   orderPlaced: { ar: 'تم الطلب! سنتصل بك قريبا.', en: 'Order placed!', fr: 'Commande passée !' },
   sizes: { ar: 'المقاسات', en: 'Sizes', fr: 'Tailles' },
+  selectSize: { ar: 'اختر المقاس', en: 'Select Size', fr: 'Choisir Taille' },
   description: { ar: 'الوصف', en: 'Description', fr: 'Description' },
   category_all: { ar: 'الكل', en: 'All', fr: 'Tout' },
   category_clothes: { ar: 'ملابس', en: 'Clothing', fr: 'Vêtements' },
@@ -160,6 +162,8 @@ export const translations: Translations = {
   writeComment: { ar: 'تعليق...', en: 'Comment...', fr: 'Commentaire...' },
   postedAgo: { ar: 'منذ', en: 'ago', fr: 'il y a' },
   noPosts: { ar: 'والو حاليا', en: 'No posts', fr: 'Aucun post' },
+  imageRequired: { ar: 'ضروري ترفع صورة وحدة على الأقل', en: 'At least one image is required', fr: 'Une image est requise' },
+  propertyDetails: { ar: 'تفاصيل العقار', en: 'Property Details', fr: 'Détails du bien' },
   
   // --- PROVIDER PORTAL ---
   controlRoom: { ar: 'غرفة التحكم', en: 'Control Room', fr: 'Salle de Contrôle' },

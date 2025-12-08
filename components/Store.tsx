@@ -34,6 +34,9 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
     
     // Image Slider State
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
+    
+    // Size Selection State
+    const [selectedSize, setSelectedSize] = useState<string>('');
 
     // Categories
     const categories = ['category_all', 'category_clothes', 'category_electronics', 'category_accessories', 'category_home', 'category_beauty'];
@@ -121,10 +124,17 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
     }
 
     const addToCart = (p: Product) => {
+        // Validation for Size
+        if (p.sizes && p.sizes.length > 0 && !selectedSize) {
+            alert(t('selectSize'));
+            return;
+        }
+
         setCart(prev => {
-            const ex = prev.find(i => i.id === p.id);
-            if(ex) return prev.map(i => i.id === p.id ? {...i, quantity: i.quantity + 1} : i);
-            return [...prev, {...p, quantity: 1}];
+            // Check if same product AND same size exists
+            const ex = prev.find(i => i.id === p.id && i.selectedSize === selectedSize);
+            if(ex) return prev.map(i => (i.id === p.id && i.selectedSize === selectedSize) ? {...i, quantity: i.quantity + 1} : i);
+            return [...prev, {...p, quantity: 1, selectedSize: selectedSize || undefined}];
         });
         alert(t('addToCart'));
     }
@@ -170,6 +180,7 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
     const openProduct = (p: Product) => {
         setSelectedProduct(p);
         setCurrentImageIndex(0);
+        setSelectedSize(''); // Reset size
         fetchReviews(p.id);
     }
 
@@ -257,8 +268,8 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                             {cart.length === 0 ? <p className="text-center text-gray-500 py-6">{t('cartEmpty')}</p> : (
                                 <>
                                     {cart.map(i => (
-                                        <div key={i.id} className="flex justify-between border-b py-2">
-                                            <span className="text-sm">{i.name} x{i.quantity}</span>
+                                        <div key={`${i.id}-${i.selectedSize}`} className="flex justify-between border-b py-2">
+                                            <span className="text-sm">{i.name} {i.selectedSize && `(${i.selectedSize})`} x{i.quantity}</span>
                                             <span className="font-bold">{i.price * i.quantity} DH</span>
                                         </div>
                                     ))}
@@ -292,7 +303,7 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                                     <p className="text-sm text-gray-600">{new Date(o.created_at).toLocaleDateString()}</p>
                                     <p className="font-bold text-orange-600 mt-1">{o.total_amount} DH</p>
                                     <div className="mt-2 text-xs text-gray-500">
-                                        {o.items.map((i: any) => `${i.name} (x${i.quantity})`).join(', ')}
+                                        {o.items.map((i: any) => `${i.name} ${i.selectedSize ? `(${i.selectedSize})` : ''} (x${i.quantity})`).join(', ')}
                                     </div>
                                 </div>
                             ))}
@@ -314,9 +325,8 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                                          <Star size={8} className="fill-yellow-400 text-yellow-400"/>
                                          <span className="text-[10px] text-gray-400">4.9</span>
                                      </div>
-                                     {/* Add Button logic handled in detail view, or here directly */}
                                      <button 
-                                        onClick={(e) => { e.stopPropagation(); addToCart(p); }} 
+                                        onClick={(e) => { e.stopPropagation(); openProduct(p); }} 
                                         className="w-full mt-1 bg-green-500 text-white text-[10px] rounded-full py-1 font-bold shadow-sm"
                                      >
                                          {t('addToCart')}
@@ -379,6 +389,24 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                                 </div>
                                 <h1 className="text-lg font-bold text-gray-900 leading-tight mb-4">{selectedProduct.name}</h1>
                                 
+                                {/* SIZE SELECTOR (New) */}
+                                {selectedProduct.sizes && selectedProduct.sizes.length > 0 && (
+                                    <div className="mb-4">
+                                        <h4 className="font-bold text-sm mb-2">{t('selectSize')}</h4>
+                                        <div className="flex flex-wrap gap-2">
+                                            {selectedProduct.sizes.map(size => (
+                                                <button
+                                                    key={size}
+                                                    onClick={() => setSelectedSize(size)}
+                                                    className={`px-4 py-2 border rounded-lg text-sm font-bold transition-all ${selectedSize === size ? 'bg-black text-white border-black' : 'bg-white text-gray-600 border-gray-300 hover:border-black'}`}
+                                                >
+                                                    {size}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
                                 <div className="p-3 bg-orange-50 rounded-xl mb-4 border border-orange-100 flex items-center gap-3">
                                     <div className="bg-orange-100 p-2 rounded-full text-orange-600"><Truck size={18}/></div>
                                     <div>
@@ -420,7 +448,7 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                                             <div className="flex-1">
                                                 <div className="flex justify-between items-center mb-1">
                                                     <span className="font-bold text-xs text-gray-900">{rev.user_name}</span>
-                                                    <span className="text-[10px] text-gray-400">{new Date(rev.created_at).toLocaleDateString()}</span>
+                                                    <span className="text-[10px] text-gray-400">{new Date(rev.created_at).toLocaleDateString()}</p>
                                                 </div>
                                                 <p className="text-sm text-gray-700 bg-gray-50 p-2 rounded-lg rounded-tl-none">{rev.comment}</p>
                                             </div>
