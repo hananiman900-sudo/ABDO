@@ -51,8 +51,27 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
             const { data } = await supabase.from('provider_ad_requests').select('*, providers(name, phone)').eq('status', 'pending');
             setAdRequests(data as any || []);
         } else if (activeTab === 'STATS') {
-            const { data } = await supabase.from('providers').select('id, name, service_type, visits_count, profile_image_url').order('visits_count', { ascending: false });
-            setProviderStats(data || []);
+            // 1. Fetch Providers (Total Visits)
+            const { data: providers } = await supabase.from('providers').select('id, name, service_type, visits_count, profile_image_url').order('visits_count', { ascending: false });
+            
+            // 2. Fetch Today's Scans to calculate "Visits Today"
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const { data: todayScans } = await supabase.from('scan_history').select('provider_id').gte('created_at', today.toISOString());
+
+            // 3. Count today's visits per provider
+            const todayCounts: Record<number, number> = {};
+            todayScans?.forEach((scan: any) => {
+                todayCounts[scan.provider_id] = (todayCounts[scan.provider_id] || 0) + 1;
+            });
+
+            // 4. Merge Data
+            const mergedStats = providers?.map((p: any) => ({
+                ...p,
+                today_visits: todayCounts[p.id] || 0
+            })) || [];
+
+            setProviderStats(mergedStats);
         } else if (activeTab === 'ORDERS') {
             const { data } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
             setOrders(data as any || []);
@@ -414,12 +433,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                                          <th className="p-3 text-right">#</th>
                                          <th className="p-3 text-right">{t('provider')}</th>
                                          <th className="p-3 text-right">{t('service')}</th>
+                                         <th className="p-3 text-center text-green-600">{t('visits')}</th>
                                          <th className="p-3 text-center">{t('totalVisits')}</th>
                                      </tr>
                                  </thead>
                                  <tbody>
                                      {providerStats.length === 0 && (
-                                         <tr><td colSpan={4} className="text-center p-6 text-gray-400">No data available</td></tr>
+                                         <tr><td colSpan={5} className="text-center p-6 text-gray-400">No data available</td></tr>
                                      )}
                                      {providerStats.map((p, index) => (
                                          <tr key={p.id} className="border-t hover:bg-gray-50">
@@ -429,6 +449,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                                                  <span className="truncate max-w-[100px]">{p.name}</span>
                                              </td>
                                              <td className="p-3 text-gray-600 text-xs">{p.service_type}</td>
+                                             <td className="p-3 text-center font-bold text-green-600">+{p.today_visits || 0}</td>
                                              <td className="p-3 text-center font-black text-blue-600">{p.visits_count || 0}</td>
                                          </tr>
                                      ))}
