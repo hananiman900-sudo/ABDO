@@ -2,8 +2,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { useLocalization } from '../hooks/useLocalization';
-import { ArrowLeft, Loader2, Plus, Trash2, Edit, CheckCircle, XCircle, ShoppingBag, Users, Megaphone, Image as ImageIcon, Settings, Save, BarChart3, X } from 'lucide-react';
-import { Product, AdRequest } from '../types';
+import { ArrowLeft, Loader2, Plus, Trash2, Edit, CheckCircle, XCircle, ShoppingBag, Users, Megaphone, Image as ImageIcon, Settings, Save, BarChart3, X, FileText, Phone } from 'lucide-react';
+import { Product, AdRequest, Order } from '../types';
 
 interface AdminDashboardProps {
     isOpen: boolean;
@@ -12,7 +12,7 @@ interface AdminDashboardProps {
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
     const { t } = useLocalization();
-    const [activeTab, setActiveTab] = useState<'PRODUCTS' | 'PROVIDERS' | 'ADS' | 'STATS'>('PRODUCTS');
+    const [activeTab, setActiveTab] = useState<'PRODUCTS' | 'PROVIDERS' | 'ADS' | 'STATS' | 'ORDERS'>('PRODUCTS');
     const [loading, setLoading] = useState(false);
 
     // Products State
@@ -29,6 +29,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
 
     // Stats State
     const [providerStats, setProviderStats] = useState<any[]>([]);
+
+    // Orders State
+    const [orders, setOrders] = useState<Order[]>([]);
 
     useEffect(() => {
         if(isOpen) {
@@ -50,6 +53,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
         } else if (activeTab === 'STATS') {
             const { data } = await supabase.from('providers').select('id, name, service_type, visits_count, profile_image_url').order('visits_count', { ascending: false });
             setProviderStats(data || []);
+        } else if (activeTab === 'ORDERS') {
+            const { data } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
+            setOrders(data as any || []);
         }
         setLoading(false);
     };
@@ -164,6 +170,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
         fetchData();
     };
 
+    // --- ORDERS LOGIC ---
+    const handleUpdateOrderStatus = async (id: number, status: string) => {
+        setLoading(true);
+        await supabase.from('orders').update({ status: status }).eq('id', id);
+        fetchData();
+        setLoading(false);
+    }
+
     if(!isOpen) return null;
 
     return (
@@ -181,6 +195,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                     className={`flex-1 py-4 px-2 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'PRODUCTS' ? 'bg-white text-orange-600 border-b-2 border-orange-600' : 'text-gray-500'}`}
                 >
                     <ShoppingBag size={18}/> {t('manageProducts')}
+                </button>
+                <button 
+                    onClick={() => setActiveTab('ORDERS')}
+                    className={`flex-1 py-4 px-2 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'ORDERS' ? 'bg-white text-teal-600 border-b-2 border-teal-600' : 'text-gray-500'}`}
+                >
+                    <FileText size={18}/> {t('storeOrders')}
                 </button>
                 <button 
                     onClick={() => setActiveTab('PROVIDERS')}
@@ -268,6 +288,58 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                                 </div>
                             ))}
                         </div>
+                    </div>
+                )}
+
+                {/* ORDERS TAB */}
+                {activeTab === 'ORDERS' && (
+                    <div className="space-y-4">
+                        <div className="bg-teal-50 p-4 rounded-xl border border-teal-200">
+                             <h3 className="font-bold text-teal-800">{t('storeOrders')}</h3>
+                             <p className="text-xs text-teal-600">Review requests and contact customers.</p>
+                        </div>
+                        {orders.length === 0 && <p className="text-center text-gray-400 py-10">No orders yet.</p>}
+                        {orders.map(o => (
+                            <div key={o.id} className="bg-white p-4 rounded-xl border shadow-sm space-y-3">
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <h4 className="font-bold flex items-center gap-2">
+                                            {o.customer_details?.name || 'Unknown User'} 
+                                            <span className={`text-[10px] px-2 py-0.5 rounded-full ${o.status === 'delivered' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                                {o.status}
+                                            </span>
+                                        </h4>
+                                        <p className="text-sm text-gray-600 flex items-center gap-1 mt-1">
+                                            <Phone size={12}/> <a href={`tel:${o.customer_details?.phone}`} className="hover:underline">{o.customer_details?.phone || 'No phone'}</a>
+                                        </p>
+                                        <p className="text-[10px] text-gray-400">{new Date(o.created_at).toLocaleString()}</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <span className="font-black text-lg text-orange-600">{o.total_amount} DH</span>
+                                    </div>
+                                </div>
+                                
+                                <div className="bg-gray-50 p-3 rounded-lg text-sm border">
+                                    <ul className="space-y-1">
+                                        {o.items.map((item: any, idx: number) => (
+                                            <li key={idx} className="flex justify-between text-xs">
+                                                <span>{item.name} <span className="text-gray-500">x{item.quantity}</span></span>
+                                                <span className="font-bold">{item.price * item.quantity} DH</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+
+                                {o.status === 'pending' && (
+                                    <button 
+                                        onClick={() => handleUpdateOrderStatus(o.id, 'delivered')}
+                                        className="w-full py-2 bg-green-600 text-white rounded-lg font-bold text-xs flex items-center justify-center gap-2 hover:bg-green-700 transition-colors"
+                                    >
+                                        <CheckCircle size={14}/> {t('markDelivered')} (Connect)
+                                    </button>
+                                )}
+                            </div>
+                        ))}
                     </div>
                 )}
 

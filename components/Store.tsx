@@ -44,6 +44,23 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
         if(isOpen) fetchProducts();
     }, [isOpen]);
 
+    // LOAD CART FROM LOCAL STORAGE
+    useEffect(() => {
+        const savedCart = localStorage.getItem('tanger_cart');
+        if (savedCart) {
+            try {
+                setCart(JSON.parse(savedCart));
+            } catch (e) {
+                console.error("Failed to load cart", e);
+            }
+        }
+    }, []);
+
+    // SAVE CART TO LOCAL STORAGE
+    useEffect(() => {
+        localStorage.setItem('tanger_cart', JSON.stringify(cart));
+    }, [cart]);
+
     const fetchProducts = async () => {
         const { data } = await supabase.from('products').select('*').order('created_at', { ascending: false });
         setProducts(data || []);
@@ -78,18 +95,29 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
     const handleCheckout = async () => {
         if(!currentUser) { onOpenAuth(); return; }
         setLoading(true);
-        await supabase.from('orders').insert({
+        
+        // Include Name and Phone explicitly in customer_details for the Admin to see
+        const { error } = await supabase.from('orders').insert({
             user_id: currentUser.id,
             user_type: currentUser.accountType,
             total_amount: cart.reduce((a,b) => a + b.price * b.quantity, 0),
             items: cart,
             status: 'pending',
-            customer_details: { name: currentUser.name, phone: currentUser.phone }
+            customer_details: { 
+                name: currentUser.name, 
+                phone: currentUser.phone 
+            }
         });
-        setCart([]);
-        alert(t('orderPlaced'));
+
+        if (!error) {
+            setCart([]);
+            localStorage.removeItem('tanger_cart'); // Clear storage only on success
+            alert(t('orderPlaced'));
+            setView('catalog');
+        } else {
+            alert(t('errorMessage'));
+        }
         setLoading(false);
-        setView('catalog');
     }
 
     const addToCart = (p: Product) => {
@@ -257,12 +285,14 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                                 <div key={o.id} className="bg-white p-4 rounded-xl border shadow-sm">
                                     <div className="flex justify-between mb-2">
                                         <span className="font-bold">Order #{o.id}</span>
-                                        <span className={`text-xs px-2 py-1 rounded-full ${o.status === 'delivered' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{o.status}</span>
+                                        <span className={`text-xs px-2 py-1 rounded-full ${o.status === 'delivered' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                            {o.status === 'pending' ? 'في الانتظار' : (o.status === 'delivered' ? 'تم التسليم' : o.status)}
+                                        </span>
                                     </div>
                                     <p className="text-sm text-gray-600">{new Date(o.created_at).toLocaleDateString()}</p>
                                     <p className="font-bold text-orange-600 mt-1">{o.total_amount} DH</p>
                                     <div className="mt-2 text-xs text-gray-500">
-                                        {o.items.map((i: any) => i.name).join(', ')}
+                                        {o.items.map((i: any) => `${i.name} (x${i.quantity})`).join(', ')}
                                     </div>
                                 </div>
                             ))}

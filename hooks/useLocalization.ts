@@ -62,6 +62,7 @@ export const translations: Translations = {
   adminDashboard: { ar: 'لوحة التحكم (المدير)', en: 'Admin Dashboard', fr: 'Tableau de Bord' },
   manageProducts: { ar: 'إدارة المنتجات', en: 'Manage Products', fr: 'Gérer Produits' },
   manageProviders: { ar: 'طلبات الانخراط', en: 'Provider Requests', fr: 'Demandes Pro' },
+  storeOrders: { ar: 'طلبات المتجر', en: 'Store Orders', fr: 'Commandes' },
   pendingProviders: { ar: 'مهنيين في الانتظار', en: 'Pending Providers', fr: 'Pros en attente' },
   approve: { ar: 'قبول', en: 'Approve', fr: 'Approuver' },
   reject: { ar: 'رفض', en: 'Reject', fr: 'Rejeter' },
@@ -75,6 +76,8 @@ export const translations: Translations = {
   ranking: { ar: 'الترتيب', en: 'Ranking', fr: 'Classement' },
   updateProduct: { ar: 'تحديث المنتج', en: 'Update Product', fr: 'Mettre à jour' },
   cancelEdit: { ar: 'إلغاء التعديل', en: 'Cancel Edit', fr: 'Annuler modif' },
+  markDelivered: { ar: 'تأكيد التسليم', en: 'Confirm Delivery', fr: 'Confirmer Livraison' },
+  customerInfo: { ar: 'معلومات الزبون', en: 'Customer Info', fr: 'Infos Client' },
   
   // --- PROFILE ---
   posts: { ar: 'الخدمات', en: 'Services', fr: 'Services' },
