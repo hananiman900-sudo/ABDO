@@ -501,7 +501,7 @@ const QRScannerView: React.FC<{ providerId: number; onClose: () => void }> = ({ 
 
     return (
         <div className="fixed inset-0 bg-black/90 z-50 flex flex-col animate-fade-in items-center justify-center p-4">
-             <div className="w-full max-w-md bg-white rounded-2xl overflow-hidden relative shadow-2xl">
+             <div className="w-full max-w-lg bg-white rounded-2xl overflow-hidden relative shadow-2xl">
                  <div className="p-4 bg-black text-white flex justify-between items-center">
                     <button onClick={onClose}><ArrowLeft/></button>
                     <span className="font-bold">{t('qrScannerTitle')}</span>
@@ -522,7 +522,7 @@ const QRScannerView: React.FC<{ providerId: number; onClose: () => void }> = ({ 
                         <div className="text-center py-10"><ShieldAlert size={80} className="text-orange-500 mx-auto"/><h2 className="text-xl font-bold mt-4 text-orange-600">{t('wrongProvider')}</h2><button onClick={() => { setStatus('idle'); setScanning(true); }} className="mt-6 bg-black text-white px-6 py-2 rounded-full font-bold">Try Again</button></div>
                     ) : (
                         <>
-                            <div className="w-full aspect-square bg-black rounded-xl overflow-hidden relative">
+                            <div className="w-full aspect-square max-h-[300px] bg-black rounded-xl overflow-hidden relative">
                                 {scanning ? (
                                     <>
                                         <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover"/>
@@ -534,9 +534,9 @@ const QRScannerView: React.FC<{ providerId: number; onClose: () => void }> = ({ 
                                 )}
                             </div>
                             <div className="w-full text-center">
-                                <p className="text-sm text-gray-500 mb-4">Align QR code or upload file</p>
-                                <button onClick={() => fileRef.current?.click()} className="w-full py-3 border-2 border-dashed border-gray-300 rounded-xl font-bold text-gray-500 hover:border-black hover:text-black transition-colors flex items-center justify-center gap-2">
-                                    <Upload size={20}/> {t('uploadQRImage')}
+                                <p className="text-sm text-gray-500 mb-4">Align QR code or upload file from gallery</p>
+                                <button onClick={() => fileRef.current?.click()} className="w-full py-4 border-2 border-dashed border-gray-300 rounded-xl font-bold text-gray-500 hover:border-black hover:text-black transition-colors flex items-center justify-center gap-2 bg-gray-50">
+                                    <Upload size={24}/> {t('uploadQRImage')}
                                 </button>
                                 <input type="file" ref={fileRef} hidden accept="image/*" onChange={handleFileUpload}/>
                             </div>

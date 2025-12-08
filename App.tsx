@@ -233,7 +233,7 @@ const AuthModal: React.FC<{ isOpen: boolean; onClose: () => void; onLogin: (user
     );
 };
 
-// --- CLIENT NOTIFICATIONS DRAWER (NEW) ---
+// --- CLIENT NOTIFICATIONS DRAWER ---
 const ClientNotificationsModal: React.FC<{ isOpen: boolean; onClose: () => void; userId: number }> = ({ isOpen, onClose, userId }) => {
     const { t } = useLocalization();
     const [ads, setAds] = useState<UrgentAd[]>([]);
@@ -299,7 +299,7 @@ const ClientNotificationsModal: React.FC<{ isOpen: boolean; onClose: () => void;
     )
 }
 
-// --- PROVIDER DIRECTORY MODAL (NEW RESTORED) ---
+// --- PROVIDER DIRECTORY MODAL ---
 const ProviderDirectory: React.FC<{ isOpen: boolean; onClose: () => void; currentUser: AuthenticatedUser | null }> = ({ isOpen, onClose, currentUser }) => {
     const { t } = useLocalization();
     const [providers, setProviders] = useState<any[]>([]);
@@ -384,7 +384,7 @@ const ServicesHub: React.FC<{ onNav: (target: string) => void; isAdmin: boolean 
     );
 }
 
-// --- CLIENT EDIT PROFILE MODAL (NEW) ---
+// --- CLIENT EDIT PROFILE MODAL ---
 const EditClientProfileModal: React.FC<{ user: AuthenticatedUser; onClose: () => void; onUpdateUser: (updates: Partial<AuthenticatedUser>) => void }> = ({ user, onClose, onUpdateUser }) => {
     const { t } = useLocalization();
     const [name, setName] = useState(user.name);
@@ -444,7 +444,7 @@ const EditClientProfileModal: React.FC<{ user: AuthenticatedUser; onClose: () =>
     )
 }
 
-// --- SUGGESTED PROVIDERS CAROUSEL (NEW) ---
+// --- SUGGESTED PROVIDERS CAROUSEL ---
 const SuggestedProviders: React.FC<{ currentUser: AuthenticatedUser; onOpenProfile: (provider: any) => void }> = ({ currentUser, onOpenProfile }) => {
     const { t } = useLocalization();
     const [suggestions, setSuggestions] = useState<any[]>([]);
@@ -514,7 +514,7 @@ const ProfileTab: React.FC<{
     onLogout: () => void;
     isAdmin: boolean;
     onNav: (target: string) => void;
-    onUpdateUser: (u: Partial<AuthenticatedUser>) => void; // Passed to handle updates
+    onUpdateUser: (u: Partial<AuthenticatedUser>) => void; 
 }> = ({ user, onLogin, onLogout, isAdmin, onNav, onUpdateUser }) => {
     const { t } = useLocalization();
     const [showEdit, setShowEdit] = useState(false);
@@ -555,7 +555,7 @@ const ProfileTab: React.FC<{
 
             <div className="p-4">
                 
-                {/* SUGGESTED PROVIDERS (New Section) */}
+                {/* SUGGESTED PROVIDERS */}
                 {user.accountType === 'CLIENT' && (
                     <SuggestedProviders currentUser={user} onOpenProfile={setViewingProvider}/>
                 )}
@@ -737,7 +737,8 @@ const AppContent: React.FC = () => {
         <div className={`flex flex-col h-screen bg-white ${language === 'ar' ? 'font-arabic' : 'font-sans'}`} dir={language === 'ar' ? 'rtl' : 'ltr'}>
             
             {/* NEW CLEAN HEADER - CONDITIONAL RENDERING */}
-            {!hideBottomNav && (
+            {/* HIDE HEADER IF IN STORE TAB */}
+            {!hideBottomNav && activeTab !== 'STORE' && (
                 <div className="bg-white/90 backdrop-blur-md border-b border-gray-100 p-3 flex justify-between items-center z-20 h-16 sticky top-0 shadow-sm animate-fade-in">
                     
                     {/* Notification Bell */}
@@ -748,16 +749,11 @@ const AppContent: React.FC = () => {
                         </button>
                     </div>
 
-                    {/* Logo */}
-                    <div className="flex items-center gap-2">
-                        <div className="w-9 h-9 bg-gradient-to-tr from-blue-600 to-cyan-400 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-500/20 transform rotate-3">
-                            <Sparkles size={20} className="text-white fill-white"/>
-                        </div>
-                        <div className="flex flex-col leading-none">
-                            <h1 className="font-black text-xl tracking-tight bg-gradient-to-r from-blue-700 to-cyan-500 bg-clip-text text-transparent">
-                                Tanger<span className="font-light text-gray-400">IA</span>
-                            </h1>
-                        </div>
+                    {/* Logo - JUST TEXT AS REQUESTED */}
+                    <div className="flex items-center justify-center">
+                        <h1 className="font-black text-xl tracking-tight bg-gradient-to-r from-blue-700 to-cyan-500 bg-clip-text text-transparent">
+                            Tanger<span className="font-light text-gray-400">IA</span>
+                        </h1>
                     </div>
 
                     {/* Login Button or User Avatar */}
@@ -784,7 +780,8 @@ const AppContent: React.FC = () => {
             </div>
 
             {/* BOTTOM NAVIGATION BAR */}
-            {!hideBottomNav && (
+            {/* HIDE NAV IF IN STORE TAB OR CHAT */}
+            {!hideBottomNav && activeTab !== 'STORE' && (
                 <div className="bg-white border-t border-gray-100 pb-safe z-30 flex justify-around items-center h-16 shadow-[0_-5px_20px_-5px_rgba(0,0,0,0.05)] animate-slide-up">
                     <button onClick={() => setActiveTab('CHAT')} className={`flex flex-col items-center justify-center w-full h-full gap-1 ${activeTab === 'CHAT' ? 'text-blue-600' : 'text-gray-400'}`}>
                         <MessageCircle size={24} className={activeTab === 'CHAT' ? 'fill-blue-100' : ''} />

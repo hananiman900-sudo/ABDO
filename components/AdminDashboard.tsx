@@ -17,7 +17,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
 
     // Products State
     const [products, setProducts] = useState<Product[]>([]);
-    const [newProduct, setNewProduct] = useState({ name: '', price: '', category: 'category_clothes', description: '', image: '' });
+    const [newProduct, setNewProduct] = useState({ name: '', price: '', category: 'category_clothes', description: '', image: '', images: [] as string[] });
     const [editingProductId, setEditingProductId] = useState<number | null>(null);
     const fileRef = useRef<HTMLInputElement>(null);
 
@@ -64,7 +64,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
             price: parseFloat(newProduct.price),
             category: newProduct.category,
             description: newProduct.description,
-            image_url: newProduct.image
+            image_url: newProduct.image, // Main image
+            images: newProduct.images // Array of images
         };
 
         let error;
@@ -94,7 +95,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
             price: p.price.toString(),
             category: p.category,
             description: p.description || '',
-            image: p.image_url || ''
+            image: p.image_url || '',
+            images: p.images || []
         });
         setEditingProductId(p.id);
         // Scroll to top to see form
@@ -102,7 +104,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
     }
 
     const handleCancelEdit = () => {
-        setNewProduct({ name: '', price: '', category: 'category_clothes', description: '', image: '' });
+        setNewProduct({ name: '', price: '', category: 'category_clothes', description: '', image: '', images: [] });
         setEditingProductId(null);
     }
 
@@ -121,9 +123,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
             const fileName = `prod_${Date.now()}`;
             await supabase.storage.from('product-images').upload(fileName, file);
             const { data } = supabase.storage.from('product-images').getPublicUrl(fileName);
-            setNewProduct(prev => ({ ...prev, image: data.publicUrl }));
+            
+            // If main image is empty, set it. Otherwise add to images array
+            if (!newProduct.image) {
+                setNewProduct(prev => ({ ...prev, image: data.publicUrl }));
+            } else {
+                setNewProduct(prev => ({ ...prev, images: [...prev.images, data.publicUrl] }));
+            }
         } catch(e) {} finally { setLoading(false); }
     };
+    
+    const removeImage = (index: number) => {
+        const newImages = [...newProduct.images];
+        newImages.splice(index, 1);
+        setNewProduct(prev => ({ ...prev, images: newImages }));
+    }
 
     // --- PROVIDER LOGIC ---
     const handleApproveProvider = async (id: number) => {
@@ -212,9 +226,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                                 </div>
                                 <textarea value={newProduct.description} onChange={e => setNewProduct({...newProduct, description: e.target.value})} placeholder={t('description')} className="w-full p-2 border rounded"/>
                                 
-                                <button onClick={() => fileRef.current?.click()} className="w-full py-2 border border-dashed rounded flex items-center justify-center gap-2 text-gray-500"><ImageIcon size={18}/> {t('productImage')}</button>
+                                <button onClick={() => fileRef.current?.click()} className="w-full py-2 border border-dashed rounded flex items-center justify-center gap-2 text-gray-500"><Plus size={18}/> Add Image</button>
                                 <input type="file" ref={fileRef} hidden onChange={handleProductImageUpload} />
-                                {newProduct.image && <img src={newProduct.image} className="h-24 w-full object-cover rounded"/>}
+                                
+                                {/* Image Preview Grid */}
+                                <div className="grid grid-cols-4 gap-2">
+                                    {newProduct.image && (
+                                        <div className="relative border rounded h-16 w-full">
+                                            <img src={newProduct.image} className="h-full w-full object-cover rounded"/>
+                                            <span className="absolute bottom-0 right-0 bg-black text-white text-[9px] px-1">Main</span>
+                                        </div>
+                                    )}
+                                    {newProduct.images.map((img, idx) => (
+                                        <div key={idx} className="relative border rounded h-16 w-full group">
+                                            <img src={img} className="h-full w-full object-cover rounded"/>
+                                            <button onClick={() => removeImage(idx)} className="absolute top-0 right-0 bg-red-500 text-white p-0.5 rounded-bl"><X size={10}/></button>
+                                        </div>
+                                    ))}
+                                </div>
                                 
                                 <button onClick={handleSaveProduct} disabled={loading} className={`w-full text-white py-2 rounded font-bold ${editingProductId ? 'bg-blue-600' : 'bg-orange-600'}`}>
                                     {loading ? <Loader2 className="animate-spin mx-auto"/> : (editingProductId ? t('save') : t('save'))}

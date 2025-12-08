@@ -102,6 +102,7 @@ export const translations: Translations = {
   orderPlaced: { ar: 'تم الطلب! سنتصل بك قريبا.', en: 'Order placed!', fr: 'Commande passée !' },
   sizes: { ar: 'المقاسات', en: 'Sizes', fr: 'Tailles' },
   description: { ar: 'الوصف', en: 'Description', fr: 'Description' },
+  category_all: { ar: 'الكل', en: 'All', fr: 'Tout' },
   category_clothes: { ar: 'ملابس', en: 'Clothing', fr: 'Vêtements' },
   category_electronics: { ar: 'إلكترونيات', en: 'Electronics', fr: 'Électronique' },
   category_accessories: { ar: 'أكسسوارات', en: 'Accessories', fr: 'Accessoires' },
@@ -113,6 +114,10 @@ export const translations: Translations = {
   addProduct: { ar: 'إضافة منتج', en: 'Add Product', fr: 'Ajouter Produit' },
   adminPanel: { ar: 'الإدارة', en: 'Admin', fr: 'Admin' },
   adRequests: { ar: 'طلبات الإشهار', en: 'Ad Requests', fr: 'Demandes Pub' },
+  myOrders: { ar: 'طلباتي', en: 'My Orders', fr: 'Mes Commandes' },
+  orderStatus: { ar: 'حالة الطلب', en: 'Order Status', fr: 'Statut' },
+  reviews: { ar: 'التعليقات', en: 'Reviews', fr: 'Avis' },
+  addReview: { ar: 'أضف تعليق', en: 'Add Review', fr: 'Ajouter avis' },
   
   // --- CHATBOT ---
   inputPlaceholder: { ar: 'كتب رسالة...', en: 'Type a message...', fr: 'Écrivez un message...' },

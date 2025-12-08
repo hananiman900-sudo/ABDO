@@ -31,7 +31,27 @@ export interface SystemAnnouncement { id: number; title: string; message: string
 export interface AppointmentForDisplay { id: number; created_at: string; providers: { name: string; service_type: string; location: string; }; }
 export interface ProviderService { id: number; provider_id: number; name: string; price: number; discount_price?: number; }
 export interface ProviderNotification { id: number; provider_id: number; message: string; created_at: string; is_read: boolean; type: 'BOOKING' | 'SYSTEM' | 'FOLLOW'; status: 'pending' | 'completed'; booking_id?: number; client_details?: any; }
-export interface Product { id: number; name: string; description: string; price: number; image_url: string; category: string; images?: string[]; sizes?: string[]; created_at: string; }
+
+export interface Product { 
+    id: number; 
+    name: string; 
+    description: string; 
+    price: number; 
+    image_url: string; 
+    images?: string[]; // Multiple images
+    category: string; 
+    sizes?: string[]; 
+    created_at: string; 
+}
+
+export interface ProductReview {
+    id: number;
+    product_id: number;
+    user_name: string;
+    comment: string;
+    created_at: string;
+}
+
 export interface Category { id: number; name: string; created_at: string; }
 export interface CartItem extends Product { quantity: number; selectedSize?: string; note?: string; }
 export interface Order { id: number; user_id: number; user_type: string; total_amount: number; status: 'pending' | 'delivered' | 'cancelled'; items: CartItem[]; customer_details?: { name: string; phone: string; }; created_at: string; }
