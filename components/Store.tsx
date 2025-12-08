@@ -10,9 +10,10 @@ interface StoreProps {
     onClose: () => void;
     currentUser: AuthenticatedUser | null;
     onOpenAuth: () => void;
+    onGoToProfile: () => void; // New prop for navigation
 }
 
-const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth }) => {
+const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth, onGoToProfile }) => {
     const { t } = useLocalization();
     const [products, setProducts] = useState<Product[]>([]);
     const [cart, setCart] = useState<CartItem[]>([]);
@@ -174,11 +175,11 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth 
                             {cart.length > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center border border-white font-bold">{cart.length}</span>}
                         </button>
 
-                        {/* User Avatar (New) */}
+                        {/* User Avatar (New) - CLICKABLE TO GO TO PROFILE */}
                         {currentUser && (
-                            <div className="w-8 h-8 rounded-full overflow-hidden border border-gray-200 ml-1">
+                            <button onClick={onGoToProfile} className="w-8 h-8 rounded-full overflow-hidden border border-gray-200 ml-1">
                                 <img src={currentUser.profile_image_url || `https://ui-avatars.com/api/?name=${currentUser.name}`} className="w-full h-full object-cover"/>
-                            </div>
+                            </button>
                         )}
                     </div>
                 </div>
@@ -312,11 +313,11 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth 
                                     <ShoppingCart size={18}/>
                                     {cart.length > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold">{cart.length}</span>}
                                 </button>
-                                {/* User Avatar in Details Header too */}
+                                {/* User Avatar in Details Header too - CLICKABLE */}
                                 {currentUser && (
-                                    <div className="w-8 h-8 rounded-full overflow-hidden border border-gray-200">
+                                    <button onClick={onGoToProfile} className="w-8 h-8 rounded-full overflow-hidden border border-gray-200">
                                         <img src={currentUser.profile_image_url || `https://ui-avatars.com/api/?name=${currentUser.name}`} className="w-full h-full object-cover"/>
-                                    </div>
+                                    </button>
                                 )}
                             </div>
                         </div>
@@ -389,7 +390,7 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth 
                                             <div className="flex-1">
                                                 <div className="flex justify-between items-center mb-1">
                                                     <span className="font-bold text-xs text-gray-900">{rev.user_name}</span>
-                                                    <span className="text-[10px] text-gray-400">{new Date(rev.created_at).toLocaleDateString()}</p>
+                                                    <span className="text-[10px] text-gray-400">{new Date(rev.created_at).toLocaleDateString()}</span>
                                                 </div>
                                                 <p className="text-sm text-gray-700 bg-gray-50 p-2 rounded-lg rounded-tl-none">{rev.comment}</p>
                                             </div>
