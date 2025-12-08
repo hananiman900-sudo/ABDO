@@ -89,26 +89,35 @@ export const getChatResponse = async (
         const apiKey = shuffledKeys[i];
         
         try {
-            // console.log(`[AI System] Attempting with Key ID: ...${apiKey.slice(-4)}`);
-            
+            // Add a small delay for retries (except the first attempt) to avoid hitting Google's rate limiter too hard
+            if (i > 0) {
+                await new Promise(resolve => setTimeout(resolve, 1500));
+            }
+
             const ai = new GoogleGenAI({ apiKey });
+            
+            // Note: Safety settings are implicit in the new SDK or handled via config if available.
+            // We use standard generation here.
             const response = await ai.models.generateContent({
                 model: "gemini-2.5-flash",
                 contents: contents,
-                config: { systemInstruction },
+                config: { 
+                    systemInstruction,
+                    temperature: 0.7, // Add temperature for more stable responses
+                },
             });
             
             // If successful, return immediately
             return response.text; 
 
         } catch (error: any) {
-            console.warn(`[AI System] Key failed. Trying next...`, error.message);
+            console.warn(`[AI System] Key ${i+1}/${shuffledKeys.length} failed.`, error.message);
             
             // If this was the last key to try, return error
             if (i === shuffledKeys.length - 1) {
                 return "⚠️ Server Busy: All AI models are currently at capacity. Please try again in a few seconds.";
             }
-            // Otherwise loop continues to next key
+            // Otherwise loop continues to next key after a delay
         }
     }
     return "Error: Connection failure.";
