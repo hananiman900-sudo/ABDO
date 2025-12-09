@@ -72,13 +72,12 @@ export const getChatResponse = async (
     const contents = [...history, { role: 'user', parts: userParts }];
 
     try {
-        // Use the API Key from the environment variable directly
-        // Safely access via window.process because process.env might be replaced by bundlers
-        const apiKey = (window as any).process?.env?.API_KEY || process.env.API_KEY;
+        // DIRECTLY USING THE PROVIDED API KEY TO PREVENT CONNECTION ERRORS
+        const apiKey = 'AIzaSyBg9Hh-7meYh_EEyGoEtkiIKtOic2P86vg';
 
         if (!apiKey) {
-            console.error("API Key is missing from window.process.env");
-            return "⚠️ عذراً، مفتاح API غير موجود. يرجى إعداده.";
+            console.error("API Key is missing");
+            return "⚠️ عذراً، مفتاح API غير موجود.";
         }
         
         const ai = new GoogleGenAI({ apiKey });
@@ -95,7 +94,7 @@ export const getChatResponse = async (
         return response.text || "No response generated."; 
 
     } catch (error: any) {
-        console.error("AI Error:", error);
-        return "⚠️ عذراً، هناك مشكلة في الاتصال بالخادم. يرجى التحقق من مفتاح API.";
+        console.error("AI Error Detailed:", error);
+        return `⚠️ عذراً، هناك مشكلة في الاتصال بالخادم. (Error: ${error.message || 'Unknown'})`;
     }
 };
