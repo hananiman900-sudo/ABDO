@@ -447,8 +447,8 @@ const ProviderPortal: React.FC<{ provider: AuthenticatedUser; onLogout: () => vo
                 
                 {/* GRID ITEMS */}
                 <div className="grid grid-cols-3 gap-0.5 mt-0.5">
-                    {/* NEW AI CONFIG BUTTON */}
-                    <GridItem icon={BrainCircuit} label="إعدادات الذكاء" onClick={() => setView('ai_config')} color="bg-purple-50 hover:bg-purple-100 text-purple-700"/>
+                    {/* FIXED: Using solid dark purple background to ensure text-white works correctly */}
+                    <GridItem icon={BrainCircuit} label="إعدادات الذكاء" onClick={() => setView('ai_config')} color="bg-purple-600 hover:bg-purple-700"/>
 
                     {isAdmin && <GridItem icon={ShieldAlert} label="الإدارة (Admin)" onClick={handleAdminClick} badge={0} color="bg-red-600 hover:bg-red-700" />}
                     <GridItem icon={QrCode} label={t('qrScannerTitle')} onClick={() => setView('scan')}/>

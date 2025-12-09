@@ -48,12 +48,28 @@ const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({ appointmentId, bookingDat
 
   const handleDownload = () => {
     if (!qrCodeUrl) return;
-    const link = document.createElement('a');
-    link.href = qrCodeUrl;
-    link.download = `appointment-${appointmentId}.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+        // Create a blob to be safer for webviews than long data URIs
+        fetch(qrCodeUrl)
+            .then(res => res.blob())
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `appointment-${appointmentId}.png`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                window.URL.revokeObjectURL(url);
+            })
+            .catch(e => {
+                console.error("Download failed", e);
+                alert("Please long press the image to save it.");
+            });
+    } catch (e) {
+        console.error("Download trigger error", e);
+        alert("Please long press the image to save it.");
+    }
   };
 
   if (isLoading) {
@@ -66,12 +82,21 @@ const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({ appointmentId, bookingDat
 
   return (
     <div className="flex flex-col items-center">
-      <img src={qrCodeUrl} alt="Appointment QR Code" className="w-48 h-48 mx-auto" />
+      <div className="bg-white p-2 rounded-xl shadow-sm border border-gray-100">
+          <img src={qrCodeUrl} alt="Appointment QR Code" className="w-48 h-48 mx-auto" />
+      </div>
+      
+      {/* Visual Instruction for Mobile App Users */}
+      <p className="text-[10px] text-gray-500 mt-2 text-center">
+        اضغط مطولاً على الصورة لحفظها <br/>
+        (Long press to save)
+      </p>
+
       <button
         onClick={handleDownload}
-        className="mt-4 flex items-center gap-2 px-4 py-2 bg-secondary text-white rounded-lg hover:bg-primary transition-colors"
+        className="mt-3 flex items-center gap-2 px-4 py-2 bg-secondary text-white rounded-lg hover:bg-primary transition-colors text-xs font-bold"
       >
-        <Download size={18} />
+        <Download size={16} />
         {t('downloadQR')}
       </button>
     </div>
