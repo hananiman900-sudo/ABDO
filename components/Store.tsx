@@ -11,9 +11,10 @@ interface StoreProps {
     currentUser: AuthenticatedUser | null;
     onOpenAuth: () => void;
     onGoToProfile: () => void; // New prop for navigation
+    notify: (msg: string, type: 'success' | 'error') => void; // New Prop
 }
 
-const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth, onGoToProfile }) => {
+const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth, onGoToProfile, notify }) => {
     const { t } = useLocalization();
     const [products, setProducts] = useState<Product[]>([]);
     const [cart, setCart] = useState<CartItem[]>([]);
@@ -115,10 +116,10 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
         if (!error) {
             setCart([]);
             localStorage.removeItem('tanger_cart'); // Clear storage only on success
-            alert(t('orderPlaced'));
+            notify(t('orderPlaced'), 'success');
             setView('catalog');
         } else {
-            alert(t('errorMessage'));
+            notify(t('errorMessage'), 'error');
         }
         setLoading(false);
     }
@@ -126,7 +127,7 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
     const addToCart = (p: Product) => {
         // Validation for Size
         if (p.sizes && p.sizes.length > 0 && !selectedSize) {
-            alert(t('selectSize'));
+            notify(t('selectSize'), 'error');
             return;
         }
 
@@ -136,7 +137,7 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
             if(ex) return prev.map(i => (i.id === p.id && i.selectedSize === selectedSize) ? {...i, quantity: i.quantity + 1} : i);
             return [...prev, {...p, quantity: 1, selectedSize: selectedSize || undefined}];
         });
-        alert(t('addToCart'));
+        notify(t('addToCart'), 'success');
     }
 
     const handleSubmitReview = async () => {

@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { AuthenticatedUser, JobPost, JobComment } from '../types';
-import { Briefcase, MapPin, Phone, Plus, X, User, Heart, MessageCircle, FileText, CheckCircle2, UserPlus, Filter, Search, Clock, Send, Image as ImageIcon, Loader2, ArrowLeft, Building2, Banknote, Calendar } from 'lucide-react';
+import { Briefcase, MapPin, Phone, Plus, X, User, Heart, MessageCircle, FileText, CheckCircle2, UserPlus, Filter, Search, Clock, Send, Image as ImageIcon, Loader2, ArrowLeft, Building2, Banknote, Calendar, ChevronRight, Share2, Globe } from 'lucide-react';
 import { useLocalization } from '../hooks/useLocalization';
 
 // --- DRAGGABLE FAB COMPONENT ---
@@ -75,7 +75,7 @@ const DraggableFab = ({ onClick }: { onClick: () => void }) => {
 };
 
 
-export const JobBoard: React.FC<{ isOpen: boolean; onClose: () => void; currentUser: AuthenticatedUser | null }> = ({ isOpen, onClose, currentUser }) => {
+export const JobBoard: React.FC<{ isOpen: boolean; onClose: () => void; currentUser: AuthenticatedUser | null; notify?: (msg: string, type: 'success'|'error') => void }> = ({ isOpen, onClose, currentUser, notify }) => {
     const { t, language } = useLocalization();
     const [activeTab, setActiveTab] = useState<'OFFERS' | 'TALENT'>('OFFERS');
     const [jobs, setJobs] = useState<JobPost[]>([]);
@@ -85,15 +85,20 @@ export const JobBoard: React.FC<{ isOpen: boolean; onClose: () => void; currentU
     const [showPostTypeSelection, setShowPostTypeSelection] = useState(false);
     const [newJob, setNewJob] = useState({ title: '', description: '', skills: '', contact: currentUser?.phone || '', category: 'cat_other', post_type: 'EMPLOYER', image_url: '', salary: '' });
     
+    // Detail View State
+    const [selectedJob, setSelectedJob] = useState<JobPost | null>(null);
+
     // Filters
     const [categoryFilter, setCategoryFilter] = useState('ALL');
     const [loading, setLoading] = useState(false);
     
     // Comments
-    const [activeCommentJobId, setActiveCommentJobId] = useState<number | null>(null);
     const [comments, setComments] = useState<JobComment[]>([]);
     const [newComment, setNewComment] = useState('');
     const [commentLoading, setCommentLoading] = useState(false);
+
+    // Likes
+    const [userLikes, setUserLikes] = useState<number[]>([]);
 
     // Image Upload
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -103,12 +108,17 @@ export const JobBoard: React.FC<{ isOpen: boolean; onClose: () => void; currentU
         'cat_security', 'cat_nurse', 'cat_med_assistant', 'cat_reception', 'cat_services', 'cat_accountant', 'cat_other'
     ];
 
+    // Helper for Notifications
+    const showMessage = (msg: string, type: 'success' | 'error' = 'success') => {
+        if(notify) notify(msg, type);
+        else alert(msg);
+    }
+
     useEffect(() => { 
         if (isOpen) {
-            // Default load
             fetchJobs();
         }
-    }, [isOpen]);
+    }, [isOpen, currentUser]);
 
     const fetchJobs = async () => {
         try {
@@ -127,6 +137,14 @@ export const JobBoard: React.FC<{ isOpen: boolean; onClose: () => void; currentU
                 }));
                 setJobs(formattedJobs);
             }
+
+            // Fetch Likes for this user
+            if (currentUser) {
+                const { data: likesData } = await supabase.from('job_likes').select('job_id').eq('user_id', currentUser.id);
+                if (likesData) {
+                    setUserLikes(likesData.map((l: any) => l.job_id));
+                }
+            }
         } catch(e) {
             console.log("Error fetching jobs", e);
         } finally {
@@ -135,7 +153,7 @@ export const JobBoard: React.FC<{ isOpen: boolean; onClose: () => void; currentU
     };
 
     const handleStartPost = () => {
-        if (!currentUser) return alert(t('loginRequired'));
+        if (!currentUser) return showMessage(t('loginRequired'), 'error');
         setShowPostTypeSelection(true);
     }
 
@@ -146,10 +164,9 @@ export const JobBoard: React.FC<{ isOpen: boolean; onClose: () => void; currentU
     }
 
     const handlePost = async () => {
-        if (!currentUser) return alert(t('loginRequired'));
+        if (!currentUser) return showMessage(t('loginRequired'), 'error');
         const skillsArray = newJob.skills.split(',').map(s => s.trim());
         
-        // Append Salary to description if needed, or store separate if DB supports it (using description for now to be safe)
         let finalDescription = newJob.description;
         if(newJob.salary) finalDescription += `\n\n💰 Salary: ${newJob.salary}`;
 
@@ -168,9 +185,9 @@ export const JobBoard: React.FC<{ isOpen: boolean; onClose: () => void; currentU
         if (!error) { 
             setIsPosting(false); 
             fetchJobs(); 
-            alert(t('success'));
+            showMessage(t('success'), 'success');
         } else {
-            alert(t('errorMessage') + (error.message ? `: ${error.message}` : ''));
+            showMessage(t('errorMessage'), 'error');
         }
     };
 
@@ -187,39 +204,52 @@ export const JobBoard: React.FC<{ isOpen: boolean; onClose: () => void; currentU
             const { data } = supabase.storage.from('announcement-images').getPublicUrl(fileName);
             setNewJob(prev => ({ ...prev, image_url: data.publicUrl }));
         } catch (e) {
-            alert(t('uploadError'));
+            showMessage(t('uploadError'), 'error');
         } finally {
             setImageLoading(false);
         }
     };
 
-    const handleLike = async (id: number) => {
-        setJobs(prev => prev.map(j => j.id === id ? { ...j, likes: (j.likes || 0) + 1 } : j));
-        const { data } = await supabase.from('job_posts').select('likes').eq('id', id).single();
-        if(data) {
-             await supabase.from('job_posts').update({ likes: (data.likes || 0) + 1 }).eq('id', id);
+    // --- NEW LIKE LOGIC: ONE PER USER ---
+    const handleLike = async (e: React.MouseEvent, id: number) => {
+        e.stopPropagation(); // Prevent opening detail view
+        if(!currentUser) return showMessage(t('loginRequired'), 'error');
+
+        const isLiked = userLikes.includes(id);
+        const currentLikes = jobs.find(j => j.id === id)?.likes || 0;
+        const newCount = isLiked ? Math.max(0, currentLikes - 1) : currentLikes + 1;
+
+        // Optimistic Update
+        setJobs(prev => prev.map(j => j.id === id ? { ...j, likes: newCount } : j));
+        setUserLikes(prev => isLiked ? prev.filter(lid => lid !== id) : [...prev, id]);
+
+        if (isLiked) {
+             // Unlike
+             await supabase.from('job_likes').delete().match({ user_id: currentUser.id, job_id: id });
+             await supabase.from('job_posts').update({ likes: newCount }).eq('id', id);
+        } else {
+             // Like
+             await supabase.from('job_likes').insert({ user_id: currentUser.id, job_id: id });
+             await supabase.from('job_posts').update({ likes: newCount }).eq('id', id);
         }
     };
 
-    const toggleComments = async (jobId: number) => {
-        if (activeCommentJobId === jobId) {
-            setActiveCommentJobId(null);
-        } else {
-            setActiveCommentJobId(jobId);
-            setCommentLoading(true);
-            const { data } = await supabase.from('job_comments').select('*').eq('job_id', jobId).order('created_at', { ascending: true });
-            setComments(data || []);
-            setCommentLoading(false);
-        }
+    // Open Detail View & Fetch Comments
+    const openJobDetails = async (job: JobPost) => {
+        setSelectedJob(job);
+        setCommentLoading(true);
+        const { data } = await supabase.from('job_comments').select('*').eq('job_id', job.id).order('created_at', { ascending: true });
+        setComments(data || []);
+        setCommentLoading(false);
     }
 
-    const submitComment = async (jobId: number) => {
-        if(!currentUser || !newComment.trim()) return;
+    const submitComment = async () => {
+        if(!currentUser || !newComment.trim() || !selectedJob) return;
         setCommentLoading(true);
         
         // 1. Insert
         const { error } = await supabase.from('job_comments').insert({
-            job_id: jobId,
+            job_id: selectedJob.id,
             user_name: currentUser.name,
             comment: newComment
         });
@@ -228,12 +258,12 @@ export const JobBoard: React.FC<{ isOpen: boolean; onClose: () => void; currentU
             setNewComment('');
             
             // 2. Refresh Comments List
-            const { data } = await supabase.from('job_comments').select('*').eq('job_id', jobId).order('created_at', { ascending: true });
+            const { data } = await supabase.from('job_comments').select('*').eq('job_id', selectedJob.id).order('created_at', { ascending: true });
             setComments(data || []);
 
             // 3. Update Job List Count Locally
             setJobs(prev => prev.map(job => 
-                job.id === jobId ? { ...job, comments_count: (job.comments_count || 0) + 1 } : job
+                job.id === selectedJob.id ? { ...job, comments_count: (job.comments_count || 0) + 1 } : job
             ));
         }
         setCommentLoading(false);
@@ -247,7 +277,7 @@ export const JobBoard: React.FC<{ isOpen: boolean; onClose: () => void; currentU
         return typeMatch && catMatch;
     });
 
-    // Calculate Category Counts based on Active Tab - SAFE CHECK ADDED
+    // Calculate Category Counts based on Active Tab
     const currentTabJobs = safeJobs.filter(j => activeTab === 'OFFERS' ? j.post_type === 'EMPLOYER' : j.post_type === 'SEEKER');
     const categoryCounts = categories.reduce((acc, curr) => {
         acc[curr] = currentTabJobs.filter(j => j.category === curr).length;
@@ -270,7 +300,7 @@ export const JobBoard: React.FC<{ isOpen: boolean; onClose: () => void; currentU
 
     return (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-0 md:p-4">
-            <div className="bg-gray-100 dark:bg-gray-900 w-full h-full md:h-[90vh] md:max-w-4xl md:rounded-3xl flex flex-col overflow-hidden animate-slide-up relative">
+            <div className="bg-gray-100 dark:bg-gray-900 w-full h-full md:h-[90vh] md:max-w-6xl md:rounded-3xl flex flex-col overflow-hidden animate-slide-up relative">
                 
                 {/* 1. Header & Navigation */}
                 <div className="bg-white dark:bg-gray-800 shadow-sm z-20">
@@ -284,7 +314,7 @@ export const JobBoard: React.FC<{ isOpen: boolean; onClose: () => void; currentU
                         <button onClick={onClose}><X className="dark:text-white"/></button>
                     </div>
 
-                    {!isPosting && (
+                    {!isPosting && !selectedJob && (
                         <>
                             {/* Main Tabs */}
                             <div className="flex">
@@ -331,9 +361,9 @@ export const JobBoard: React.FC<{ isOpen: boolean; onClose: () => void; currentU
                 </div>
 
                 {/* 2. Main Content Feed */}
-                <div className="flex-1 overflow-y-auto bg-gray-100 dark:bg-gray-900 p-4 relative">
-                    {!isPosting ? (
-                        <>
+                <div className="flex-1 overflow-y-auto bg-gray-100 dark:bg-gray-900 relative">
+                    {!isPosting && !selectedJob && (
+                        <div className="p-4">
                             {loading ? (
                                 <div className="flex justify-center py-20"><Loader2 className="animate-spin text-gray-400" size={32}/></div>
                             ) : filteredJobs.length === 0 ? (
@@ -344,7 +374,11 @@ export const JobBoard: React.FC<{ isOpen: boolean; onClose: () => void; currentU
                             ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-20">
                                     {filteredJobs.map(job => (
-                                        <div key={job.id} className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-md transition-shadow flex flex-col">
+                                        <div 
+                                            key={job.id} 
+                                            onClick={() => openJobDetails(job)}
+                                            className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-md transition-all cursor-pointer group"
+                                        >
                                             
                                             {/* Card Header */}
                                             <div className="p-4 flex items-start justify-between">
@@ -357,7 +391,7 @@ export const JobBoard: React.FC<{ isOpen: boolean; onClose: () => void; currentU
                                                         )}
                                                     </div>
                                                     <div>
-                                                        <h4 className="font-bold dark:text-white line-clamp-1">{job.title}</h4>
+                                                        <h4 className="font-bold dark:text-white line-clamp-1 group-hover:text-blue-600 transition-colors">{job.title}</h4>
                                                         <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
                                                             {job.user_name} • <Clock size={10}/> {formatTime(job.created_at)}
                                                         </p>
@@ -372,7 +406,7 @@ export const JobBoard: React.FC<{ isOpen: boolean; onClose: () => void; currentU
 
                                             {/* Description & Metadata */}
                                             <div className="px-4 pb-2 flex-1">
-                                                <p className="text-sm text-gray-600 dark:text-gray-300 mb-3 line-clamp-3 whitespace-pre-line">{job.description}</p>
+                                                <p className="text-sm text-gray-600 dark:text-gray-300 mb-3 line-clamp-2 whitespace-pre-line">{job.description}</p>
                                                 
                                                 {/* Skills Chips */}
                                                 {job.skills && job.skills.length > 0 && (
@@ -389,53 +423,20 @@ export const JobBoard: React.FC<{ isOpen: boolean; onClose: () => void; currentU
 
                                             {/* Footer Actions */}
                                             <div className="p-3 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex items-center justify-between">
-                                                <div className="flex gap-3 text-gray-400">
-                                                     <button onClick={() => handleLike(job.id)} className="flex items-center gap-1 hover:text-red-500">
-                                                         <Heart size={16} className={job.likes ? "fill-red-500 text-red-500" : ""}/> 
-                                                         <span className="text-xs">{job.likes || 0}</span>
+                                                <div className="flex gap-4 text-gray-400">
+                                                     <button onClick={(e) => handleLike(e, job.id)} className="flex items-center gap-1 hover:scale-110 transition-transform">
+                                                         <Heart size={18} className={userLikes.includes(job.id) ? "fill-red-500 text-red-500" : ""}/> 
+                                                         <span className="text-xs font-bold">{job.likes || 0}</span>
                                                      </button>
-                                                     <button onClick={() => toggleComments(job.id)} className="flex items-center gap-1 hover:text-blue-500 text-gray-500">
-                                                         <MessageCircle size={16}/>
+                                                     <div className="flex items-center gap-1 text-gray-500">
+                                                         <MessageCircle size={18}/>
                                                          <span className="text-xs font-bold">{job.comments_count || 0}</span>
-                                                     </button>
+                                                     </div>
                                                 </div>
-                                                <a 
-                                                    href={`https://wa.me/${job.contact_phone?.replace(/\s/g, '').replace(/^0/, '212')}?text=Hello, I saw your post on TangerConnect for: ${job.title}`} 
-                                                    target="_blank" 
-                                                    rel="noreferrer"
-                                                    className={`px-4 py-2 rounded-full text-xs font-bold text-white shadow-sm flex items-center gap-2 ${job.post_type === 'EMPLOYER' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'}`}
-                                                >
-                                                    <Send size={12}/> {job.post_type === 'EMPLOYER' ? t('applyWhatsApp') : t('hireWhatsApp')}
-                                                </a>
+                                                <span className="text-xs text-blue-600 font-bold flex items-center gap-1">
+                                                    View Details <ChevronRight size={14}/>
+                                                </span>
                                             </div>
-
-                                            {/* Inline Comments */}
-                                            {activeCommentJobId === job.id && (
-                                                <div className="p-4 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 animate-fade-in">
-                                                    <div className="max-h-40 overflow-y-auto space-y-2 mb-3 bg-gray-50 dark:bg-gray-900/50 p-2 rounded-lg">
-                                                        {comments.map(c => (
-                                                            <div key={c.id} className="text-xs border-b border-gray-100 dark:border-gray-700 last:border-0 pb-1">
-                                                                <span className="font-bold dark:text-white mr-2">{c.user_name}:</span>
-                                                                <span className="text-gray-600 dark:text-gray-400">{c.comment}</span>
-                                                            </div>
-                                                        ))}
-                                                        {comments.length === 0 && !commentLoading && <p className="text-xs text-gray-400 italic text-center py-2">No comments yet. Be the first!</p>}
-                                                        {commentLoading && <div className="flex justify-center"><Loader2 size={16} className="animate-spin text-gray-400"/></div>}
-                                                    </div>
-                                                    <div className="flex gap-2">
-                                                        <input 
-                                                            value={newComment}
-                                                            onChange={e => setNewComment(e.target.value)}
-                                                            placeholder={t('writeComment')}
-                                                            className="flex-1 bg-gray-100 dark:bg-gray-700 rounded-lg px-3 py-2 text-xs outline-none dark:text-white"
-                                                            onKeyPress={(e) => e.key === 'Enter' && newComment.trim() && submitComment(job.id)}
-                                                        />
-                                                        <button onClick={() => submitComment(job.id)} disabled={!newComment.trim() || commentLoading} className="bg-blue-500 text-white p-2 rounded-lg">
-                                                            {commentLoading ? <Loader2 size={14} className="animate-spin"/> : <Send size={14}/>}
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            )}
                                         </div>
                                     ))}
                                 </div>
@@ -443,10 +444,139 @@ export const JobBoard: React.FC<{ isOpen: boolean; onClose: () => void; currentU
 
                             {/* DRAGGABLE FAB BUTTON */}
                             <DraggableFab onClick={handleStartPost} />
-                        </>
-                    ) : (
-                        /* VIEW 3: CREATE POST FORM */
-                        <div className="max-w-md mx-auto py-4">
+                        </div>
+                    )}
+
+                    {/* VIEW 3: FULL SCREEN DETAILS (Responsive Modal) */}
+                    {selectedJob && (
+                        <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-0 md:p-6 animate-fade-in">
+                            <div className="bg-white dark:bg-gray-900 w-full h-full md:max-w-2xl md:h-auto md:max-h-[85vh] md:rounded-3xl flex flex-col shadow-2xl relative overflow-hidden">
+                                
+                                {/* Details Header */}
+                                <div className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 p-3 flex items-center gap-3">
+                                    <button onClick={() => setSelectedJob(null)} className="p-2 bg-gray-100 dark:bg-gray-700 rounded-full hover:bg-gray-200 transition-colors">
+                                        <ArrowLeft size={20} className="dark:text-white"/>
+                                    </button>
+                                    <h3 className="font-bold text-lg dark:text-white truncate flex-1">{selectedJob.title}</h3>
+                                    <button onClick={(e) => handleLike(e, selectedJob.id)} className="p-2 bg-gray-100 dark:bg-gray-700 rounded-full hover:bg-gray-200">
+                                        <Heart size={20} className={userLikes.includes(selectedJob.id) ? "fill-red-500 text-red-500" : "text-gray-500"}/>
+                                    </button>
+                                </div>
+
+                                <div className="flex-1 overflow-y-auto pb-20 bg-gray-50 dark:bg-gray-900">
+                                    {/* Hero Section */}
+                                    <div className="bg-white dark:bg-gray-800 p-6 mb-2 border-b dark:border-gray-700">
+                                        <div className="flex flex-col items-center text-center mb-4">
+                                            <div className={`w-20 h-20 rounded-2xl flex items-center justify-center text-white font-bold text-3xl mb-3 shadow-lg ${selectedJob.post_type === 'EMPLOYER' ? 'bg-blue-600' : 'bg-green-600'}`}>
+                                                {selectedJob.image_url ? (
+                                                    <img src={selectedJob.image_url} className="w-full h-full object-cover rounded-2xl"/>
+                                                ) : (
+                                                    selectedJob.user_name?.charAt(0).toUpperCase()
+                                                )}
+                                            </div>
+                                            <h1 className="text-2xl font-black dark:text-white mb-1">{selectedJob.title}</h1>
+                                            <p className="text-sm text-gray-500 dark:text-gray-400 font-bold">{selectedJob.user_name}</p>
+                                            <div className="flex gap-2 mt-3">
+                                                <span className={`px-3 py-1 rounded-full text-xs font-bold ${selectedJob.post_type === 'EMPLOYER' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
+                                                    {selectedJob.post_type === 'EMPLOYER' ? t('iamHiring') : t('iamLooking')}
+                                                </span>
+                                                {selectedJob.category && <span className="px-3 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">{t(selectedJob.category)}</span>}
+                                            </div>
+                                        </div>
+                                        
+                                        {/* Stats Row */}
+                                        <div className="flex justify-around border-t border-b border-gray-100 dark:border-gray-700 py-4">
+                                            <div className="text-center">
+                                                <span className="block font-bold text-lg dark:text-white">{selectedJob.likes || 0}</span>
+                                                <span className="text-xs text-gray-400">Likes</span>
+                                            </div>
+                                            <div className="text-center">
+                                                <span className="block font-bold text-lg dark:text-white">{comments.length}</span>
+                                                <span className="text-xs text-gray-400">Comments</span>
+                                            </div>
+                                            <div className="text-center">
+                                                <span className="block font-bold text-lg dark:text-white">{formatTime(selectedJob.created_at)}</span>
+                                                <span className="text-xs text-gray-400">Posted</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Content */}
+                                    <div className="p-4 space-y-4">
+                                        <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+                                            <h4 className="font-bold mb-2 dark:text-white flex items-center gap-2"><FileText size={18}/> {t('description')}</h4>
+                                            <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line leading-relaxed">
+                                                {selectedJob.description}
+                                            </p>
+                                        </div>
+
+                                        {selectedJob.skills && selectedJob.skills.length > 0 && (
+                                            <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+                                                <h4 className="font-bold mb-3 dark:text-white flex items-center gap-2"><CheckCircle2 size={18}/> {t('skillsPlaceholder')}</h4>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {selectedJob.skills.map((s, i) => (
+                                                        <span key={i} className="px-3 py-1.5 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg text-sm font-medium">
+                                                            {s}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Comments Section */}
+                                        <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm mb-20 border border-gray-100 dark:border-gray-700">
+                                            <h4 className="font-bold mb-4 dark:text-white flex items-center gap-2">
+                                                <MessageCircle size={18}/> Comments ({comments.length})
+                                            </h4>
+                                            <div className="space-y-4 mb-4">
+                                                {comments.map(c => (
+                                                    <div key={c.id} className="flex gap-3">
+                                                        <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center font-bold text-xs shrink-0">
+                                                            {c.user_name.charAt(0)}
+                                                        </div>
+                                                        <div className="flex-1 bg-gray-50 dark:bg-gray-900 p-3 rounded-2xl rounded-tl-none">
+                                                            <p className="text-xs font-bold text-gray-900 dark:text-white mb-1">{c.user_name}</p>
+                                                            <p className="text-sm text-gray-700 dark:text-gray-300">{c.comment}</p>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                                {comments.length === 0 && <p className="text-center text-gray-400 text-sm py-4">No comments yet.</p>}
+                                            </div>
+                                            
+                                            <div className="flex gap-2 items-center">
+                                                <input 
+                                                    value={newComment}
+                                                    onChange={e => setNewComment(e.target.value)}
+                                                    placeholder={t('writeComment')}
+                                                    className="flex-1 bg-gray-100 dark:bg-gray-700 rounded-full px-4 py-3 text-sm outline-none dark:text-white border border-transparent focus:border-blue-500 transition-colors"
+                                                    onKeyPress={(e) => e.key === 'Enter' && newComment.trim() && submitComment()}
+                                                />
+                                                <button onClick={submitComment} disabled={!newComment.trim() || commentLoading} className="bg-blue-600 text-white p-3 rounded-full shadow-lg disabled:opacity-50 hover:bg-blue-700 transition-colors">
+                                                    {commentLoading ? <Loader2 size={18} className="animate-spin"/> : <Send size={18}/>}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Sticky Footer Button */}
+                                <div className="absolute bottom-0 left-0 right-0 p-4 bg-white dark:bg-gray-800 border-t dark:border-gray-700 shadow-[0_-5px_20px_-5px_rgba(0,0,0,0.1)] rounded-b-3xl">
+                                    <a 
+                                        href={`https://wa.me/${selectedJob.contact_phone?.replace(/\s/g, '').replace(/^0/, '212')}?text=Hello, I saw your post on TangerConnect for: ${selectedJob.title}`} 
+                                        target="_blank" 
+                                        rel="noreferrer"
+                                        className={`w-full py-4 rounded-full text-white font-bold shadow-lg flex justify-center items-center gap-2 active:scale-95 transition-transform ${selectedJob.post_type === 'EMPLOYER' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'}`}
+                                    >
+                                        <Send size={20}/> {selectedJob.post_type === 'EMPLOYER' ? t('applyWhatsApp') : t('hireWhatsApp')}
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* VIEW 4: CREATE POST FORM */}
+                    {isPosting && (
+                        <div className="max-w-md mx-auto py-4 px-4">
                             <h3 className="font-bold text-xl mb-6 dark:text-white flex items-center gap-2">{t('postNewAd')}</h3>
                             <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm space-y-4">
                                 

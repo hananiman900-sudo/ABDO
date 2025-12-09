@@ -11,10 +11,92 @@ import { JobBoard } from './components/JobBoard';
 import { AdminDashboard } from './components/AdminDashboard'; // Import New Component
 import { useLocalization, LocalizationProvider } from './hooks/useLocalization';
 import { supabase } from './services/supabaseClient';
-import { LogIn, User, MapPin, ShoppingBag, Home, Briefcase, Settings, X, Phone, Globe, LayoutGrid, Heart, List, LogOut, CheckCircle, Edit, Share2, Grid, Bookmark, Menu, Users, Database, Instagram, Facebook, Tag, Sparkles, MessageCircle, Calendar, Bell, Eye, EyeOff, Camera, Loader2, UserPlus, UserCheck, Megaphone, Clock, ArrowLeft } from 'lucide-react';
+import { LogIn, User, MapPin, ShoppingBag, Home, Briefcase, Settings, X, Phone, Globe, LayoutGrid, Heart, List, LogOut, CheckCircle, Edit, Share2, Grid, Bookmark, Menu, Users, Database, Instagram, Facebook, Tag, Sparkles, MessageCircle, Calendar, Bell, Eye, EyeOff, Camera, Loader2, UserPlus, UserCheck, Megaphone, Clock, ArrowLeft, Moon, Sun, AlertCircle } from 'lucide-react';
+
+// --- CUSTOM TOAST NOTIFICATION ---
+const ToastNotification: React.FC<{ message: string; type: 'success' | 'error'; onClose: () => void }> = ({ message, type, onClose }) => {
+    useEffect(() => {
+        const timer = setTimeout(onClose, 3000);
+        return () => clearTimeout(timer);
+    }, [onClose]);
+
+    return (
+        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-[100] animate-fade-in">
+            <div className={`flex items-center gap-3 px-6 py-3 rounded-full shadow-2xl border ${type === 'success' ? 'bg-white text-green-700 border-green-100' : 'bg-white text-red-600 border-red-100'}`}>
+                {type === 'success' ? <CheckCircle size={20} className="text-green-500 fill-green-100"/> : <AlertCircle size={20} className="text-red-500 fill-red-100"/>}
+                <span className="font-bold text-sm">{message}</span>
+            </div>
+        </div>
+    );
+}
+
+// --- APP SETTINGS MODAL ---
+const SettingsModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ isOpen, onClose }) => {
+    const { t, language, setLanguage } = useLocalization();
+    const [isDark, setIsDark] = useState(document.documentElement.classList.contains('dark'));
+
+    const toggleDarkMode = () => {
+        if (isDark) {
+            document.documentElement.classList.remove('dark');
+            localStorage.setItem('theme', 'light');
+            setIsDark(false);
+        } else {
+            document.documentElement.classList.add('dark');
+            localStorage.setItem('theme', 'dark');
+            setIsDark(true);
+        }
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-4 animate-fade-in">
+            <div className="bg-white dark:bg-gray-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl relative">
+                <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 dark:text-gray-300"><X/></button>
+                <h2 className="text-xl font-black mb-6 flex items-center gap-2 dark:text-white"><Settings className="text-gray-400"/> {t('menu')}</h2>
+                
+                <div className="space-y-6">
+                    {/* Language Selector */}
+                    <div>
+                        <h3 className="text-xs font-bold text-gray-400 uppercase mb-3 flex items-center gap-1"><Globe size={14}/> Language</h3>
+                        <div className="grid grid-cols-3 gap-2">
+                            {['ar', 'fr', 'en'].map((lang) => (
+                                <button 
+                                    key={lang}
+                                    onClick={() => setLanguage(lang as Language)}
+                                    className={`py-2 rounded-xl text-sm font-bold border transition-all ${language === lang ? 'bg-blue-600 text-white border-blue-600 shadow-md' : 'bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-600'}`}
+                                >
+                                    {lang === 'ar' ? 'العربية' : (lang === 'fr' ? 'Français' : 'English')}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Dark Mode Toggle */}
+                    <div>
+                        <h3 className="text-xs font-bold text-gray-400 uppercase mb-3 flex items-center gap-1"><Moon size={14}/> Appearance</h3>
+                        <button 
+                            onClick={toggleDarkMode}
+                            className="w-full flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-2xl border border-gray-200 dark:border-gray-600"
+                        >
+                            <span className="font-bold text-gray-700 dark:text-gray-200">{isDark ? 'Dark Mode' : 'Light Mode'}</span>
+                            <div className={`w-12 h-6 rounded-full p-1 flex items-center transition-colors ${isDark ? 'bg-blue-600 justify-end' : 'bg-gray-300 justify-start'}`}>
+                                <div className="w-4 h-4 rounded-full bg-white shadow-sm"></div>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+
+                <div className="mt-8 pt-4 border-t dark:border-gray-700 text-center">
+                    <p className="text-xs text-gray-400">TangerConnect v2.1</p>
+                </div>
+            </div>
+        </div>
+    )
+}
 
 // --- AUTH MODAL (SEPARATED TABS) ---
-const AuthModal: React.FC<{ isOpen: boolean; onClose: () => void; onLogin: (user: AuthenticatedUser) => void }> = ({ isOpen, onClose, onLogin }) => {
+const AuthModal: React.FC<{ isOpen: boolean; onClose: () => void; onLogin: (user: AuthenticatedUser) => void; notify: (msg: string, type: 'success'|'error') => void }> = ({ isOpen, onClose, onLogin, notify }) => {
     const { t, language } = useLocalization();
     const [isRegister, setIsRegister] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -55,7 +137,7 @@ const AuthModal: React.FC<{ isOpen: boolean; onClose: () => void; onLogin: (user
                 if (error) throw error;
                 
                 if (accountType === AccountType.PROVIDER && payload.phone !== '0617774846') {
-                    alert(t('accountPending'));
+                    notify(t('accountPending'), 'success');
                     onClose();
                     setLoading(false);
                     return;
@@ -77,6 +159,7 @@ const AuthModal: React.FC<{ isOpen: boolean; onClose: () => void; onLogin: (user
                         profile_image_url: data.profile_image_url, 
                         username: data.username 
                     });
+                    notify(t('success'), 'success');
                 }
 
             } else {
@@ -94,25 +177,26 @@ const AuthModal: React.FC<{ isOpen: boolean; onClose: () => void; onLogin: (user
                 const { data: user, error } = await query.single();
 
                 if (error || !user) {
-                    alert(t('errorMessage') + " (User not found in " + (accountType === AccountType.CLIENT ? "Client" : "Provider") + " database)");
+                    notify(t('errorMessage') + " (User not found)", 'error');
                     setLoading(false);
                     return;
                 }
 
                 if (user.password !== formData.password) {
-                     alert(t('passwordError')); 
+                     notify(t('passwordError'), 'error'); 
                      setLoading(false); 
                      return;
                 }
 
                 // CHECK ACTIVE STATUS FOR PROVIDERS
                 if (accountType === AccountType.PROVIDER && !user.is_active) {
-                    alert(t('accountPending'));
+                    notify(t('accountPending'), 'error');
                     setLoading(false);
                     return;
                 }
                 
                 // Login Successful
+                notify(t('success'), 'success');
                 onLogin({ 
                     id: user.id, 
                     name: user.full_name || user.name, 
@@ -128,7 +212,7 @@ const AuthModal: React.FC<{ isOpen: boolean; onClose: () => void; onLogin: (user
                 });
             }
         } catch (e: any) { 
-            alert(e.message || t('errorMessage')); 
+            notify(e.message || t('errorMessage'), 'error'); 
         } finally { 
             setLoading(false); 
         }
@@ -375,7 +459,7 @@ const ServicesHub: React.FC<{ onNav: (target: string) => void; isAdmin: boolean 
                 <h2 className="text-2xl font-black text-gray-900">{t('servicesHubTitle')}</h2>
                 <p className="text-gray-500 text-sm">{t('servicesHubDesc')}</p>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <ServiceCard icon={Home} title={t('realEstateTitle')} color="bg-purple-500" bg="bg-white" onClick={() => onNav('REAL_ESTATE')}/>
                 <ServiceCard icon={Briefcase} title={t('jobBoardTitle')} color="bg-green-500" bg="bg-white" onClick={() => onNav('JOBS')}/>
                 <ServiceCard icon={Users} title={t('providerDirectory')} color="bg-blue-500" bg="bg-white" onClick={() => onNav('DIRECTORY')}/>
@@ -391,7 +475,7 @@ const ServicesHub: React.FC<{ onNav: (target: string) => void; isAdmin: boolean 
 }
 
 // --- CLIENT EDIT PROFILE MODAL ---
-const EditClientProfileModal: React.FC<{ user: AuthenticatedUser; onClose: () => void; onUpdateUser: (updates: Partial<AuthenticatedUser>) => void }> = ({ user, onClose, onUpdateUser }) => {
+const EditClientProfileModal: React.FC<{ user: AuthenticatedUser; onClose: () => void; onUpdateUser: (updates: Partial<AuthenticatedUser>) => void; notify: (m: string, t: any) => void }> = ({ user, onClose, onUpdateUser, notify }) => {
     const { t } = useLocalization();
     const [name, setName] = useState(user.name);
     const [bio, setBio] = useState(user.bio || '');
@@ -423,8 +507,9 @@ const EditClientProfileModal: React.FC<{ user: AuthenticatedUser; onClose: () =>
         
         if(!error) {
             onUpdateUser({ name, bio, profile_image_url: image });
+            notify(t('success'), 'success');
             onClose();
-        } else alert(t('errorMessage'));
+        } else notify(t('errorMessage'), 'error');
         setLoading(false);
     }
 
@@ -520,8 +605,10 @@ const ProfileTab: React.FC<{
     onLogout: () => void;
     isAdmin: boolean;
     onNav: (target: string) => void;
-    onUpdateUser: (u: Partial<AuthenticatedUser>) => void; 
-}> = ({ user, onLogin, onLogout, isAdmin, onNav, onUpdateUser }) => {
+    onUpdateUser: (u: Partial<AuthenticatedUser>) => void;
+    notify: (msg: string, type: 'success' | 'error') => void;
+    onOpenSettings: () => void;
+}> = ({ user, onLogin, onLogout, isAdmin, onNav, onUpdateUser, notify, onOpenSettings }) => {
     const { t } = useLocalization();
     const [showEdit, setShowEdit] = useState(false);
     const [viewingProvider, setViewingProvider] = useState<any | null>(null);
@@ -585,7 +672,9 @@ const ProfileTab: React.FC<{
                              </div>
                          </div>
                     )}
-                    <div className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50">
+                    
+                    {/* APP SETTINGS - LINKED TO MODAL */}
+                    <div className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50" onClick={onOpenSettings}>
                         <div className="flex items-center gap-3">
                             <div className="p-2 bg-gray-100 text-gray-600 rounded-lg"><Settings size={18}/></div>
                             <span className="font-bold">App Settings</span>
@@ -595,7 +684,7 @@ const ProfileTab: React.FC<{
             </div>
 
             {/* MODALS */}
-            {showEdit && <EditClientProfileModal user={user} onClose={() => setShowEdit(false)} onUpdateUser={onUpdateUser}/>}
+            {showEdit && <EditClientProfileModal user={user} onClose={() => setShowEdit(false)} onUpdateUser={onUpdateUser} notify={notify}/>}
             {viewingProvider && <ChatProfileModal provider={viewingProvider} onClose={() => setViewingProvider(null)} currentUser={user} />}
         </div>
     );
@@ -634,9 +723,27 @@ const AppContent: React.FC = () => {
     const [showAppointments, setShowAppointments] = useState(false);
     const [showDB, setShowDB] = useState(false);
     const [showDirectory, setShowDirectory] = useState(false); 
+    const [showSettings, setShowSettings] = useState(false);
     
     // New Admin Dashboard State
     const [showAdminDashboard, setShowAdminDashboard] = useState(false);
+
+    // Custom Toast State
+    const [toast, setToast] = useState<{message: string, type: 'success' | 'error'} | null>(null);
+
+    const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+        setToast({ message, type });
+    };
+
+    // DARK MODE INIT
+    useEffect(() => {
+        const theme = localStorage.getItem('theme');
+        if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    }, []);
 
     useEffect(() => {
         const timer = setTimeout(() => setShowSplash(false), 2500);
@@ -740,84 +847,92 @@ const AppContent: React.FC = () => {
     }
 
     return (
-        <div className={`flex flex-col h-screen bg-white ${language === 'ar' ? 'font-arabic' : 'font-sans'}`} dir={language === 'ar' ? 'rtl' : 'ltr'}>
+        <div className={`flex flex-col h-screen bg-gray-50 dark:bg-gray-900 ${language === 'ar' ? 'font-arabic' : 'font-sans'}`} dir={language === 'ar' ? 'rtl' : 'ltr'}>
             
-            {/* NEW CLEAN HEADER - CONDITIONAL RENDERING */}
-            {/* HIDE HEADER IF IN STORE TAB */}
-            {!hideBottomNav && activeTab !== 'STORE' && (
-                <div className="bg-white/90 backdrop-blur-md border-b border-gray-100 p-3 flex justify-between items-center z-20 h-16 sticky top-0 shadow-sm animate-fade-in">
-                    
-                    {/* Notification Bell */}
-                    <div className="w-10">
-                        <button onClick={() => user && setShowClientNotifs(true)} className="relative inline-block p-1">
-                            <Bell size={24} className="text-gray-700"/>
-                            {unreadNotifs > 0 && <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center animate-pulse border border-white font-bold">{unreadNotifs}</span>}
+            {/* WRAPPER FOR LARGE SCREENS - RESPONSIVENESS */}
+            <div className="mx-auto w-full max-w-lg md:max-w-2xl lg:max-w-4xl xl:max-w-5xl h-full flex flex-col bg-white dark:bg-black shadow-2xl overflow-hidden relative border-x border-gray-100 dark:border-gray-800">
+
+                {/* NEW CLEAN HEADER - CONDITIONAL RENDERING */}
+                {/* HIDE HEADER IF IN STORE TAB */}
+                {!hideBottomNav && activeTab !== 'STORE' && (
+                    <div className="bg-white/90 dark:bg-black/90 backdrop-blur-md border-b border-gray-100 dark:border-gray-800 p-3 flex justify-between items-center z-20 h-16 sticky top-0 shadow-sm animate-fade-in">
+                        
+                        {/* Notification Bell */}
+                        <div className="w-10">
+                            <button onClick={() => user && setShowClientNotifs(true)} className="relative inline-block p-1">
+                                <Bell size={24} className="text-gray-700 dark:text-gray-200"/>
+                                {unreadNotifs > 0 && <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center animate-pulse border border-white font-bold">{unreadNotifs}</span>}
+                            </button>
+                        </div>
+
+                        {/* Logo - JUST TEXT AS REQUESTED */}
+                        <div className="flex items-center justify-center">
+                            <h1 className="font-black text-xl tracking-tight bg-gradient-to-r from-blue-700 to-cyan-500 bg-clip-text text-transparent">
+                                Tanger<span className="font-light text-gray-400">IA</span>
+                            </h1>
+                        </div>
+
+                        {/* Login Button or User Avatar */}
+                        <div className="w-10 flex justify-end">
+                            {!user ? (
+                                <button onClick={() => setShowAuth(true)} className="w-9 h-9 bg-black dark:bg-white text-white dark:text-black rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-transform">
+                                    <LogIn size={16}/>
+                                </button>
+                            ) : (
+                                <div className="w-9 h-9 rounded-full overflow-hidden border border-gray-200 dark:border-gray-700">
+                                    <img src={user.profile_image_url || `https://ui-avatars.com/api/?name=${user.name}`} className="w-full h-full object-cover"/>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* MAIN CONTENT AREA */}
+                <div className="flex-1 overflow-hidden relative bg-white dark:bg-black">
+                    {activeTab === 'CHAT' && <Chatbot currentUser={user} onOpenAuth={() => setShowAuth(true)} onDiscover={() => setActiveTab('SERVICES')} onToggleNav={setHideBottomNav} />}
+                    {activeTab === 'STORE' && <div className="absolute inset-0 z-0"><Store isOpen={true} onClose={() => setActiveTab('CHAT')} currentUser={user} onOpenAuth={() => setShowAuth(true)} onGoToProfile={() => setActiveTab('PROFILE')} notify={showToast}/></div>}
+                    {activeTab === 'SERVICES' && <ServicesHub onNav={handleNav} isAdmin={isAdmin} />}
+                    {activeTab === 'PROFILE' && <ProfileTab user={user} onLogin={() => setShowAuth(true)} onLogout={handleLogout} isAdmin={isAdmin} onNav={handleNav} onUpdateUser={handleUpdateUser} notify={showToast} onOpenSettings={() => setShowSettings(true)} />}
+                </div>
+
+                {/* BOTTOM NAVIGATION BAR */}
+                {/* HIDE NAV IF IN STORE TAB OR CHAT */}
+                {!hideBottomNav && activeTab !== 'STORE' && (
+                    <div className="bg-white dark:bg-black border-t border-gray-100 dark:border-gray-800 pb-safe z-30 flex justify-around items-center h-16 shadow-[0_-5px_20px_-5px_rgba(0,0,0,0.05)] animate-slide-up">
+                        <button onClick={() => setActiveTab('CHAT')} className={`flex flex-col items-center justify-center w-full h-full gap-1 ${activeTab === 'CHAT' ? 'text-blue-600' : 'text-gray-400'}`}>
+                            <MessageCircle size={24} className={activeTab === 'CHAT' ? 'fill-blue-100 dark:fill-blue-900' : ''} />
+                            <span className="text-[10px] font-bold">{t('navChat')}</span>
+                        </button>
+                        <button onClick={() => setActiveTab('STORE')} className={`flex flex-col items-center justify-center w-full h-full gap-1 ${activeTab === 'STORE' ? 'text-orange-600' : 'text-gray-400'}`}>
+                            <ShoppingBag size={24} className={activeTab === 'STORE' ? 'fill-orange-100 dark:fill-orange-900' : ''} />
+                            <span className="text-[10px] font-bold">{t('navStore')}</span>
+                        </button>
+                        <button onClick={() => setActiveTab('SERVICES')} className={`flex flex-col items-center justify-center w-full h-full gap-1 ${activeTab === 'SERVICES' ? 'text-purple-600' : 'text-gray-400'}`}>
+                            <LayoutGrid size={24} className={activeTab === 'SERVICES' ? 'fill-purple-100 dark:fill-purple-900' : ''} />
+                            <span className="text-[10px] font-bold">{t('navExplore')}</span>
+                        </button>
+                        <button onClick={() => setActiveTab('PROFILE')} className={`flex flex-col items-center justify-center w-full h-full gap-1 ${activeTab === 'PROFILE' ? 'text-black dark:text-white' : 'text-gray-400'}`}>
+                            {user?.profile_image_url ? (
+                                <img src={user.profile_image_url} className={`w-6 h-6 rounded-full object-cover border-2 ${activeTab === 'PROFILE' ? 'border-black dark:border-white' : 'border-transparent'}`}/>
+                            ) : (
+                                <User size={24} className={activeTab === 'PROFILE' ? 'fill-gray-200 dark:fill-gray-700' : ''} />
+                            )}
+                            <span className="text-[10px] font-bold">{t('navProfile')}</span>
                         </button>
                     </div>
-
-                    {/* Logo - JUST TEXT AS REQUESTED */}
-                    <div className="flex items-center justify-center">
-                        <h1 className="font-black text-xl tracking-tight bg-gradient-to-r from-blue-700 to-cyan-500 bg-clip-text text-transparent">
-                            Tanger<span className="font-light text-gray-400">IA</span>
-                        </h1>
-                    </div>
-
-                    {/* Login Button or User Avatar */}
-                    <div className="w-10 flex justify-end">
-                        {!user ? (
-                            <button onClick={() => setShowAuth(true)} className="w-9 h-9 bg-black text-white rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-transform">
-                                <LogIn size={16}/>
-                            </button>
-                        ) : (
-                            <div className="w-9 h-9 rounded-full overflow-hidden border border-gray-200">
-                                <img src={user.profile_image_url || `https://ui-avatars.com/api/?name=${user.name}`} className="w-full h-full object-cover"/>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {/* MAIN CONTENT AREA */}
-            <div className="flex-1 overflow-hidden relative bg-white">
-                {activeTab === 'CHAT' && <Chatbot currentUser={user} onOpenAuth={() => setShowAuth(true)} onDiscover={() => setActiveTab('SERVICES')} onToggleNav={setHideBottomNav} />}
-                {activeTab === 'STORE' && <div className="absolute inset-0 z-0"><Store isOpen={true} onClose={() => setActiveTab('CHAT')} currentUser={user} onOpenAuth={() => setShowAuth(true)} onGoToProfile={() => setActiveTab('PROFILE')} /></div>}
-                {activeTab === 'SERVICES' && <ServicesHub onNav={handleNav} isAdmin={isAdmin} />}
-                {activeTab === 'PROFILE' && <ProfileTab user={user} onLogin={() => setShowAuth(true)} onLogout={handleLogout} isAdmin={isAdmin} onNav={handleNav} onUpdateUser={handleUpdateUser} />}
+                )}
             </div>
+            
+            {/* GLOBAL TOAST */}
+            {toast && <ToastNotification message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-            {/* BOTTOM NAVIGATION BAR */}
-            {/* HIDE NAV IF IN STORE TAB OR CHAT */}
-            {!hideBottomNav && activeTab !== 'STORE' && (
-                <div className="bg-white border-t border-gray-100 pb-safe z-30 flex justify-around items-center h-16 shadow-[0_-5px_20px_-5px_rgba(0,0,0,0.05)] animate-slide-up">
-                    <button onClick={() => setActiveTab('CHAT')} className={`flex flex-col items-center justify-center w-full h-full gap-1 ${activeTab === 'CHAT' ? 'text-blue-600' : 'text-gray-400'}`}>
-                        <MessageCircle size={24} className={activeTab === 'CHAT' ? 'fill-blue-100' : ''} />
-                        <span className="text-[10px] font-bold">{t('navChat')}</span>
-                    </button>
-                    <button onClick={() => setActiveTab('STORE')} className={`flex flex-col items-center justify-center w-full h-full gap-1 ${activeTab === 'STORE' ? 'text-orange-600' : 'text-gray-400'}`}>
-                        <ShoppingBag size={24} className={activeTab === 'STORE' ? 'fill-orange-100' : ''} />
-                        <span className="text-[10px] font-bold">{t('navStore')}</span>
-                    </button>
-                    <button onClick={() => setActiveTab('SERVICES')} className={`flex flex-col items-center justify-center w-full h-full gap-1 ${activeTab === 'SERVICES' ? 'text-purple-600' : 'text-gray-400'}`}>
-                        <LayoutGrid size={24} className={activeTab === 'SERVICES' ? 'fill-purple-100' : ''} />
-                        <span className="text-[10px] font-bold">{t('navExplore')}</span>
-                    </button>
-                    <button onClick={() => setActiveTab('PROFILE')} className={`flex flex-col items-center justify-center w-full h-full gap-1 ${activeTab === 'PROFILE' ? 'text-black' : 'text-gray-400'}`}>
-                        {user?.profile_image_url ? (
-                            <img src={user.profile_image_url} className={`w-6 h-6 rounded-full object-cover border-2 ${activeTab === 'PROFILE' ? 'border-black' : 'border-transparent'}`}/>
-                        ) : (
-                            <User size={24} className={activeTab === 'PROFILE' ? 'fill-gray-200' : ''} />
-                        )}
-                        <span className="text-[10px] font-bold">{t('navProfile')}</span>
-                    </button>
-                </div>
-            )}
-
-            <AuthModal isOpen={showAuth} onClose={() => setShowAuth(false)} onLogin={handleLogin} />
+            <AuthModal isOpen={showAuth} onClose={() => setShowAuth(false)} onLogin={handleLogin} notify={showToast} />
             <RealEstate isOpen={showRealEstate} onClose={() => setShowRealEstate(false)} currentUser={user} />
-            <JobBoard isOpen={showJobBoard} onClose={() => setShowJobBoard(false)} currentUser={user} />
+            <JobBoard isOpen={showJobBoard} onClose={() => setShowJobBoard(false)} currentUser={user} notify={showToast} />
             <AppointmentsDrawer isOpen={showAppointments} onClose={() => setShowAppointments(false)} user={user} />
             <DatabaseSetup isOpen={showDB} onClose={() => setShowDB(false)} />
             <ProviderDirectory isOpen={showDirectory} onClose={() => setShowDirectory(false)} currentUser={user} />
+            <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
             
             {/* NEW ADMIN DASHBOARD MODAL */}
             {isAdmin && <AdminDashboard isOpen={showAdminDashboard} onClose={() => setShowAdminDashboard(false)} />}
