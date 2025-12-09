@@ -68,7 +68,15 @@ export const getChatResponse = async (
 
     try {
         // Use the API Key from the environment variable directly
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        // Safely access via window.process because process.env might be replaced by bundlers
+        const apiKey = (window as any).process?.env?.API_KEY || process.env.API_KEY;
+
+        if (!apiKey) {
+            console.error("API Key is missing from window.process.env");
+            return "⚠️ عذراً، مفتاح API غير موجود. يرجى إعداده.";
+        }
+        
+        const ai = new GoogleGenAI({ apiKey });
         
         const response = await ai.models.generateContent({
             model: "gemini-2.5-flash",
