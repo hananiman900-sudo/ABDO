@@ -8,8 +8,6 @@ import jsQR from 'jsqr';
 
 // --- SUB-COMPONENTS (FULL SCREEN VIEWS) ---
 
-// ... (Existing NotificationView, HistoryView, UrgentAdsView, OffersView, AdsView, QRScannerView, EditProfileModal codes remain exactly the same) ...
-
 const NotificationView: React.FC<{ providerId: number; onClose: () => void }> = ({ providerId, onClose }) => {
     const { t } = useLocalization();
     const [notifications, setNotifications] = useState<ProviderNotification[]>([]);
@@ -245,7 +243,18 @@ const AdsView: React.FC<{ providerId: number; onClose: () => void }> = ({ provid
                 <h2 className="font-bold text-xl">{t('requestBoost')}</h2>
             </div>
             <div className="p-4 space-y-4 overflow-y-auto pb-20">
-                 <div className="bg-purple-50 p-4 rounded-xl border border-purple-100"><p className="text-sm text-purple-800 font-bold mb-3">{t('paidAdDesc')}</p><textarea value={newAd.message} onChange={e => setNewAd({...newAd, message: e.target.value})} placeholder={t('messageLabel')} className="w-full p-2 rounded-lg border mb-2"/><button onClick={() => fileRef.current?.click()} className="w-full py-2 border border-dashed rounded-lg mb-2 bg-white flex justify-center gap-2 text-gray-500 hover:bg-gray-50"><ImageIcon size={18}/> {t('uploadQRImage')}</button><input type="file" ref={fileRef} hidden onChange={handleUpload}/>{newAd.image && <img src={newAd.image} className="h-24 w-full object-cover rounded-lg mb-2"/><button onClick={handleSubmit} disabled={loading} className="w-full bg-purple-600 text-white py-2 rounded-lg font-bold shadow-md hover:bg-purple-700 transition-colors">{loading ? <Loader2 className="animate-spin mx-auto"/> : t('sendButton')}</button></div>
+                 <div className="bg-purple-50 p-4 rounded-xl border border-purple-100">
+                    <p className="text-sm text-purple-800 font-bold mb-3">{t('paidAdDesc')}</p>
+                    <textarea value={newAd.message} onChange={e => setNewAd({...newAd, message: e.target.value})} placeholder={t('messageLabel')} className="w-full p-2 rounded-lg border mb-2"/>
+                    <button onClick={() => fileRef.current?.click()} className="w-full py-2 border border-dashed rounded-lg mb-2 bg-white flex justify-center gap-2 text-gray-500 hover:bg-gray-50">
+                        <ImageIcon size={18}/> {t('uploadQRImage')}
+                    </button>
+                    <input type="file" ref={fileRef} hidden onChange={handleUpload}/>
+                    {newAd.image && <img src={newAd.image} className="h-24 w-full object-cover rounded-lg mb-2"/>}
+                    <button onClick={handleSubmit} disabled={loading} className="w-full bg-purple-600 text-white py-2 rounded-lg font-bold shadow-md hover:bg-purple-700 transition-colors">
+                        {loading ? <Loader2 className="animate-spin mx-auto"/> : t('sendButton')}
+                    </button>
+                </div>
                  <div className="space-y-3"><h3 className="font-bold text-gray-700 text-sm uppercase">Request History</h3>{requests.length === 0 && <p className="text-gray-400 text-sm text-center">No ad requests sent.</p>}{requests.map(r => (<div key={r.id} className="p-3 bg-gray-50 rounded-lg border flex justify-between items-center shadow-sm"><div className="flex gap-2 items-center">{r.image_url && <img src={r.image_url} className="w-10 h-10 rounded object-cover bg-gray-200"/>}<div><p className="text-sm font-semibold line-clamp-1">{r.message}</p><p className="text-[10px] text-gray-400">{new Date(r.created_at).toLocaleDateString()}</p></div></div><span className={`text-[10px] px-2 py-1 rounded-full font-bold ${r.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{r.status === 'pending' ? 'في طور الإنجاز' : 'مقبول'}</span></div>))}</div>
             </div>
         </div>
