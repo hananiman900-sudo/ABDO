@@ -14,21 +14,6 @@ export const getChatResponse = async (
   targetProvider?: any // New parameter to pass the specific provider context
 ): Promise<string> => {
     
-    // FAILOVER SYSTEM: Get Keys from Config
-    const config = (window as any).TANGER_CONFIG || {};
-    let apiKeys: string[] = config.API_KEYS || [];
-    
-    // Fallback if config is missing (using the keys you provided to ensure they work)
-    if (!apiKeys || apiKeys.length === 0) {
-        apiKeys = [
-          'AIzaSyD0WW8wQ9IXKwPqENLJfUwiiL0NCWnDb48',
-          'AIzaSyDPzeKphFk1yHnztG1RJ8nm4CBRbG_ILDU',
-          'AIzaSyA9HwY4o-ecSguVOixMuo7vNZgWzFJZTSA',
-          'AIzaSyB1-FA-Cuk1mxwU8sVE_LYyi_pqjcOqK94',
-          'AIzaSyBRMjMrd5mfGDWLZSF-tEA7u_s3NG-bVvk'
-        ];
-    }
-
     // Fetch Providers List (only if we are in general mode, otherwise we know who we are talking to)
     let providersContext = "No data";
     if (!targetProvider) {
@@ -81,44 +66,23 @@ export const getChatResponse = async (
 
     const contents = [...history, { role: 'user', parts: userParts }];
 
-    // LOAD BALANCING LOGIC: Shuffle keys to distribute load
-    // This creates a random order for this specific request
-    const shuffledKeys = [...apiKeys].sort(() => 0.5 - Math.random());
-
-    for (let i = 0; i < shuffledKeys.length; i++) {
-        const apiKey = shuffledKeys[i];
+    try {
+        // Use the API Key from the environment variable directly
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         
-        try {
-            // Add a small delay for retries (except the first attempt) to avoid hitting Google's rate limiter too hard
-            if (i > 0) {
-                await new Promise(resolve => setTimeout(resolve, 1500));
-            }
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: contents,
+            config: { 
+                systemInstruction,
+                temperature: 0.7,
+            },
+        });
+        
+        return response.text || "No response generated."; 
 
-            const ai = new GoogleGenAI({ apiKey });
-            
-            // Note: Safety settings are implicit in the new SDK or handled via config if available.
-            // We use standard generation here.
-            const response = await ai.models.generateContent({
-                model: "gemini-2.5-flash",
-                contents: contents,
-                config: { 
-                    systemInstruction,
-                    temperature: 0.7, // Add temperature for more stable responses
-                },
-            });
-            
-            // If successful, return immediately
-            return response.text; 
-
-        } catch (error: any) {
-            console.warn(`[AI System] Key ${i+1}/${shuffledKeys.length} failed.`, error.message);
-            
-            // If this was the last key to try, return error
-            if (i === shuffledKeys.length - 1) {
-                return "⚠️ Server Busy: All AI models are currently at capacity. Please try again in a few seconds.";
-            }
-            // Otherwise loop continues to next key after a delay
-        }
+    } catch (error: any) {
+        console.error("AI Error:", error);
+        return "⚠️ عذراً، هناك مشكلة في الاتصال بالخادم. يرجى التحقق من مفتاح API.";
     }
-    return "Error: Connection failure.";
 };

@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -11,19 +10,18 @@
       // CONFIGURATION
       window.TANGER_CONFIG = {
         SUPABASE_URL: 'https://lrprlzijjykvpxpyxrcn.supabase.co',
-        SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxycHJsemlqanlrdnB4cHl4cmNuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMxMjIwNDEsImV4cCI6MjA3ODY5ODA0MX0.6S8eSgprS686iobE7zrmurxIvzvC8Qmpu71rKT8FvZc',
-        
-        // YOUR 5 KEYS - FAILOVER SYSTEM ENABLED
-        API_KEYS: [
-          'AIzaSyD0WW8wQ9IXKwPqENLJfUwiiL0NCWnDb48',
-          'AIzaSyDPzeKphFk1yHnztG1RJ8nm4CBRbG_ILDU',
-          'AIzaSyA9HwY4o-ecSguVOixMuo7vNZgWzFJZTSA',
-          'AIzaSyB1-FA-Cuk1mxwU8sVE_LYyi_pqjcOqK94',
-          'AIzaSyBRMjMrd5mfGDWLZSF-tEA7u_s3NG-bVvk'
-        ]
+        SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxycHJsemlqanlrdnB4cHl4cmNuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMxMjIwNDEsImV4cCI6MjA3ODY5ODA0MX0.6S8eSgprS686iobE7zrmurxIvzvC8Qmpu71rKT8FvZc'
       };
       
-      window.process = { env: window.TANGER_CONFIG };
+      // Ensure process.env exists for libraries that expect it, 
+      // but API_KEY should be injected by the build environment or server.
+      window.process = { 
+        env: {
+          ...window.TANGER_CONFIG,
+          // API_KEY provided by user
+          API_KEY: 'AIzaSyBg9Hh-7meYh_EEyGoEtkiIKtOic2P86vg'
+        } 
+      };
 
       tailwind.config = {
         darkMode: 'class',
