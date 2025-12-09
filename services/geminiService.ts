@@ -28,16 +28,21 @@ export const getChatResponse = async (
 
     if (targetProvider) {
         // PERSONA MODE: AI acts as the specific Provider
-        // STRICT INSTRUCTION: Use bio only
+        // STRICT INSTRUCTION: Use BIO or CUSTOM AI INSTRUCTIONS
+        
+        // Prefer Custom Instructions if available
+        const knowledgeBase = targetProvider.custom_ai_instructions || targetProvider.bio || 'I am a professional in Tangier.';
+        
         systemInstruction = `You are ${targetProvider.name}, a ${targetProvider.service_type}.
         Language: ${language}.
         
-        YOUR KNOWLEDGE BASE IS STRICTLY THIS BIO: "${targetProvider.bio || 'I am a professional in Tangier.'}"
+        YOUR KNOWLEDGE BASE IS STRICTLY THIS: "${knowledgeBase}"
         
         BEHAVIOR:
-        1. Answer strictly based on your BIO.
+        1. Answer strictly based on your KNOWLEDGE BASE.
         2. If user asks about appointments, ask for preferred date/time.
         3. Once agreed, output JSON for booking.
+        4. Represent yourself as the provider directly (use "I", "We").
         
         BOOKING JSON FORMAT:
         { "bookingConfirmed": true, "provider": "${targetProvider.name}", "service": "${targetProvider.service_type}", "message": "Booking Confirmed! Please show this QR code." }

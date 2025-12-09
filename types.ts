@@ -16,6 +16,7 @@ export interface AuthenticatedUser {
   latitude?: number;
   longitude?: number;
   bio?: string;
+  custom_ai_instructions?: string; // NEW FIELD FOR AI KNOWLEDGE
   profile_image_url?: string;
   social_links?: { instagram?: string; facebook?: string; gps?: string; };
   service_type?: string;
@@ -31,6 +32,16 @@ export interface SystemAnnouncement { id: number; title: string; message: string
 export interface AppointmentForDisplay { id: number; created_at: string; providers: { name: string; service_type: string; location: string; }; }
 export interface ProviderService { id: number; provider_id: number; name: string; price: number; discount_price?: number; }
 export interface ProviderNotification { id: number; provider_id: number; message: string; created_at: string; is_read: boolean; type: 'BOOKING' | 'SYSTEM' | 'FOLLOW'; status: 'pending' | 'completed'; booking_id?: number; client_details?: any; }
+
+export interface ChatHistoryItem {
+    id: number;
+    user_id: number;
+    provider_id?: number; // Null for General Bot
+    role: string;
+    text: string;
+    image_url?: string;
+    created_at: string;
+}
 
 export interface Product { 
     id: number; 

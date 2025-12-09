@@ -48,7 +48,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
             const { data } = await supabase.from('providers').select('*').eq('is_active', false);
             setPendingProviders(data || []);
         } else if (activeTab === 'ADS') {
-            const { data } = await supabase.from('provider_ad_requests').select('*, providers(name, phone)').eq('status', 'pending');
+            // UPDATED: Fetch ALL requests, not just pending, so Admin can see history
+            const { data } = await supabase.from('provider_ad_requests').select('*, providers(name, phone)').order('created_at', { ascending: false });
             setAdRequests(data as any || []);
         } else if (activeTab === 'STATS') {
             // 1. Fetch Providers (Total Visits)
@@ -191,6 +192,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
     const handleRejectAd = async (id: number) => {
         await supabase.from('provider_ad_requests').update({ status: 'rejected' }).eq('id', id);
         fetchData();
+    };
+    
+    // NEW: Delete Ad Request (Archive)
+    const handleDeleteAdRequest = async (id: number) => {
+        if(confirm(t('delete') + '?')) {
+            await supabase.from('provider_ad_requests').delete().eq('id', id);
+            fetchData();
+        }
     };
 
     // --- ORDERS LOGIC ---
@@ -398,20 +407,44 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                 {/* ADS TAB */}
                 {activeTab === 'ADS' && (
                     <div className="space-y-4">
-                         {adRequests.length === 0 && <p className="text-center text-gray-400 py-10">No pending ads.</p>}
+                         <div className="bg-purple-50 p-4 rounded-xl border border-purple-200 mb-2">
+                             <h3 className="font-bold text-purple-800">{t('adRequests')}</h3>
+                             <p className="text-xs text-purple-600">Archive of all requests.</p>
+                        </div>
+
+                         {adRequests.length === 0 && <p className="text-center text-gray-400 py-10">No ad requests found.</p>}
                          {adRequests.map(r => (
-                             <div key={r.id} className="bg-white p-4 rounded-xl border shadow-sm">
-                                 <div className="flex gap-3 mb-3">
-                                     <img src={r.image_url} className="w-20 h-20 rounded bg-gray-100 object-cover"/>
-                                     <div>
-                                         <p className="font-bold text-sm">{r.providers?.name}</p>
-                                         <p className="text-sm text-gray-800">{r.message}</p>
-                                         <p className="text-xs text-gray-500 mt-1">{new Date(r.created_at).toLocaleDateString()}</p>
+                             <div key={r.id} className={`bg-white p-4 rounded-xl border shadow-sm ${r.status !== 'pending' ? 'opacity-75 bg-gray-50' : ''}`}>
+                                 <div className="flex justify-between items-start mb-3">
+                                     <div className="flex gap-3">
+                                        <img src={r.image_url} className="w-16 h-16 rounded bg-gray-100 object-cover"/>
+                                        <div>
+                                            <p className="font-bold text-sm">{r.providers?.name}</p>
+                                            <p className="text-sm text-gray-800">{r.message}</p>
+                                            <p className="text-xs text-gray-500 mt-1">{new Date(r.created_at).toLocaleDateString()}</p>
+                                        </div>
                                      </div>
+                                     {/* Status Badge */}
+                                     <span className={`text-[10px] px-2 py-1 rounded-full font-bold uppercase ${
+                                         r.status === 'approved' ? 'bg-green-100 text-green-700' : 
+                                         r.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
+                                     }`}>
+                                         {r.status}
+                                     </span>
                                  </div>
+
+                                 {/* Actions */}
                                  <div className="flex gap-2">
-                                     <button onClick={() => handleRejectAd(r.id)} className="flex-1 py-2 bg-red-50 text-red-600 rounded-lg font-bold text-xs">{t('reject')}</button>
-                                     <button onClick={() => handleApproveAd(r)} className="flex-1 py-2 bg-green-600 text-white rounded-lg font-bold text-xs">{t('approve')}</button>
+                                     {r.status === 'pending' ? (
+                                        <>
+                                            <button onClick={() => handleRejectAd(r.id)} className="flex-1 py-2 bg-red-50 text-red-600 rounded-lg font-bold text-xs">{t('reject')}</button>
+                                            <button onClick={() => handleApproveAd(r)} className="flex-1 py-2 bg-green-600 text-white rounded-lg font-bold text-xs">{t('approve')}</button>
+                                        </>
+                                     ) : (
+                                        <button onClick={() => handleDeleteAdRequest(r.id)} className="w-full py-2 bg-gray-200 text-gray-600 hover:bg-red-500 hover:text-white transition-colors rounded-lg font-bold text-xs flex items-center justify-center gap-2">
+                                            <Trash2 size={14}/> Delete Request
+                                        </button>
+                                     )}
                                  </div>
                              </div>
                          ))}
