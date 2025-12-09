@@ -73,7 +73,7 @@ export const getChatResponse = async (
 
     try {
         // DIRECTLY USING THE PROVIDED API KEY TO PREVENT CONNECTION ERRORS
-        const apiKey = 'AIzaSyBg9Hh-7meYh_EEyGoEtkiIKtOic2P86vg';
+        const apiKey = 'AIzaSyAYLry3mo4z-zkZ_6ykfsgPAnEZMv01NnM';
 
         if (!apiKey) {
             console.error("API Key is missing");
