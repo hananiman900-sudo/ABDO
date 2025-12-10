@@ -16,7 +16,13 @@ export interface AuthenticatedUser {
   latitude?: number;
   longitude?: number;
   bio?: string;
-  custom_ai_instructions?: string; // NEW FIELD FOR AI KNOWLEDGE
+  // NEW AI FIELDS
+  custom_ai_instructions?: string; 
+  price_info?: string;
+  location_info?: string;
+  working_hours?: string;
+  booking_info?: string; // New field for Booking Conditions/Details
+  
   profile_image_url?: string;
   social_links?: { instagram?: string; facebook?: string; gps?: string; };
   service_type?: string;

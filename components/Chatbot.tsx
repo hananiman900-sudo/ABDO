@@ -5,9 +5,9 @@ import { getChatResponse } from '../services/geminiService';
 import { useLocalization } from '../hooks/useLocalization';
 import { supabase } from '../services/supabaseClient';
 import QRCodeDisplay from './QRCodeDisplay';
-import { Send, Mic, Paperclip, Camera, Loader2, X, Globe, Search, ArrowLeft, MoreVertical, Calendar, Info, Phone, MapPin, Instagram, Facebook, Tag, UserPlus, UserCheck, Megaphone, Star, Check, ChevronDown, CheckCircle, StopCircle } from 'lucide-react';
+import { Send, Mic, Paperclip, Camera, Loader2, X, Globe, Search, ArrowLeft, MoreVertical, Calendar, Info, Phone, MapPin, Instagram, Facebook, Tag, UserPlus, UserCheck, Megaphone, Star, Check, ChevronDown, CheckCircle, StopCircle, Sparkles, Banknote, Clock } from 'lucide-react';
 
-// --- SUB-COMPONENTS ---
+// ... (Existing Sub-components: UrgentTicker, BookingModal, ChatProfileModal remain unchanged)
 
 export const UrgentTicker: React.FC = () => {
     const [ads, setAds] = useState<UrgentAd[]>([]);
@@ -31,7 +31,7 @@ export const UrgentTicker: React.FC = () => {
 }
 
 export const BookingModal: React.FC<{ provider: any; onClose: () => void; currentUser: AuthenticatedUser | null; onBooked: (details: any) => void; initialOffer?: Offer | null }> = ({ provider, onClose, currentUser, onBooked, initialOffer }) => {
-    // ... (Existing BookingModal code remains unchanged)
+    // ... (Existing BookingModal code)
     const { t } = useLocalization();
     const [offers, setOffers] = useState<Offer[]>([]);
     const [selectedOffer, setSelectedOffer] = useState<Offer | null>(null);
@@ -80,7 +80,7 @@ export const BookingModal: React.FC<{ provider: any; onClose: () => void; curren
 }
 
 export const ChatProfileModal: React.FC<{ provider: any; onClose: () => void; currentUser: AuthenticatedUser | null; onBookOffer?: (offer: Offer) => void }> = ({ provider, onClose, currentUser, onBookOffer }) => {
-   // ... (Existing ChatProfileModal code remains unchanged)
+   // ... (Existing ChatProfileModal code)
     const { t } = useLocalization();
     const [offers, setOffers] = useState<Offer[]>([]);
     const [isFollowing, setIsFollowing] = useState(false);
@@ -140,6 +140,7 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
     const [currentAdIndex, setCurrentAdIndex] = useState(0);
     const [preSelectedOffer, setPreSelectedOffer] = useState<Offer | null>(null);
     const [isRecording, setIsRecording] = useState(false);
+    const [suggestions, setSuggestions] = useState<string[]>([]); // Smart Chips
 
     useEffect(() => {
         const fetchProviders = async () => { const { data } = await supabase.from('providers').select('*').eq('is_active', true); setProviders(data || []); }
@@ -155,19 +156,15 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
 
     useEffect(() => { onToggleNav(view === 'CHAT'); }, [view]);
 
-    useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, view]);
+    useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, view, suggestions]);
 
     // LOAD HISTORY WHEN CHAT OPENS
     useEffect(() => {
         if (view === 'CHAT' && currentUser) {
             const loadHistory = async () => {
                 let query = supabase.from('chat_history').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: true });
-                
-                if (selectedChat) {
-                    query = query.eq('provider_id', selectedChat.id);
-                } else {
-                    query = query.is('provider_id', null);
-                }
+                if (selectedChat) query = query.eq('provider_id', selectedChat.id);
+                else query = query.is('provider_id', null);
 
                 const { data } = await query;
                 if (data) {
@@ -175,8 +172,6 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
                         role: msg.role === 'USER' ? Role.USER : Role.BOT,
                         text: msg.text || '',
                         imageUrl: msg.image_url,
-                        // Note: Booking details aren't stored fully in simple history, 
-                        // but text persists.
                     }));
                     setMessages(formatted);
                 } else {
@@ -185,7 +180,24 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
             };
             loadHistory();
         } else if (view === 'CHAT' && !currentUser) {
-            setMessages([]); // Clear for guest
+            setMessages([]);
+        }
+        
+        // Initial Suggestions based on chat type AND available data
+        if(view === 'CHAT') {
+            if (selectedChat) {
+                // Determine what data the provider actually has
+                const dynamicSuggestions = ['📅 حجز موعد'];
+                if (selectedChat.price_info) dynamicSuggestions.unshift('💰 الأثمنة');
+                if (selectedChat.location_info) dynamicSuggestions.push('📍 الموقع');
+                if (selectedChat.working_hours) dynamicSuggestions.push('🕒 التوقيت');
+                // NEW: Add Booking Conditions if available
+                if (selectedChat.booking_info) dynamicSuggestions.push('📝 شروط الحجز');
+                
+                setSuggestions(dynamicSuggestions);
+            } else {
+                setSuggestions(['🏥 أبحث عن طبيب', '🔧 أحتاج سباك', '🏠 سمسار عقارات']);
+            }
         }
     }, [view, selectedChat, currentUser]);
 
@@ -197,16 +209,66 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
         setShowBooking(false);
     };
 
-    const handleSend = async () => {
-        if((!input.trim() && !preview) || isLoading) return;
+    // HYBRID HANDLER: Smart Chip Clicks
+    const handleChipClick = async (text: string) => {
+        setInput(text);
+        
+        // Check if we can answer locally (Deterministic Response)
+        if (selectedChat) {
+            let localAnswer = null;
+            if (text === '💰 الأثمنة' && selectedChat.price_info) localAnswer = selectedChat.price_info;
+            if (text === '📍 الموقع' && selectedChat.location_info) localAnswer = selectedChat.location_info;
+            if (text === '🕒 التوقيت' && selectedChat.working_hours) localAnswer = selectedChat.working_hours;
+            // NEW: Handle Booking Info
+            if (text === '📝 شروط الحجز' && selectedChat.booking_info) localAnswer = selectedChat.booking_info;
+            
+            if (text === '📅 حجز موعد') {
+                 setPreSelectedOffer(null); 
+                 setShowBooking(true);
+                 return; // Stop here, UI handles booking
+            }
+
+            if (localAnswer) {
+                // 1. Show User Msg
+                const userMsg: Message = { role: Role.USER, text: text };
+                setMessages(prev => [...prev, userMsg]);
+                setInput('');
+                
+                // 2. Simulate Bot Typing delay
+                setIsLoading(true);
+                setTimeout(async () => {
+                    const botMsg: Message = { role: Role.BOT, text: localAnswer as string };
+                    setMessages(prev => [...prev, botMsg]);
+                    setIsLoading(false);
+
+                    // 3. Save to DB (optional, but good for history)
+                    if (currentUser) {
+                        await supabase.from('chat_history').insert([
+                            { user_id: currentUser.id, provider_id: selectedChat.id, role: 'USER', text: text },
+                            { user_id: currentUser.id, provider_id: selectedChat.id, role: 'BOT', text: localAnswer }
+                        ]);
+                    }
+                }, 600);
+                return; // EXIT FUNCTION, NO API CALL
+            }
+        }
+
+        // If no local answer, fall back to AI
+        setTimeout(() => handleSend(text), 100);
+    }
+
+    const handleSend = async (manualText?: string) => {
+        const textToSend = manualText || input;
+        if((!textToSend.trim() && !preview) || isLoading) return;
         
         // 1. Add User Message to UI
-        const userMsg: Message = { role: Role.USER, text: input, imageUrl: preview || undefined };
+        const userMsg: Message = { role: Role.USER, text: textToSend, imageUrl: preview || undefined };
         setMessages(prev => [...prev, userMsg]);
         setInput(''); setPreview(null);
+        setSuggestions([]); // Clear old suggestions while thinking
         setIsLoading(true);
 
-        // 2. Persist User Message (if logged in)
+        // 2. Persist User Message
         if (currentUser) {
             await supabase.from('chat_history').insert({
                 user_id: currentUser.id,
@@ -221,7 +283,6 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
             // 3. Get AI Response
             const history = messages.filter(m => !m.isComponent).map(m => ({ role: m.role === Role.USER ? 'user' : 'model', parts: [{ text: m.text }] }));
             
-            // Pass the provider object which now contains custom_ai_instructions from type definition
             const responseText = await getChatResponse(
                 history, 
                 userMsg.text, 
@@ -233,23 +294,34 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
                 selectedChat 
             );
             
-            let botMsg: Message = { role: Role.BOT, text: responseText };
+            // 4. PARSE SUGGESTIONS from Response
+            let displayText = responseText;
+            const suggestionMatch = responseText.match(/SUGGESTIONS\|(.*)/);
+            
+            if (suggestionMatch) {
+                displayText = responseText.replace(suggestionMatch[0], '').trim();
+                const rawOptions = suggestionMatch[1].split('|');
+                setSuggestions(rawOptions.map(o => o.trim()).filter(o => o.length > 0));
+            } else {
+                 setSuggestions([]);
+            }
+
+            let botMsg: Message = { role: Role.BOT, text: displayText };
 
             try {
+                // Check for Booking JSON
                 const jsonMatch = responseText.match(/\{[\s\S]*\}/);
                 if(jsonMatch) {
                     const data = JSON.parse(jsonMatch[0]);
                     if(data.bookingConfirmed) {
                         botMsg = { role: Role.BOT, text: data.message, bookingDetails: { ...data, appointmentId: Date.now() }, isComponent: true };
-                        // Persist text part only for booking confirmation
                     }
                 }
             } catch(e) {}
             
-            // 4. Update UI
+            // 5. Update UI & Persist Bot Msg
             setMessages(prev => [...prev, botMsg]);
 
-            // 5. Persist Bot Message (if logged in)
             if (currentUser) {
                 await supabase.from('chat_history').insert({
                     user_id: currentUser.id,
@@ -264,6 +336,8 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
         } 
         finally { setIsLoading(false); }
     };
+
+    // ... (Remaining handlers: handleFile, toggleRecording, handleBookingConfirmed, handleBookFromProfile)
 
     const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -288,7 +362,6 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
         setShowBooking(false);
         const msg = { role: Role.BOT, text: details.message, bookingDetails: details, isComponent: true };
         setMessages(prev => [...prev, msg]);
-        // Also save this confirmation text to history
         if(currentUser) {
             supabase.from('chat_history').insert({
                 user_id: currentUser.id,
@@ -386,6 +459,21 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
                 {isLoading && (<div className="flex justify-start mb-2"><div className="bg-white p-3 rounded-lg rounded-tl-none shadow-sm"><Loader2 size={16} className="animate-spin text-gray-400"/></div></div>)}
                 <div ref={messagesEndRef}/>
             </div>
+            
+            {/* SMART SUGGESTION CHIPS */}
+            {suggestions.length > 0 && !isLoading && (
+                <div className="p-2 bg-[#EFE7DD] flex gap-2 overflow-x-auto no-scrollbar">
+                    {suggestions.map((chip, i) => (
+                        <button 
+                            key={i} 
+                            onClick={() => handleChipClick(chip)}
+                            className="bg-white border border-gray-200 text-blue-600 px-4 py-1.5 rounded-full text-xs font-bold shadow-sm whitespace-nowrap hover:bg-blue-50 transition-colors flex items-center gap-1"
+                        >
+                            <Sparkles size={12} className="text-yellow-500"/> {chip}
+                        </button>
+                    ))}
+                </div>
+            )}
 
             <div className="p-2 bg-white flex items-end gap-2 pb-safe border-t">
                 <div className="flex-1 bg-gray-100 rounded-3xl flex items-center p-1.5 px-3">

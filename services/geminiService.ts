@@ -14,11 +14,15 @@ export const getChatResponse = async (
   targetProvider?: any // New parameter to pass the specific provider context
 ): Promise<string> => {
     
-    // Fetch Providers List (only if we are in general mode, otherwise we know who we are talking to)
+    // 1. OPTIMIZATION: Limit history to last 10 turns to save API Quota (Tokens)
+    // This prevents "Resource Exhausted" errors on long chats
+    const limitedHistory = history.slice(-10);
+
+    // Fetch Providers List (only if we are in general mode)
     let providersContext = "No data";
     if (!targetProvider) {
         try {
-            const { data } = await supabase.from('providers').select('name, service_type, location, id, bio, social_links');
+            const { data } = await supabase.from('providers').select('name, service_type, location, id, bio, social_links').limit(20);
             if(data) providersContext = JSON.stringify(data);
         } catch(e) {}
     }
@@ -43,14 +47,17 @@ export const getChatResponse = async (
         """
 
         CRITICAL BEHAVIOR RULES:
-        1. **BE HUMAN & NATURAL:** Do NOT act like a robot reading a script. Be warm, professional, and concise.
-        2. **ANSWER ONLY THE QUESTION:** If the user asks "Where are you?", ONLY give the location. Do NOT list your services or prices unless asked.
-        3. **DO NOT DUMP INFO:** Never copy/paste the entire "Knowledge Base". Use it only as a reference to find facts.
-        4. **UNKNOWN INFO:** If the user asks something not in your Knowledge Base, say nicely that you don't know and ask for their phone number to call them back.
-        5. **booking:** If the user wants an appointment, ask for their preferred date/time. Once agreed, output the JSON below.
-
-        JSON FORMAT FOR BOOKING (Only output this when booking is confirmed):
-        { "bookingConfirmed": true, "provider": "${targetProvider.name}", "service": "${targetProvider.service_type}", "message": "Booking Confirmed! Please show this QR code." }
+        1. **BE HUMAN & NATURAL:** Be warm, professional, and concise.
+        2. **ANSWER ONLY THE QUESTION:** Do not list services unless asked.
+        3. **UNKNOWN INFO:** If asked something not in your Knowledge Base, say you don't know and ask for their phone number.
+        4. **SUGGESTIONS:** At the very end of your response, you MUST provide 3 short, relevant follow-up questions the user might want to ask next based on your Knowledge Base.
+        
+        FORMATTING OUPUT:
+        - Put the main response text first.
+        - If confirming a booking, output JSON: { "bookingConfirmed": true, ... }
+        - If NOT booking, at the very end, on a new line, write:
+          SUGGESTIONS|Option 1|Option 2|Option 3
+          (Example: SUGGESTIONS|كم الثمن؟|أين الموقع؟|حجز موعد)
         `;
     } else {
         // GENERAL MODE: City Assistant
@@ -63,22 +70,21 @@ export const getChatResponse = async (
 
         BEHAVIOR RULES:
         1. **BE HELPFUL:** Answer questions about Tangier services naturally.
-        2. **RECOMMENDATIONS:** If a user needs a service (e.g., "I need a plumber"), look at the PROVIDERS DATA and recommend specific names.
-        3. **MEDICAL:** If user says "My tooth hurts", suggest they visit a dentist from the list (if available).
-        4. **CONCISENESS:** Keep answers short and direct. Do not write long paragraphs.
-
-        JSON FORMAT (Only if you confirm a booking on behalf of a provider):
-        { "bookingConfirmed": true, "provider": "Name", "service": "Type", "message": "Booking Confirmed." }
+        2. **RECOMMENDATIONS:** Recommend specific names from the data if asked.
+        3. **CONCISENESS:** Keep answers short.
+        
+        FORMATTING:
+        At the end, suggest 3 relevant actions on a new line:
+        SUGGESTIONS|Option 1|Option 2|Option 3
         `;
     }
 
     const userParts: any[] = [{ text: newMessage }];
     if (image) userParts.push({ inlineData: { data: image.base64, mimeType: image.mimeType } });
 
-    const contents = [...history, { role: 'user', parts: userParts }];
+    const contents = [...limitedHistory, { role: 'user', parts: userParts }];
 
     try {
-        // DIRECTLY USING THE PROVIDED API KEY TO PREVENT CONNECTION ERRORS
         const apiKey = 'AIzaSyAYLry3mo4z-zkZ_6ykfsgPAnEZMv01NnM';
 
         if (!apiKey) {
@@ -93,7 +99,7 @@ export const getChatResponse = async (
             contents: contents,
             config: { 
                 systemInstruction,
-                temperature: 0.7, // Slightly higher for more natural/creative responses
+                temperature: 0.7,
             },
         });
         
@@ -101,6 +107,8 @@ export const getChatResponse = async (
 
     } catch (error: any) {
         console.error("AI Error Detailed:", error);
-        return `⚠️ عذراً، هناك مشكلة في الاتصال بالخادم. (Error: ${error.message || 'Unknown'})`;
+        // User friendly error map
+        if (error.message?.includes('429')) return "⚠️ الضغط كبير على الخادم (Busy). يرجى الانتظار قليلاً.";
+        return `⚠️ عذراً، هناك مشكلة في الاتصال. (${error.message || 'Unknown'})`;
     }
 };

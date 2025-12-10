@@ -3,8 +3,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useLocalization } from '../hooks/useLocalization';
 import { AuthenticatedUser, ProviderNotification, AdRequest, Offer, UrgentAd } from '../types';
 import { supabase } from '../services/supabaseClient';
-import { CheckCircle, XCircle, Camera, Loader2, Upload, MessageCircle, History, Users, Megaphone, Settings, ArrowLeft, Image as ImageIcon, QrCode, Bell, User, LayoutGrid, FileText, Lock, LogOut, Grid, Bookmark, Heart, Plus, Zap, Tag, Instagram, Facebook, MapPin, Edit3, Share2, Info, Trash2, Edit, ShieldAlert, Save, X, Database, BrainCircuit, Sparkles } from 'lucide-react';
+import { CheckCircle, XCircle, Camera, Loader2, Upload, MessageCircle, History, Users, Megaphone, Settings, ArrowLeft, Image as ImageIcon, QrCode, Bell, User, LayoutGrid, FileText, Lock, LogOut, Grid, Bookmark, Heart, Plus, Zap, Tag, Instagram, Facebook, MapPin, Edit3, Share2, Info, Trash2, Edit, ShieldAlert, Save, X, Database, BrainCircuit, Sparkles, Banknote, Clock, Map, CalendarCheck } from 'lucide-react';
 import jsQR from 'jsqr';
+
+// ... (Previous sub-components: NotificationView, HistoryView, UrgentAdsView, OffersView, AdsView, QRScannerView, EditProfileModal remain unchanged)
 
 // --- SUB-COMPONENTS (FULL SCREEN VIEWS) ---
 
@@ -223,8 +225,8 @@ const AdsView: React.FC<{ providerId: number; onClose: () => void }> = ({ provid
 
     useEffect(() => { fetchRequests(); }, []);
     const fetchRequests = async () => {
-        const { data } = await supabase.from('provider_ad_requests').select('*').eq('provider_id', providerId).order('created_at', { ascending: false });
-        setRequests(data || []);
+        const { data } = await supabase.from('provider_ad_requests').select('*, providers(name)').eq('provider_id', providerId).order('created_at', { ascending: false });
+        setRequests(data as any || []);
     }
     const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]; if(!file) return; setLoading(true);
@@ -262,6 +264,7 @@ const AdsView: React.FC<{ providerId: number; onClose: () => void }> = ({ provid
 }
 
 const QRScannerView: React.FC<{ providerId: number; onClose: () => void }> = ({ providerId, onClose }) => {
+    // ... (QR Scanner Logic Remains unchanged)
     const { t } = useLocalization();
     const [status, setStatus] = useState<'idle' | 'success' | 'error' | 'wrong_provider'>('idle');
     const [scannedClientName, setScannedClientName] = useState('');
@@ -351,22 +354,36 @@ const EditProfileModal: React.FC<{ provider: AuthenticatedUser; onClose: () => v
     return (<div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4"><div className="bg-white rounded-2xl w-full max-w-sm p-6 space-y-4"><h2 className="font-bold text-lg">{t('editProfile')}</h2><div className="flex justify-center mb-2"><div className="w-20 h-20 rounded-full bg-gray-200 overflow-hidden relative cursor-pointer" onClick={() => fileRef.current?.click()}>{form.image ? <img src={form.image} className="w-full h-full object-cover"/> : <Camera className="absolute inset-0 m-auto text-gray-400"/>}{loading && <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white"><Loader2 className="animate-spin"/></div>}</div><input type="file" ref={fileRef} hidden onChange={handleImageUpload} /></div><textarea value={form.bio} onChange={e => setForm({...form, bio: e.target.value})} placeholder={t('bioLabel')} className="w-full p-2 border rounded-lg h-24 text-sm"/><div className="space-y-2"><h4 className="font-bold text-xs uppercase text-gray-400">{t('socialLinks')}</h4><div className="flex items-center gap-2 border rounded-lg p-2"><Instagram size={16}/><input value={form.instagram} onChange={e => setForm({...form, instagram: e.target.value})} placeholder="Instagram Username" className="flex-1 outline-none text-sm"/></div><div className="flex items-center gap-2 border rounded-lg p-2"><Facebook size={16}/><input value={form.facebook} onChange={e => setForm({...form, facebook: e.target.value})} placeholder="Facebook Username" className="flex-1 outline-none text-sm"/></div><div className="flex items-center gap-2 border rounded-lg p-2"><MapPin size={16}/><input value={form.gps} onChange={e => setForm({...form, gps: e.target.value})} placeholder="GPS Coordinates" className="flex-1 outline-none text-sm"/></div></div><div className="flex gap-2"><button onClick={onClose} className="flex-1 py-2 bg-gray-100 rounded-lg">{t('cancel')}</button><button onClick={handleSave} disabled={loading} className="flex-1 py-2 bg-black text-white rounded-lg font-bold">{t('saveProfile')}</button></div></div></div>)
 }
 
-// --- NEW COMPONENT: AI INSTRUCTIONS VIEW ---
+// --- UPDATED: AI INSTRUCTIONS VIEW WITH STRUCTURED INPUTS ---
 const AIInstructionsView: React.FC<{ provider: AuthenticatedUser; onClose: () => void; onUpdateUser: (updates: Partial<AuthenticatedUser>) => void }> = ({ provider, onClose, onUpdateUser }) => {
     const { t } = useLocalization();
     const [instructions, setInstructions] = useState(provider.custom_ai_instructions || '');
+    // NEW STRUCTURED FIELDS
+    const [priceInfo, setPriceInfo] = useState(provider.price_info || '');
+    const [locationInfo, setLocationInfo] = useState(provider.location_info || '');
+    const [workingHours, setWorkingHours] = useState(provider.working_hours || '');
+    const [bookingInfo, setBookingInfo] = useState(provider.booking_info || '');
+    
     const [loading, setLoading] = useState(false);
 
     const handleSave = async () => {
         setLoading(true);
+        const updates = { 
+            custom_ai_instructions: instructions,
+            price_info: priceInfo,
+            location_info: locationInfo,
+            working_hours: workingHours,
+            booking_info: bookingInfo
+        };
+
         const { error } = await supabase
             .from('providers')
-            .update({ custom_ai_instructions: instructions })
+            .update(updates)
             .eq('id', provider.id);
         
         setLoading(false);
         if(!error) {
-            onUpdateUser({ custom_ai_instructions: instructions });
+            onUpdateUser(updates);
             alert(t('success'));
             onClose();
         } else {
@@ -380,25 +397,79 @@ const AIInstructionsView: React.FC<{ provider: AuthenticatedUser; onClose: () =>
                 <button onClick={onClose}><ArrowLeft/></button>
                 <h2 className="font-bold text-xl flex items-center gap-2"><BrainCircuit className="text-purple-600"/> إعدادات الذكاء (AI Config)</h2>
             </div>
-            <div className="p-4 flex-1 overflow-y-auto">
-                <div className="bg-purple-50 p-4 rounded-xl border border-purple-200 mb-6">
+            <div className="p-4 flex-1 overflow-y-auto space-y-6">
+                
+                {/* Intro Box */}
+                <div className="bg-purple-50 p-4 rounded-xl border border-purple-200">
                     <p className="text-sm text-purple-800 font-bold mb-2 flex items-center gap-2">
-                        <Sparkles size={16}/> ماذا تريد أن يقول "البوت" عنك؟
+                        <Sparkles size={16}/> روبوت هجين (Hybrid Bot)
                     </p>
                     <p className="text-xs text-purple-700 leading-relaxed">
-                        اكتب هنا كل المعلومات التي تريد أن يعرفها الذكاء الاصطناعي عن خدماتك. 
-                        مثلاً: الأسعار، أوقات العمل، الخدمات بالتفصيل، العنوان الدقيق...
-                        عندما يسأل الزبون "البوت" عنك، سيستخدم "البوت" هذا النص للإجابة.
+                        قم بملء الخانات أدناه بدقة. عندما يسأل الزبون عن "الثمن" أو "الموقع"، سيقوم التطبيق بعرض جوابك المكتوب هنا فوراً دون الحاجة للذكاء الاصطناعي، مما يضمن دقة المعلومة وسرعة الرد.
                     </p>
                 </div>
 
+                {/* 1. Price Info */}
                 <div className="space-y-2">
-                    <label className="text-sm font-bold text-gray-700">تعليمات الروبوت (AI Instructions)</label>
+                    <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                        <Banknote size={16} className="text-green-600"/> معلومات الأسعار (Prices)
+                    </label>
+                    <textarea 
+                        value={priceInfo} 
+                        onChange={e => setPriceInfo(e.target.value)}
+                        placeholder="مثال: الاستشارة: 200 درهم، تبييض الأسنان: 1500 درهم..."
+                        className="w-full h-24 p-3 rounded-xl border-2 border-gray-100 focus:border-green-500 outline-none text-sm resize-none bg-gray-50"
+                    />
+                </div>
+
+                {/* 2. Working Hours */}
+                <div className="space-y-2">
+                    <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                        <Clock size={16} className="text-orange-600"/> التوقيت (Working Hours)
+                    </label>
+                    <input 
+                        type="text"
+                        value={workingHours} 
+                        onChange={e => setWorkingHours(e.target.value)}
+                        placeholder="مثال: يومياً من 9:00 صباحاً إلى 6:00 مساءً، ما عدا الأحد."
+                        className="w-full p-3 rounded-xl border-2 border-gray-100 focus:border-orange-500 outline-none text-sm bg-gray-50"
+                    />
+                </div>
+
+                {/* 3. Location Info */}
+                <div className="space-y-2">
+                    <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                        <Map size={16} className="text-blue-600"/> تفاصيل العنوان (Exact Location)
+                    </label>
+                    <textarea 
+                        value={locationInfo} 
+                        onChange={e => setLocationInfo(e.target.value)}
+                        placeholder="مثال: شارع محمد الخامس، قرب مقهى باريس، الطابق الثاني."
+                        className="w-full h-20 p-3 rounded-xl border-2 border-gray-100 focus:border-blue-500 outline-none text-sm resize-none bg-gray-50"
+                    />
+                </div>
+
+                {/* 4. Booking Details (New) */}
+                <div className="space-y-2">
+                    <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                        <CalendarCheck size={16} className="text-red-600"/> تفاصيل وشروط الحجز (Booking Conditions)
+                    </label>
+                    <textarea 
+                        value={bookingInfo} 
+                        onChange={e => setBookingInfo(e.target.value)}
+                        placeholder="مثال: الدفع نقداً فقط، يرجى إحضار البطاقة الوطنية، الحضور قبل 10 دقائق..."
+                        className="w-full h-24 p-3 rounded-xl border-2 border-gray-100 focus:border-red-500 outline-none text-sm resize-none bg-gray-50"
+                    />
+                </div>
+
+                {/* 5. General Context (Old Field) */}
+                <div className="space-y-2">
+                    <label className="text-sm font-bold text-gray-700">معلومات إضافية (General Bio for AI)</label>
                     <textarea 
                         value={instructions} 
                         onChange={e => setInstructions(e.target.value)}
-                        placeholder="مثال: أنا طبيب أسنان أعمل من 9 صباحاً إلى 5 مساءً. ثمن الكشف 200 درهم. أقوم بتبييض الأسنان وتقويمها..."
-                        className="w-full h-64 p-4 rounded-xl border-2 border-gray-200 focus:border-purple-500 outline-none text-sm leading-relaxed resize-none"
+                        placeholder="أي معلومات أخرى تريد أن يعرفها البوت للرد على الأسئلة العامة..."
+                        className="w-full h-32 p-3 rounded-xl border-2 border-gray-100 focus:border-purple-500 outline-none text-sm leading-relaxed resize-none bg-gray-50"
                     />
                 </div>
             </div>
@@ -411,7 +482,7 @@ const AIInstructionsView: React.FC<{ provider: AuthenticatedUser; onClose: () =>
     );
 };
 
-// --- INSTAGRAM STYLE PORTAL ---
+// ... (ProviderPortal remains mostly unchanged, just linking to updated AIInstructionsView)
 const ProviderPortal: React.FC<{ provider: AuthenticatedUser; onLogout: () => void; onUpdateUser: (updates: Partial<AuthenticatedUser>) => void; onNavTo?: (target: string) => void }> = ({ provider, onLogout, onUpdateUser, onNavTo }) => {
     const { t } = useLocalization();
     const [view, setView] = useState<'scan' | 'notifications' | 'history' | 'ads' | 'offers' | 'urgent' | 'ai_config' | null>(null);
