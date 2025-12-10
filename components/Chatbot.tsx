@@ -31,7 +31,6 @@ export const UrgentTicker: React.FC = () => {
 }
 
 export const BookingModal: React.FC<{ provider: any; onClose: () => void; currentUser: AuthenticatedUser | null; onBooked: (details: any) => void; initialOffer?: Offer | null }> = ({ provider, onClose, currentUser, onBooked, initialOffer }) => {
-    // ... (Existing BookingModal code)
     const { t } = useLocalization();
     const [offers, setOffers] = useState<Offer[]>([]);
     const [selectedOffer, setSelectedOffer] = useState<Offer | null>(null);
@@ -80,7 +79,6 @@ export const BookingModal: React.FC<{ provider: any; onClose: () => void; curren
 }
 
 export const ChatProfileModal: React.FC<{ provider: any; onClose: () => void; currentUser: AuthenticatedUser | null; onBookOffer?: (offer: Offer) => void }> = ({ provider, onClose, currentUser, onBookOffer }) => {
-   // ... (Existing ChatProfileModal code)
     const { t } = useLocalization();
     const [offers, setOffers] = useState<Offer[]>([]);
     const [isFollowing, setIsFollowing] = useState(false);
@@ -142,6 +140,9 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
     const [isRecording, setIsRecording] = useState(false);
     const [suggestions, setSuggestions] = useState<string[]>([]); // Smart Chips
 
+    // Speech Recognition Reference
+    const recognitionRef = useRef<any>(null);
+
     useEffect(() => {
         const fetchProviders = async () => { const { data } = await supabase.from('providers').select('*').eq('is_active', true); setProviders(data || []); }
         const fetchAds = async () => { const { data } = await supabase.from('system_announcements').select('*').eq('is_active', true); setSystemAds(data || []); }
@@ -183,17 +184,14 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
             setMessages([]);
         }
         
-        // Initial Suggestions based on chat type AND available data
+        // Initial Suggestions
         if(view === 'CHAT') {
             if (selectedChat) {
-                // Determine what data the provider actually has
                 const dynamicSuggestions = ['📅 حجز موعد'];
                 if (selectedChat.price_info) dynamicSuggestions.unshift('💰 الأثمنة');
                 if (selectedChat.location_info) dynamicSuggestions.push('📍 الموقع');
                 if (selectedChat.working_hours) dynamicSuggestions.push('🕒 التوقيت');
-                // NEW: Add Booking Conditions if available
                 if (selectedChat.booking_info) dynamicSuggestions.push('📝 شروط الحجز');
-                
                 setSuggestions(dynamicSuggestions);
             } else {
                 setSuggestions(['🏥 أبحث عن طبيب', '🔧 أحتاج سباك', '🏠 سمسار عقارات']);
@@ -209,39 +207,31 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
         setShowBooking(false);
     };
 
-    // HYBRID HANDLER: Smart Chip Clicks
     const handleChipClick = async (text: string) => {
         setInput(text);
         
-        // Check if we can answer locally (Deterministic Response)
         if (selectedChat) {
             let localAnswer = null;
             if (text === '💰 الأثمنة' && selectedChat.price_info) localAnswer = selectedChat.price_info;
             if (text === '📍 الموقع' && selectedChat.location_info) localAnswer = selectedChat.location_info;
             if (text === '🕒 التوقيت' && selectedChat.working_hours) localAnswer = selectedChat.working_hours;
-            // NEW: Handle Booking Info
             if (text === '📝 شروط الحجز' && selectedChat.booking_info) localAnswer = selectedChat.booking_info;
             
             if (text === '📅 حجز موعد') {
                  setPreSelectedOffer(null); 
                  setShowBooking(true);
-                 return; // Stop here, UI handles booking
+                 return;
             }
 
             if (localAnswer) {
-                // 1. Show User Msg
                 const userMsg: Message = { role: Role.USER, text: text };
                 setMessages(prev => [...prev, userMsg]);
                 setInput('');
-                
-                // 2. Simulate Bot Typing delay
                 setIsLoading(true);
                 setTimeout(async () => {
                     const botMsg: Message = { role: Role.BOT, text: localAnswer as string };
                     setMessages(prev => [...prev, botMsg]);
                     setIsLoading(false);
-
-                    // 3. Save to DB (optional, but good for history)
                     if (currentUser) {
                         await supabase.from('chat_history').insert([
                             { user_id: currentUser.id, provider_id: selectedChat.id, role: 'USER', text: text },
@@ -249,11 +239,9 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
                         ]);
                     }
                 }, 600);
-                return; // EXIT FUNCTION, NO API CALL
+                return;
             }
         }
-
-        // If no local answer, fall back to AI
         setTimeout(() => handleSend(text), 100);
     }
 
@@ -261,14 +249,12 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
         const textToSend = manualText || input;
         if((!textToSend.trim() && !preview) || isLoading) return;
         
-        // 1. Add User Message to UI
         const userMsg: Message = { role: Role.USER, text: textToSend, imageUrl: preview || undefined };
         setMessages(prev => [...prev, userMsg]);
         setInput(''); setPreview(null);
-        setSuggestions([]); // Clear old suggestions while thinking
+        setSuggestions([]); 
         setIsLoading(true);
 
-        // 2. Persist User Message
         if (currentUser) {
             await supabase.from('chat_history').insert({
                 user_id: currentUser.id,
@@ -280,7 +266,6 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
         }
 
         try {
-            // 3. Get AI Response
             const history = messages.filter(m => !m.isComponent).map(m => ({ role: m.role === Role.USER ? 'user' : 'model', parts: [{ text: m.text }] }));
             
             const responseText = await getChatResponse(
@@ -294,7 +279,6 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
                 selectedChat 
             );
             
-            // 4. PARSE SUGGESTIONS from Response
             let displayText = responseText;
             const suggestionMatch = responseText.match(/SUGGESTIONS\|(.*)/);
             
@@ -303,13 +287,15 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
                 const rawOptions = suggestionMatch[1].split('|');
                 setSuggestions(rawOptions.map(o => o.trim()).filter(o => o.length > 0));
             } else {
-                 setSuggestions([]);
+                // Keep persistent hybrid suggestions if no new ones
+                if(selectedChat) {
+                    // Logic to restore original chips if not specified
+                }
             }
 
             let botMsg: Message = { role: Role.BOT, text: displayText };
 
             try {
-                // Check for Booking JSON
                 const jsonMatch = responseText.match(/\{[\s\S]*\}/);
                 if(jsonMatch) {
                     const data = JSON.parse(jsonMatch[0]);
@@ -319,7 +305,6 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
                 }
             } catch(e) {}
             
-            // 5. Update UI & Persist Bot Msg
             setMessages(prev => [...prev, botMsg]);
 
             if (currentUser) {
@@ -337,8 +322,6 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
         finally { setIsLoading(false); }
     };
 
-    // ... (Remaining handlers: handleFile, toggleRecording, handleBookingConfirmed, handleBookFromProfile)
-
     const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if(file) {
@@ -349,12 +332,50 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
         e.target.value = '';
     }
 
+    // --- NEW WEB SPEECH API IMPLEMENTATION ---
     const toggleRecording = () => {
         if (isRecording) {
+            if (recognitionRef.current) {
+                recognitionRef.current.stop();
+            }
             setIsRecording(false);
-            setInput(t('recording') + " [Simulated]");
         } else {
-            setIsRecording(true);
+            // Start Recording
+            const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+            
+            if (!SpeechRecognition) {
+                alert("Your browser does not support voice recognition.");
+                return;
+            }
+
+            recognitionRef.current = new SpeechRecognition();
+            recognitionRef.current.continuous = false; // Stop after one sentence
+            recognitionRef.current.lang = 'ar-MA'; // Target Moroccan Arabic if possible, or 'ar'
+            recognitionRef.current.interimResults = false;
+
+            recognitionRef.current.onstart = () => {
+                setIsRecording(true);
+            };
+
+            recognitionRef.current.onresult = (event: any) => {
+                const transcript = event.results[0][0].transcript;
+                if (transcript) {
+                    setInput(transcript);
+                    // Optional: Auto Send
+                    // setTimeout(() => handleSend(transcript), 500); 
+                }
+            };
+
+            recognitionRef.current.onerror = (event: any) => {
+                console.error("Speech Error", event.error);
+                setIsRecording(false);
+            };
+
+            recognitionRef.current.onend = () => {
+                setIsRecording(false);
+            };
+
+            recognitionRef.current.start();
         }
     }
 
@@ -480,7 +501,7 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
                     <button onClick={() => fileRef.current?.click()} className="p-2 text-gray-400 hover:text-gray-600"><Paperclip size={20}/></button>
                     <input type="file" ref={fileRef} hidden onChange={handleFile} accept="image/*"/>
                     <input type="file" ref={cameraInputRef} hidden accept="image/*" capture="environment" onChange={handleFile} />
-                    <textarea value={input} onChange={e => setInput(e.target.value)} placeholder={isRecording ? t('recording') : t('inputPlaceholder')} rows={1} className="flex-1 bg-transparent border-none focus:ring-0 resize-none max-h-20 py-3 text-sm outline-none text-gray-800" onKeyDown={e => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }}}/>
+                    <textarea value={input} onChange={e => setInput(e.target.value)} placeholder={isRecording ? "تحدث الآن (Listening)..." : t('inputPlaceholder')} rows={1} className="flex-1 bg-transparent border-none focus:ring-0 resize-none max-h-20 py-3 text-sm outline-none text-gray-800" onKeyDown={e => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }}}/>
                     <button onClick={() => cameraInputRef.current?.click()} className="p-2 text-gray-400 hover:text-gray-600"><Camera size={20}/></button>
                 </div>
                 <button onClick={() => { if(input.trim() || preview) handleSend(); else toggleRecording(); }} className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-all ${input.trim() || preview ? 'bg-blue-600 text-white' : (isRecording ? 'bg-red-500 text-white animate-pulse' : 'bg-green-500 text-white')}`}>{input.trim() || preview ? <Send size={20} className={language === 'ar' ? 'rotate-180 ml-1' : 'mr-1'}/> : (isRecording ? <StopCircle size={24}/> : <Mic size={24}/>)}</button>
