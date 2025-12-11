@@ -5,12 +5,16 @@ import { getChatResponse } from '../services/geminiService';
 import { useLocalization } from '../hooks/useLocalization';
 import { supabase } from '../services/supabaseClient';
 import QRCodeDisplay from './QRCodeDisplay';
-import { Send, Mic, Paperclip, Camera, Loader2, X, Globe, Search, ArrowLeft, MoreVertical, Calendar, Info, Phone, MapPin, Instagram, Facebook, Tag, UserPlus, UserCheck, Megaphone, Star, Check, ChevronDown, CheckCircle, StopCircle, Sparkles, Banknote, Clock } from 'lucide-react';
+import { Send, Mic, Paperclip, Camera, Loader2, X, Globe, Search, ArrowLeft, MoreVertical, Calendar, Info, Phone, MapPin, Instagram, Facebook, Tag, UserPlus, UserCheck, Megaphone, Star, Check, ChevronDown, CheckCircle, StopCircle, Sparkles, Banknote, Clock, Zap } from 'lucide-react';
 
-// ... (Existing Sub-components: UrgentTicker, BookingModal, ChatProfileModal remain unchanged)
+// ... (Existing Sub-components: BookingModal, ChatProfileModal remain unchanged)
 
 export const UrgentTicker: React.FC = () => {
+    const { t } = useLocalization();
     const [ads, setAds] = useState<UrgentAd[]>([]);
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const [isVisible, setIsVisible] = useState(true);
+
     useEffect(() => {
         const fetch = async () => {
             const { data } = await supabase.from('urgent_ads').select('*, providers(name)').eq('is_active', true);
@@ -19,12 +23,62 @@ export const UrgentTicker: React.FC = () => {
         fetch();
     }, []);
 
+    useEffect(() => {
+        if (ads.length <= 1) return;
+
+        const interval = setInterval(() => {
+            // 1. Fade Out
+            setIsVisible(false);
+            
+            setTimeout(() => {
+                // 2. Change Content
+                setCurrentIndex((prev) => (prev + 1) % ads.length);
+                // 3. Fade In
+                setIsVisible(true);
+            }, 500); // Wait for fade out to finish (0.5s)
+
+        }, 4000); // Total cycle 4s
+
+        return () => clearInterval(interval);
+    }, [ads]);
+
     if(ads.length === 0) return null;
 
+    const currentAd = ads[currentIndex];
+
     return (
-        <div className="bg-yellow-100 text-yellow-900 py-1 overflow-hidden whitespace-nowrap border-b border-yellow-200 z-10 shadow-sm">
-            <div className="animate-marquee inline-block font-bold text-xs">
-                {ads.map(ad => `📢 ${ad.providers?.name || 'Urgent'}: ${ad.message}  •  `)}
+        <div className="bg-white border-b border-gray-100 shadow-sm z-10 flex items-stretch h-10 overflow-hidden relative">
+            {/* FIXED RED LABEL */}
+            <div className="bg-red-600 text-white px-3 flex items-center justify-center relative z-20 shrink-0">
+                <div className="absolute inset-0 bg-red-600 animate-pulse z-0"></div>
+                <div className="relative z-10 flex items-center gap-1 font-black text-xs">
+                    <Zap size={12} className="fill-white"/>
+                    <span>خبر عاجل</span>
+                </div>
+                {/* Slanted Edge Effect */}
+                <div className="absolute top-0 -left-3 w-0 h-0 border-t-[40px] border-t-red-600 border-l-[15px] border-l-transparent pointer-events-none ltr:hidden"></div>
+                <div className="absolute top-0 -right-3 w-0 h-0 border-t-[40px] border-t-red-600 border-r-[15px] border-r-transparent pointer-events-none rtl:hidden"></div>
+            </div>
+
+            {/* ANIMATED CONTENT AREA */}
+            <div className="flex-1 flex items-center px-4 bg-gray-50 overflow-hidden relative">
+                <div 
+                    className={`flex items-center gap-2 text-xs w-full transition-all duration-500 ease-in-out transform ${
+                        isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'
+                    }`}
+                >
+                    <span className="font-black text-blue-800 whitespace-nowrap">
+                        {currentAd?.providers?.name || 'مجهول'}:
+                    </span>
+                    <span className="text-gray-700 font-medium truncate">
+                        {currentAd?.message}
+                    </span>
+                </div>
+                
+                {/* Progress Bar (Optional Visual cue) */}
+                {ads.length > 1 && (
+                     <div key={currentIndex} className="absolute bottom-0 left-0 h-0.5 bg-red-500 animate-[width_4s_linear]"></div>
+                )}
             </div>
         </div>
     );
@@ -134,8 +188,6 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
     const [preview, setPreview] = useState<string | null>(null);
     const [showProfile, setShowProfile] = useState(false);
     const [showBooking, setShowBooking] = useState(false);
-    const [systemAds, setSystemAds] = useState<SystemAnnouncement[]>([]);
-    const [currentAdIndex, setCurrentAdIndex] = useState(0);
     const [preSelectedOffer, setPreSelectedOffer] = useState<Offer | null>(null);
     const [isRecording, setIsRecording] = useState(false);
     const [suggestions, setSuggestions] = useState<string[]>([]); // Smart Chips
@@ -145,15 +197,8 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
 
     useEffect(() => {
         const fetchProviders = async () => { const { data } = await supabase.from('providers').select('*').eq('is_active', true); setProviders(data || []); }
-        const fetchAds = async () => { const { data } = await supabase.from('system_announcements').select('*').eq('is_active', true); setSystemAds(data || []); }
-        fetchProviders(); fetchAds();
+        fetchProviders();
     }, []);
-
-    useEffect(() => {
-        if(systemAds.length <= 1) return;
-        const timer = setInterval(() => { setCurrentAdIndex(prev => (prev + 1) % systemAds.length); }, 4000);
-        return () => clearInterval(timer);
-    }, [systemAds]);
 
     useEffect(() => { onToggleNav(view === 'CHAT'); }, [view]);
 
@@ -402,13 +447,6 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
     // --- VIEW 1: CHAT LIST ---
     if (view === 'LIST') {
         const filteredProviders = providers.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.service_type.toLowerCase().includes(searchTerm.toLowerCase()));
-        const currentAd = systemAds[currentAdIndex];
-        const handleAdClick = async () => {
-            if(!currentAd) return;
-            const p = providers.find(prov => prov.name === currentAd.title);
-            if(p) openChat(p);
-            else openChat(null); 
-        }
 
         return (
             <div className="flex flex-col h-full bg-white relative">
@@ -421,12 +459,6 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
                 </div>
 
                 <div className="flex-1 overflow-y-auto pb-20">
-                    {!searchTerm && currentAd && (
-                        <div onClick={handleAdClick} className="flex items-center gap-4 p-4 cursor-pointer bg-yellow-50/50 hover:bg-yellow-50 border-b border-yellow-100 transition-all duration-500">
-                            <div className="w-14 h-14 rounded-full p-0.5 bg-gradient-to-tr from-yellow-400 to-orange-500 relative shrink-0"><img src={currentAd.image_url} className="w-full h-full rounded-full border-2 border-white object-cover"/><div className="absolute -bottom-1 -right-1 bg-yellow-400 text-white rounded-full p-1 border border-white"><Star size={10} fill="white"/></div></div>
-                            <div className="flex-1 min-w-0"><div className="flex justify-between items-center mb-1"><h3 className="font-bold text-gray-900 truncate">{currentAd.title}</h3><span className="text-[10px] font-bold text-yellow-600 bg-yellow-100 px-2 py-0.5 rounded-full uppercase tracking-wide">{t('sponsored')}</span></div><p className="text-sm text-gray-600 line-clamp-1 flex items-center gap-1 animate-fade-in">{currentAd.message}</p></div>
-                        </div>
-                    )}
                     <div onClick={() => openChat(null)} className="flex items-center gap-4 p-4 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
                         <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white shadow-md shrink-0"><Globe size={28}/></div>
                         <div className="flex-1 min-w-0"><div className="flex justify-between items-center mb-1"><h3 className="font-bold text-gray-900">Tanger IA</h3><span className="text-[10px] text-gray-400">Now</span></div><p className="text-sm text-gray-500 line-clamp-1">{t('appDesc')}</p></div>

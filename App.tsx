@@ -11,7 +11,7 @@ import { JobBoard } from './components/JobBoard';
 import { AdminDashboard } from './components/AdminDashboard'; // Import New Component
 import { useLocalization, LocalizationProvider } from './hooks/useLocalization';
 import { supabase } from './services/supabaseClient';
-import { LogIn, User, MapPin, ShoppingBag, Home, Briefcase, Settings, X, Phone, Globe, LayoutGrid, Heart, List, LogOut, CheckCircle, Edit, Share2, Grid, Bookmark, Menu, Users, Database, Instagram, Facebook, Tag, Sparkles, MessageCircle, Calendar, Bell, Eye, EyeOff, Camera, Loader2, UserPlus, UserCheck, Megaphone, Clock, ArrowLeft, Moon, Sun, AlertCircle } from 'lucide-react';
+import { LogIn, User, MapPin, ShoppingBag, Home, Briefcase, Settings, X, Phone, Globe, LayoutGrid, Heart, List, LogOut, CheckCircle, Edit, Share2, Grid, Bookmark, Menu, Users, Database, Instagram, Facebook, Tag, Sparkles, MessageCircle, Calendar, Bell, Eye, EyeOff, Camera, Loader2, UserPlus, UserCheck, Megaphone, Clock, ArrowLeft, Moon, Sun, AlertCircle, Zap, Scan, BrainCircuit, ShieldCheck, Gem } from 'lucide-react';
 
 // --- CUSTOM TOAST NOTIFICATION ---
 const ToastNotification: React.FC<{ message: string; type: 'success' | 'error'; onClose: () => void }> = ({ message, type, onClose }) => {
@@ -25,6 +25,71 @@ const ToastNotification: React.FC<{ message: string; type: 'success' | 'error'; 
             <div className={`flex items-center gap-3 px-6 py-3 rounded-full shadow-2xl border ${type === 'success' ? 'bg-white text-green-700 border-green-100' : 'bg-white text-red-600 border-red-100'}`}>
                 {type === 'success' ? <CheckCircle size={20} className="text-green-500 fill-green-100"/> : <AlertCircle size={20} className="text-red-500 fill-red-100"/>}
                 <span className="font-bold text-sm">{message}</span>
+            </div>
+        </div>
+    );
+}
+
+// --- NEW COMPONENT: PROVIDER PENDING VIEW ---
+const ProviderPendingView: React.FC<{ user: AuthenticatedUser; onLogout: () => void }> = ({ user, onLogout }) => {
+    return (
+        <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-blue-900 to-black text-white flex flex-col items-center justify-center p-6 relative overflow-hidden" dir="rtl">
+            {/* Background Decorations */}
+            <div className="absolute top-0 left-0 w-80 h-80 bg-blue-500/20 rounded-full blur-[100px] -translate-x-1/2 -translate-y-1/2"></div>
+            <div className="absolute bottom-0 right-0 w-80 h-80 bg-purple-500/20 rounded-full blur-[100px] translate-x-1/2 translate-y-1/2"></div>
+
+            <div className="relative z-10 w-full max-w-sm bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl p-8 shadow-2xl animate-slide-up flex flex-col items-center">
+                
+                <div className="w-24 h-24 bg-gradient-to-tr from-yellow-400 to-orange-500 rounded-full mb-6 flex items-center justify-center shadow-lg border-4 border-white/20">
+                    <Clock size={48} className="text-white animate-pulse"/>
+                </div>
+                
+                <h1 className="text-2xl font-black mb-2 text-center">مرحباً، {user.name}</h1>
+                <p className="text-blue-200 text-sm text-center mb-8 px-4 leading-relaxed">
+                    تم إنشاء حسابك بنجاح! نحن الآن بانتظار تفعيل حسابك من طرف الإدارة.
+                </p>
+
+                <div className="w-full space-y-3 mb-8">
+                    <div className="bg-black/30 p-4 rounded-2xl flex items-center gap-4 border border-white/10 hover:bg-black/40 transition-colors">
+                        <div className="bg-blue-500/20 p-2.5 rounded-xl text-blue-300"><BrainCircuit size={20}/></div>
+                        <div>
+                            <h3 className="font-bold text-sm text-white">الذكاء الاصطناعي (AI)</h3>
+                            <p className="text-[10px] text-gray-300">رد آلي ذكي على استفسارات الزبناء 24/7.</p>
+                        </div>
+                    </div>
+                    <div className="bg-black/30 p-4 rounded-2xl flex items-center gap-4 border border-white/10 hover:bg-black/40 transition-colors">
+                        <div className="bg-purple-500/20 p-2.5 rounded-xl text-purple-300"><Scan size={20}/></div>
+                        <div>
+                            <h3 className="font-bold text-sm text-white">نظام QR Code</h3>
+                            <p className="text-[10px] text-gray-300">تنظيم المواعيد والتحقق من الحجوزات.</p>
+                        </div>
+                    </div>
+                    <div className="bg-black/30 p-4 rounded-2xl flex items-center gap-4 border border-white/10 hover:bg-black/40 transition-colors">
+                        <div className="bg-green-500/20 p-2.5 rounded-xl text-green-300"><Megaphone size={20}/></div>
+                        <div>
+                            <h3 className="font-bold text-sm text-white">إشهارات وتنبيهات</h3>
+                            <p className="text-[10px] text-gray-300">أرسل عروضاً وتنبيهات لجميع متابعيك.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="text-center w-full bg-gradient-to-r from-white/10 to-transparent p-4 rounded-2xl border border-white/10 mb-6">
+                    <p className="text-xs text-gray-300 uppercase tracking-widest mb-1">ثمن الاشتراك الشهري</p>
+                    <div className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-orange-400 drop-shadow-sm">
+                        50 DH
+                    </div>
+                </div>
+                
+                <p className="text-[10px] text-center text-gray-400 mb-6">سيقوم المسؤول بالاتصال بك قريباً لتفعيل الخدمات.</p>
+
+                <button onClick={onLogout} className="w-full py-3 bg-white/10 hover:bg-white/20 text-white font-bold rounded-xl transition-all border border-white/10 flex items-center justify-center gap-2 text-sm">
+                    <LogOut size={16}/> تسجيل الخروج
+                </button>
+            </div>
+            
+            <div className="mt-8 flex items-center gap-2 opacity-50">
+                <ShieldCheck size={14} className="text-green-400"/>
+                <p className="text-[10px] text-white">TangerConnect Business Secure</p>
             </div>
         </div>
     );
@@ -105,11 +170,11 @@ const AuthModal: React.FC<{ isOpen: boolean; onClose: () => void; onLogin: (user
     // Default to CLIENT, user must explicitly switch to PROVIDER
     const [accountType, setAccountType] = useState<AccountType>(AccountType.CLIENT);
     
-    const [formData, setFormData] = useState({ phone: '', password: '', name: '', service_type: '', username: '' });
+    const [formData, setFormData] = useState({ phone: '', password: '', name: '', service_type: '', username: '', location: '' });
 
     // Reset form when switching types
     useEffect(() => {
-        setFormData({ phone: '', password: '', name: '', service_type: '', username: '' });
+        setFormData({ phone: '', password: '', name: '', service_type: '', username: '', location: '' });
         setIsRegister(false); 
     }, [accountType]);
 
@@ -127,6 +192,7 @@ const AuthModal: React.FC<{ isOpen: boolean; onClose: () => void; onLogin: (user
                     payload.service_type = formData.service_type || 'General';
                     // If no username provided, use phone as username fallback
                     payload.username = formData.username || formData.phone; 
+                    payload.location = formData.location || 'Tangier'; // Default location to fix NOT NULL constraint
                     
                     // CRITICAL: New providers are INACTIVE until approved by Admin
                     // Exception: The specific Admin number stays active for fallback
@@ -136,14 +202,7 @@ const AuthModal: React.FC<{ isOpen: boolean; onClose: () => void; onLogin: (user
                 const { error } = await supabase.from(table).insert(payload);
                 if (error) throw error;
                 
-                if (accountType === AccountType.PROVIDER && payload.phone !== '0617774846') {
-                    notify(t('accountPending'), 'success');
-                    onClose();
-                    setLoading(false);
-                    return;
-                }
-                
-                // Login immediately if client or admin
+                // Allow login immediately even if inactive (handled by App router)
                 const query = supabase.from(table).select('*');
                 if (accountType === AccountType.PROVIDER) query.eq('username', payload.username);
                 else query.eq('phone', formData.phone);
@@ -157,9 +216,14 @@ const AuthModal: React.FC<{ isOpen: boolean; onClose: () => void; onLogin: (user
                         phone: data.phone, 
                         service_type: data.service_type, 
                         profile_image_url: data.profile_image_url, 
-                        username: data.username 
+                        username: data.username,
+                        isActive: data.is_active // Pass active status
                     });
-                    notify(t('success'), 'success');
+                    if (accountType === AccountType.PROVIDER && !data.is_active) {
+                        // Don't show success toast, the pending screen is self explanatory
+                    } else {
+                        notify(t('success'), 'success');
+                    }
                 }
 
             } else {
@@ -188,12 +252,7 @@ const AuthModal: React.FC<{ isOpen: boolean; onClose: () => void; onLogin: (user
                      return;
                 }
 
-                // CHECK ACTIVE STATUS FOR PROVIDERS
-                if (accountType === AccountType.PROVIDER && !user.is_active) {
-                    notify(t('accountPending'), 'error');
-                    setLoading(false);
-                    return;
-                }
+                // CHANGED: Allow login even if inactive, App router will handle the view
                 
                 // Login Successful
                 notify(t('success'), 'success');
@@ -208,7 +267,9 @@ const AuthModal: React.FC<{ isOpen: boolean; onClose: () => void; onLogin: (user
                     username: user.username, 
                     social_links: user.social_links, 
                     followers_count: user.followers_count, 
-                    visits_count: user.visits_count 
+                    visits_count: user.visits_count,
+                    isActive: user.is_active, // Important
+                    subscriptionEndDate: user.subscription_end_date
                 });
             }
         } catch (e: any) { 
@@ -259,6 +320,7 @@ const AuthModal: React.FC<{ isOpen: boolean; onClose: () => void; onLogin: (user
                                     <>
                                         <input placeholder={t('username')} value={formData.username} onChange={e => setFormData({...formData, username: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl outline-none border focus:border-black transition-colors"/>
                                         <input placeholder="Service Type (e.g. Doctor, Plumber)" value={formData.service_type} onChange={e => setFormData({...formData, service_type: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl outline-none border focus:border-black transition-colors"/>
+                                        <input placeholder="Location (e.g. City Center)" value={formData.location} onChange={e => setFormData({...formData, location: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl outline-none border focus:border-black transition-colors"/>
                                     </>
                                 )}
                             </>
@@ -837,7 +899,15 @@ const AppContent: React.FC = () => {
 
     if(showSplash) return <SplashScreen />;
 
+    // --- PROVIDER VIEW LOGIC (UPDATED) ---
     if (user?.accountType === AccountType.PROVIDER && userView === UserView.PROVIDER) {
+        
+        // CHECK 1: IS ACTIVE?
+        if (!user.isActive) {
+            return <ProviderPendingView user={user} onLogout={handleLogout} />;
+        }
+
+        // CHECK 2: SHOW PORTAL
         return (
             <>
                 <ProviderPortal provider={user} onLogout={toggleProviderView} onUpdateUser={handleUpdateUser} onNavTo={handleProviderNav} />

@@ -10,28 +10,28 @@ const findLocalMatch = (text: string, provider: any): string | null => {
     // 1. PRICE DETECTION (الأثمنة)
     const priceKeywords = ['ثمن', 'سعر', 'بشحال', 'فلوك', 'price', 'prix', 'cost', 'money', 'argent', 'درهم', 'dh'];
     if (priceKeywords.some(k => lowerText.includes(k))) {
-        return provider.price_info || "سمح ليا، المزود مازال ماحددش الأثمنة بالضبط. (Price info not set)";
+        if (provider.price_info) return provider.price_info;
     }
 
     // 2. LOCATION DETECTION (الموقع)
     const locKeywords = ['موقع', 'عنوان', 'فين', 'بلاصة', 'location', 'address', 'adresse', 'place', 'where', 'localisation', 'gps'];
     if (locKeywords.some(k => lowerText.includes(k))) {
-        return provider.location_info || "العنوان غير متوفر حالياً. (Location not set)";
+        if (provider.location_info) return provider.location_info;
     }
 
     // 3. TIME DETECTION (التوقيت)
     const timeKeywords = ['وقت', 'ساعة', 'متى', 'وقتاش', 'time', 'hour', 'heure', 'open', 'close', 'ferme', 'حل', 'سد', 'توقيت', 'محلول'];
     if (timeKeywords.some(k => lowerText.includes(k))) {
-        return provider.working_hours || "أوقات العمل غير محددة. (Hours not set)";
+        if (provider.working_hours) return provider.working_hours;
     }
 
     // 4. BOOKING DETAILS (الحجز)
     const bookKeywords = ['حجز', 'موعد', 'rendez', 'book', 'reservation', 'appointment', 'شروط'];
     if (bookKeywords.some(k => lowerText.includes(k))) {
-        return provider.booking_info || "يمكنك حجز موعد عبر الضغط على أيقونة الرزنامة في الأعلى.";
+        if (provider.booking_info) return provider.booking_info;
     }
 
-    return null; // No match found
+    return null; // No strict local match found, proceed to AI
 };
 
 export const getChatResponse = async (
@@ -50,7 +50,7 @@ export const getChatResponse = async (
         return "📸 شكراً على الصورة. لقد تم استلامها وسيطلع عليها المهني قريباً.\n(Image received successfully)";
     }
 
-    // --- 2. TRY LOCAL MATCHING FIRST (Hybrid System) ---
+    // --- 2. TRY LOCAL MATCHING FIRST (Hybrid System - Strict Fields) ---
     if (targetProvider) {
         const localResponse = findLocalMatch(newMessage, targetProvider);
         if (localResponse) {
@@ -59,47 +59,58 @@ export const getChatResponse = async (
         }
     }
 
-    // --- 3. FALLBACK: If no local match, use API (or generic response if key fails) ---
-    // If you want to COMPLETELY disable API cost, you can remove the code below 
-    // and just return a generic menu guidance.
-    
-    /* 
-    // OPTIONAL: UNCOMMENT TO DISABLE API ENTIRELY
-    return "مرحباً! أنا المساعد الآلي. يرجى اختيار أحد الأزرار أسفله (الأثمنة، الموقع، الحجز) للحصول على إجابة دقيقة.";
-    */
-
-    const limitedHistory = history.slice(-5); // Reduce context to minimum
-
-    let providersContext = "No data";
-    if (!targetProvider) {
-        try {
-            const { data } = await supabase.from('providers').select('name, service_type, location, id, bio, social_links').limit(10);
-            if(data) providersContext = JSON.stringify(data);
-        } catch(e) {}
-    }
-
+    // --- 3. PREPARE CONTEXT FOR AI ---
     let systemInstruction = "";
 
     if (targetProvider) {
-        // Simple instructions for the API fallback
-        const knowledgeBase = targetProvider.custom_ai_instructions || targetProvider.bio || 'Professional in Tangier';
+        // Combine all knowledge sources
+        const knowledgeBase = `
+        Provider Name: ${targetProvider.name}
+        Service Type: ${targetProvider.service_type}
+        
+        [STRUCTURED INFO]:
+        Prices: ${targetProvider.price_info || "Not specified"}
+        Location: ${targetProvider.location_info || "Not specified"}
+        Hours: ${targetProvider.working_hours || "Not specified"}
+        Booking Rules: ${targetProvider.booking_info || "Not specified"}
+        
+        [ADDITIONAL INFO / KNOWLEDGE BASE]:
+        ${targetProvider.custom_ai_instructions || ""}
+        ${targetProvider.bio || ""}
+        `;
+
         systemInstruction = `
-        You are ${targetProvider.name}. 
-        User asks: "${newMessage}".
-        Based on: "${knowledgeBase}".
-        Answer briefly in user's language.
-        If unknown, say "Please call me directly."
+        You are an AI assistant for "${targetProvider.name}".
+        
+        CONTEXT DATA:
+        ${knowledgeBase}
+
+        INSTRUCTIONS:
+        1. The [ADDITIONAL INFO] section contains sentences separated by periods/dots (.).
+        2. When answering, SEARCH the [ADDITIONAL INFO] for the specific sentence that matches the user's question.
+        3. EXTRACT and output ONLY that relevant sentence/section.
+        4. DO NOT dump all information. Be precise and brief.
+        5. If the answer is found in [STRUCTURED INFO], use that.
+        6. If the answer is not in the context, say "Please contact us directly for this information" in the user's language.
+        7. Respond in the same language as the user (mostly Arabic/Darija or French).
         `;
     } else {
-        systemInstruction = `You are TangerConnect. Help user find services in Tangier. Data: ${providersContext}`;
+        // General Assistant Logic
+        try {
+            const { data } = await supabase.from('providers').select('name, service_type, location').limit(15);
+            const directory = data ? JSON.stringify(data) : "No directory data.";
+            systemInstruction = `You are TangerConnect, a helpful city assistant for Tangier. Help users find services.
+            Directory Data: ${directory}
+            Keep answers short and helpful.`;
+        } catch(e) {}
     }
 
+    const limitedHistory = history.slice(-5); // Reduce context to save tokens
     const userParts: any[] = [{ text: newMessage }];
     const contents = [...limitedHistory, { role: 'user', parts: userParts }];
 
     try {
-        // USE HARDCODED KEY AS REQUESTED
-        const apiKey = 'AIzaSyAYLry3mo4z-zkZ_6ykfsgPAnEZMv01NnM';
+        const apiKey = 'AIzaSyAYLry3mo4z-zkZ_6ykfsgPAnEZMv01NnM'; // Hardcoded as per environment constraint
 
         const ai = new GoogleGenAI({ apiKey });
         
@@ -108,7 +119,8 @@ export const getChatResponse = async (
             contents: contents,
             config: { 
                 systemInstruction,
-                maxOutputTokens: 100, // Limit output to save cost
+                maxOutputTokens: 150, // Short responses
+                temperature: 0.3, // Lower temperature for more deterministic/factual retrieval
             },
         });
         
@@ -116,7 +128,6 @@ export const getChatResponse = async (
 
     } catch (error: any) {
         console.error("AI Error:", error);
-        // Fallback if API fails
-        return "⚠️ المرجو استخدام الأزرار المقترحة (الأثمنة، الموقع...) للحصول على إجابة فورية.";
+        return "⚠️ المرجو استخدام الأزرار المقترحة (الأثمنة، الموقع...) للحصول على إجابة دقيقة.";
     }
 };

@@ -266,6 +266,11 @@ $$;
 
 NOTIFY pgrst, 'reload config';`;
 
+const v23UpdateSQL = `-- Update V23: Ensure Additional Info Column
+-- Just in case it wasn't added correctly or needs to be text type
+ALTER TABLE public.providers ADD COLUMN IF NOT EXISTS custom_ai_instructions text DEFAULT NULL;
+NOTIFY pgrst, 'reload config';`;
+
 const createAdminSQL = `-- Create Admin User
 INSERT INTO public.providers (
   name, service_type, location, username, password, phone, is_active, subscription_end_date
@@ -303,6 +308,15 @@ ${v22UpdateSQL}
         </div>
         <div className="p-6 h-[calc(100vh-65px)] overflow-y-auto">
           <p className="mb-6 text-gray-700 dark:text-gray-300">{t('databaseSetupDesc')}</p>
+
+          {/* V23 Update Block */}
+          <div className="mb-8 p-4 border-l-4 border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 rounded-r-lg shadow-lg animate-fade-in">
+             <h3 className="text-xl font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-2 mb-4">
+                <BrainCircuit /> V23: Check AI Fields
+             </h3>
+             <p className="mb-2 text-sm text-gray-600 dark:text-gray-400">Ensures the additional info field exists for the chatbot.</p>
+             <CodeBlock title="V23 SQL Update" code={v23UpdateSQL.trim()} />
+          </div>
 
           {/* V22 Update Block */}
           <div className="mb-8 p-4 border-l-4 border-cyan-500 bg-cyan-50 dark:bg-cyan-900/20 rounded-r-lg shadow-lg animate-fade-in">

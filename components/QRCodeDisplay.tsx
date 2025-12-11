@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import QRCode from 'qrcode';
 import { useLocalization } from '../hooks/useLocalization';
-import { Download, Loader2 } from 'lucide-react';
+import { Download, Loader2, Share2 } from 'lucide-react';
 
 interface QRCodeDisplayProps {
   appointmentId: number;
@@ -46,29 +46,42 @@ const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({ appointmentId, bookingDat
     generateQR();
   }, [appointmentId, bookingData]);
 
-  const handleDownload = () => {
+  const handleAction = async () => {
     if (!qrCodeUrl) return;
+
     try {
-        // Create a blob to be safer for webviews than long data URIs
-        fetch(qrCodeUrl)
-            .then(res => res.blob())
-            .then(blob => {
-                const url = window.URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = `appointment-${appointmentId}.png`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                window.URL.revokeObjectURL(url);
-            })
-            .catch(e => {
-                console.error("Download failed", e);
-                alert("Please long press the image to save it.");
-            });
+        // Convert Base64 to Blob
+        const response = await fetch(qrCodeUrl);
+        const blob = await response.blob();
+        const file = new File([blob], `appointment-${appointmentId}.png`, { type: 'image/png' });
+
+        // Try Web Share API first (Best for Mobile Apps)
+        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+            try {
+                await navigator.share({
+                    title: 'TangerConnect Appointment',
+                    text: `Appointment ID: ${appointmentId}`,
+                    files: [file]
+                });
+                return; // Success, exit
+            } catch (err) {
+                console.log("Share failed or cancelled, falling back to download");
+            }
+        }
+
+        // Fallback: Direct Download (Best for Desktop)
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `appointment-${appointmentId}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+
     } catch (e) {
-        console.error("Download trigger error", e);
-        alert("Please long press the image to save it.");
+        console.error("Action failed", e);
+        alert(t('keepQR')); // Fallback alert asking user to save it manually
     }
   };
 
@@ -87,17 +100,18 @@ const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({ appointmentId, bookingDat
       </div>
       
       {/* Visual Instruction for Mobile App Users */}
-      <p className="text-[10px] text-gray-500 mt-2 text-center">
+      <p className="text-[10px] text-gray-500 mt-2 text-center dark:text-gray-400">
         اضغط مطولاً على الصورة لحفظها <br/>
         (Long press to save)
       </p>
 
       <button
-        onClick={handleDownload}
-        className="mt-3 flex items-center gap-2 px-4 py-2 bg-secondary text-white rounded-lg hover:bg-primary transition-colors text-xs font-bold"
+        onClick={handleAction}
+        className="mt-3 flex items-center gap-2 px-6 py-2 bg-secondary text-white rounded-full hover:bg-primary transition-colors text-sm font-bold shadow-md active:scale-95"
       >
-        <Download size={16} />
-        {t('downloadQR')}
+        {/* Show Share icon on mobile-ish capability, else Download */}
+        {navigator.share ? <Share2 size={16} /> : <Download size={16} />}
+        {navigator.share ? t('share') : t('downloadQR')}
       </button>
     </div>
   );

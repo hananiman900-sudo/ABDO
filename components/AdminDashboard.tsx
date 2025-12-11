@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { useLocalization } from '../hooks/useLocalization';
-import { ArrowLeft, Loader2, Plus, Trash2, Edit, CheckCircle, XCircle, ShoppingBag, Users, Megaphone, Image as ImageIcon, Settings, Save, BarChart3, X, FileText, Phone } from 'lucide-react';
+import { ArrowLeft, Loader2, Plus, Trash2, Edit, CheckCircle, XCircle, ShoppingBag, Users, Megaphone, Image as ImageIcon, Settings, Save, BarChart3, X, FileText, Phone, CreditCard, RefreshCw } from 'lucide-react';
 import { Product, AdRequest, Order } from '../types';
 
 interface AdminDashboardProps {
@@ -12,7 +12,7 @@ interface AdminDashboardProps {
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
     const { t } = useLocalization();
-    const [activeTab, setActiveTab] = useState<'PRODUCTS' | 'PROVIDERS' | 'ADS' | 'STATS' | 'ORDERS'>('PRODUCTS');
+    const [activeTab, setActiveTab] = useState<'PRODUCTS' | 'PROVIDERS' | 'ADS' | 'STATS' | 'ORDERS' | 'SUBS'>('PRODUCTS');
     const [loading, setLoading] = useState(false);
 
     // Products State
@@ -32,6 +32,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
 
     // Orders State
     const [orders, setOrders] = useState<Order[]>([]);
+    
+    // Subscriptions State
+    const [activeProviders, setActiveProviders] = useState<any[]>([]);
 
     useEffect(() => {
         if(isOpen) {
@@ -76,6 +79,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
         } else if (activeTab === 'ORDERS') {
             const { data } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
             setOrders(data as any || []);
+        } else if (activeTab === 'SUBS') {
+            // Fetch all active providers with subscription data
+            const { data } = await supabase.from('providers').select('*').eq('is_active', true).order('subscription_end_date', { ascending: true }); // Expiring soonest first
+            setActiveProviders(data || []);
         }
         setLoading(false);
     };
@@ -171,7 +178,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
 
     // --- PROVIDER LOGIC ---
     const handleApproveProvider = async (id: number) => {
-        await supabase.from('providers').update({ is_active: true }).eq('id', id);
+        // Approve and set subscription for 30 days
+        const endDate = new Date();
+        endDate.setDate(endDate.getDate() + 30);
+        
+        await supabase.from('providers').update({ 
+            is_active: true, 
+            subscription_end_date: endDate.toISOString() 
+        }).eq('id', id);
         fetchData();
     };
 
@@ -210,6 +224,31 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
         setLoading(false);
     }
 
+    // --- SUBSCRIPTION LOGIC ---
+    const handleRenewSubscription = async (provider: any) => {
+        setLoading(true);
+        // Add 30 days to current end date, or to now if expired
+        let currentEnd = provider.subscription_end_date ? new Date(provider.subscription_end_date) : new Date();
+        const now = new Date();
+        
+        if (currentEnd < now) currentEnd = now; // If expired, start from today
+        
+        currentEnd.setDate(currentEnd.getDate() + 30);
+        
+        await supabase.from('providers').update({ subscription_end_date: currentEnd.toISOString() }).eq('id', provider.id);
+        fetchData();
+        alert(`تم تجديد اشتراك ${provider.name} لمدة شهر بنجاح.`);
+        setLoading(false);
+    }
+
+    const calculateDaysLeft = (dateStr: string) => {
+        if(!dateStr) return 0;
+        const end = new Date(dateStr);
+        const now = new Date();
+        const diff = end.getTime() - now.getTime();
+        return Math.ceil(diff / (1000 * 60 * 60 * 24));
+    }
+
     if(!isOpen) return null;
 
     return (
@@ -221,7 +260,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
             </div>
 
             {/* TABS */}
-            <div className="flex border-b bg-gray-100 overflow-x-auto">
+            <div className="flex border-b bg-gray-100 overflow-x-auto no-scrollbar">
                 <button 
                     onClick={() => setActiveTab('PRODUCTS')}
                     className={`flex-1 py-4 px-2 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'PRODUCTS' ? 'bg-white text-orange-600 border-b-2 border-orange-600' : 'text-gray-500'}`}
@@ -239,6 +278,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                     className={`flex-1 py-4 px-2 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'PROVIDERS' ? 'bg-white text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}
                 >
                     <Users size={18}/> {t('manageProviders')}
+                </button>
+                <button 
+                    onClick={() => setActiveTab('SUBS')}
+                    className={`flex-1 py-4 px-2 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'SUBS' ? 'bg-white text-pink-600 border-b-2 border-pink-600' : 'text-gray-500'}`}
+                >
+                    <CreditCard size={18}/> الاشتراكات
                 </button>
                 <button 
                     onClick={() => setActiveTab('ADS')}
@@ -401,6 +446,63 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                                 </div>
                             </div>
                         ))}
+                    </div>
+                )}
+
+                {/* SUBSCRIPTIONS TAB */}
+                {activeTab === 'SUBS' && (
+                    <div className="space-y-4">
+                        <div className="bg-pink-50 p-4 rounded-xl border border-pink-200 mb-2">
+                             <h3 className="font-bold text-pink-800">إدارة الاشتراكات</h3>
+                             <p className="text-xs text-pink-600">تتبع المدة المتبقية لكل مهني وتجديد الاشتراكات.</p>
+                        </div>
+
+                        <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+                             <table className="w-full text-sm">
+                                 <thead className="bg-gray-100 text-gray-600 font-bold">
+                                     <tr>
+                                         <th className="p-3 text-right">المهني</th>
+                                         <th className="p-3 text-right">الهاتف</th>
+                                         <th className="p-3 text-center">الأيام المتبقية</th>
+                                         <th className="p-3 text-center">إجراء</th>
+                                     </tr>
+                                 </thead>
+                                 <tbody>
+                                     {activeProviders.map((p) => {
+                                         const daysLeft = calculateDaysLeft(p.subscription_end_date);
+                                         return (
+                                             <tr key={p.id} className="border-t hover:bg-gray-50">
+                                                 <td className="p-3 font-bold">
+                                                     <div className="flex items-center gap-2">
+                                                         <div className={`w-2 h-2 rounded-full ${daysLeft > 5 ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                                                         {p.name}
+                                                     </div>
+                                                     <span className="text-xs text-gray-400 font-normal block">{p.service_type}</span>
+                                                 </td>
+                                                 <td className="p-3 text-gray-600 text-xs">
+                                                     <a href={`tel:${p.phone}`} className="hover:text-blue-600 hover:underline">{p.phone}</a>
+                                                 </td>
+                                                 <td className="p-3 text-center">
+                                                     <span className={`px-2 py-1 rounded-full text-xs font-bold ${daysLeft > 5 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                                         {daysLeft} يوم
+                                                     </span>
+                                                     <span className="block text-[9px] text-gray-400 mt-1">{p.subscription_end_date ? new Date(p.subscription_end_date).toLocaleDateString() : 'N/A'}</span>
+                                                 </td>
+                                                 <td className="p-3 text-center">
+                                                     <button 
+                                                        onClick={() => handleRenewSubscription(p)}
+                                                        className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+                                                        title="تجديد شهر واحد"
+                                                     >
+                                                         <RefreshCw size={16}/>
+                                                     </button>
+                                                 </td>
+                                             </tr>
+                                         )
+                                     })}
+                                 </tbody>
+                             </table>
+                        </div>
                     </div>
                 )}
 
