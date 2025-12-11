@@ -5,11 +5,11 @@ import { getChatResponse } from '../services/geminiService';
 import { useLocalization } from '../hooks/useLocalization';
 import { supabase } from '../services/supabaseClient';
 import QRCodeDisplay from './QRCodeDisplay';
-import { Send, Mic, Paperclip, Camera, Loader2, X, Globe, Search, ArrowLeft, MoreVertical, Calendar, Info, Phone, MapPin, Instagram, Facebook, Tag, UserPlus, UserCheck, Megaphone, Star, Check, ChevronDown, CheckCircle, StopCircle, Sparkles, Banknote, Clock, Zap } from 'lucide-react';
+import { Send, Mic, Paperclip, Camera, Loader2, X, Globe, Search, ArrowLeft, MoreVertical, Calendar, Info, Phone, MapPin, Instagram, Facebook, Tag, UserPlus, UserCheck, Megaphone, Star, Check, ChevronDown, CheckCircle, StopCircle, Sparkles, Banknote, Clock, Zap, Bell } from 'lucide-react';
 
 // ... (Existing Sub-components: BookingModal, ChatProfileModal remain unchanged)
 
-export const UrgentTicker: React.FC = () => {
+export const UrgentTicker: React.FC<{ onClick: () => void }> = ({ onClick }) => {
     const { t } = useLocalization();
     const [ads, setAds] = useState<UrgentAd[]>([]);
     const [currentIndex, setCurrentIndex] = useState(0);
@@ -47,7 +47,7 @@ export const UrgentTicker: React.FC = () => {
     const currentAd = ads[currentIndex];
 
     return (
-        <div className="bg-white border-b border-gray-100 shadow-sm z-10 flex items-stretch h-10 overflow-hidden relative">
+        <div onClick={onClick} className="bg-white border-b border-gray-100 shadow-sm z-10 flex items-stretch h-10 overflow-hidden relative cursor-pointer active:opacity-90 transition-opacity">
             {/* FIXED RED LABEL */}
             <div className="bg-red-600 text-white px-3 flex items-center justify-center relative z-20 shrink-0">
                 <div className="absolute inset-0 bg-red-600 animate-pulse z-0"></div>
@@ -173,7 +173,7 @@ export const ChatProfileModal: React.FC<{ provider: any; onClose: () => void; cu
 
 // --- MAIN CHATBOT COMPONENT ---
 
-const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () => void; onDiscover: () => void; onToggleNav: (hidden: boolean) => void }> = ({ currentUser, onOpenAuth, onDiscover, onToggleNav }) => {
+const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () => void; onDiscover: () => void; onToggleNav: (hidden: boolean) => void; onOpenNotifications: () => void }> = ({ currentUser, onOpenAuth, onDiscover, onToggleNav, onOpenNotifications }) => {
     const { t, language } = useLocalization();
     const [view, setView] = useState<'LIST' | 'CHAT'>('LIST');
     const [selectedChat, setSelectedChat] = useState<any | null>(null); 
@@ -450,11 +450,20 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
 
         return (
             <div className="flex flex-col h-full bg-white relative">
-                <UrgentTicker />
+                <UrgentTicker onClick={onOpenNotifications} />
                 <div className="p-4 pb-2">
-                    <div className="bg-gray-100 rounded-full flex items-center px-4 py-2">
-                        <Search size={18} className="text-gray-400"/>
-                        <input placeholder={t('search')} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="bg-transparent border-none outline-none flex-1 ml-2 text-sm"/>
+                    <div className="flex items-center gap-2">
+                        <div className="bg-gray-100 rounded-full flex items-center px-4 py-2 flex-1">
+                            <Search size={18} className="text-gray-400"/>
+                            <input placeholder={t('search')} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="bg-transparent border-none outline-none flex-1 ml-2 text-sm"/>
+                        </div>
+                        {/* RESTORED BOOST/AD ICON with GRADIENT */}
+                        <button 
+                            onClick={onOpenNotifications}
+                            className="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-500 to-blue-500 text-white flex items-center justify-center shadow-md active:scale-95 transition-transform"
+                        >
+                            <Megaphone size={18} />
+                        </button>
                     </div>
                 </div>
 
@@ -477,7 +486,7 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
     // --- VIEW 2: CONVERSATION WINDOW ---
     return (
         <div className="flex flex-col h-full bg-[#EFE7DD] relative">
-            <UrgentTicker />
+            <UrgentTicker onClick={onOpenNotifications} />
             <div className="bg-white py-3 px-2 border-b flex items-center gap-2 shadow-sm z-20">
                 <button onClick={() => setView('LIST')} className="p-2"><ArrowLeft size={20}/></button>
                 <div onClick={() => selectedChat && setShowProfile(true)} className="flex items-center gap-3 flex-1 cursor-pointer">

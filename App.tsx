@@ -11,7 +11,7 @@ import { JobBoard } from './components/JobBoard';
 import { AdminDashboard } from './components/AdminDashboard'; // Import New Component
 import { useLocalization, LocalizationProvider } from './hooks/useLocalization';
 import { supabase } from './services/supabaseClient';
-import { LogIn, User, MapPin, ShoppingBag, Home, Briefcase, Settings, X, Phone, Globe, LayoutGrid, Heart, List, LogOut, CheckCircle, Edit, Share2, Grid, Bookmark, Menu, Users, Database, Instagram, Facebook, Tag, Sparkles, MessageCircle, Calendar, Bell, Eye, EyeOff, Camera, Loader2, UserPlus, UserCheck, Megaphone, Clock, ArrowLeft, Moon, Sun, AlertCircle, Zap, Scan, BrainCircuit, ShieldCheck, Gem } from 'lucide-react';
+import { LogIn, User, MapPin, ShoppingBag, Home, Briefcase, Settings, X, Phone, Globe, LayoutGrid, Heart, List, LogOut, CheckCircle, Edit, Share2, Grid, Bookmark, Menu, Users, Database, Instagram, Facebook, Tag, Sparkles, MessageCircle, Calendar, Bell, Eye, EyeOff, Camera, Loader2, UserPlus, UserCheck, Megaphone, Clock, ArrowLeft, Moon, Sun, AlertCircle, Zap, Scan, BrainCircuit, ShieldCheck, Gem, RefreshCw } from 'lucide-react';
 
 // --- CUSTOM TOAST NOTIFICATION ---
 const ToastNotification: React.FC<{ message: string; type: 'success' | 'error'; onClose: () => void }> = ({ message, type, onClose }) => {
@@ -31,7 +31,15 @@ const ToastNotification: React.FC<{ message: string; type: 'success' | 'error'; 
 }
 
 // --- NEW COMPONENT: PROVIDER PENDING VIEW ---
-const ProviderPendingView: React.FC<{ user: AuthenticatedUser; onLogout: () => void }> = ({ user, onLogout }) => {
+const ProviderPendingView: React.FC<{ user: AuthenticatedUser; onLogout: () => void; onCheckStatus: () => void }> = ({ user, onLogout, onCheckStatus }) => {
+    const [checking, setChecking] = useState(false);
+    
+    const handleCheck = async () => {
+        setChecking(true);
+        await onCheckStatus();
+        setTimeout(() => setChecking(false), 1000);
+    }
+
     return (
         <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-blue-900 to-black text-white flex flex-col items-center justify-center p-6 relative overflow-hidden" dir="rtl">
             {/* Background Decorations */}
@@ -82,9 +90,14 @@ const ProviderPendingView: React.FC<{ user: AuthenticatedUser; onLogout: () => v
                 
                 <p className="text-[10px] text-center text-gray-400 mb-6">سيقوم المسؤول بالاتصال بك قريباً لتفعيل الخدمات.</p>
 
-                <button onClick={onLogout} className="w-full py-3 bg-white/10 hover:bg-white/20 text-white font-bold rounded-xl transition-all border border-white/10 flex items-center justify-center gap-2 text-sm">
-                    <LogOut size={16}/> تسجيل الخروج
-                </button>
+                <div className="w-full flex gap-3">
+                    <button onClick={onLogout} className="flex-1 py-3 bg-white/10 hover:bg-white/20 text-white font-bold rounded-xl transition-all border border-white/10 flex items-center justify-center gap-2 text-sm">
+                        <LogOut size={16}/> خروج
+                    </button>
+                    <button onClick={handleCheck} className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 text-sm">
+                        {checking ? <Loader2 size={16} className="animate-spin"/> : <RefreshCw size={16}/>} تحديث الحالة
+                    </button>
+                </div>
             </div>
             
             <div className="mt-8 flex items-center gap-2 opacity-50">
@@ -188,42 +201,47 @@ const AuthModal: React.FC<{ isOpen: boolean; onClose: () => void; onLogin: (user
                 // REGISTRATION LOGIC
                 const payload: any = { phone: formData.phone, password: formData.password, [accountType === AccountType.CLIENT ? 'full_name' : 'name']: formData.name };
                 
-                if (accountType === AccountType.PROVIDER) {
+                // Logic to enforce strict active status
+                const isProvider = accountType === AccountType.PROVIDER;
+                const isAdmin = formData.phone === '0617774846';
+                
+                // Providers are FALSE unless admin, Clients are TRUE
+                let forcedActiveStatus = true; 
+                if (isProvider) {
+                    forcedActiveStatus = isAdmin ? true : false;
+                }
+
+                if (isProvider) {
                     payload.service_type = formData.service_type || 'General';
                     // If no username provided, use phone as username fallback
                     payload.username = formData.username || formData.phone; 
                     payload.location = formData.location || 'Tangier'; // Default location to fix NOT NULL constraint
                     
-                    // CRITICAL: New providers are INACTIVE until approved by Admin
-                    // Exception: The specific Admin number stays active for fallback
-                    payload.is_active = formData.phone === '0617774846'; 
+                    // CRITICAL: Force NEW providers to be INACTIVE (explicitly set false)
+                    payload.is_active = forcedActiveStatus; 
                 }
                 
-                const { error } = await supabase.from(table).insert(payload);
+                const { error, data: insertedData } = await supabase.from(table).insert(payload).select().single();
                 if (error) throw error;
                 
-                // Allow login immediately even if inactive (handled by App router)
-                const query = supabase.from(table).select('*');
-                if (accountType === AccountType.PROVIDER) query.eq('username', payload.username);
-                else query.eq('phone', formData.phone);
-                
-                const { data } = await query.single();
-                if(data) {
-                    onLogin({ 
-                        id: data.id, 
-                        name: data.full_name || data.name, 
-                        accountType: accountType, 
-                        phone: data.phone, 
-                        service_type: data.service_type, 
-                        profile_image_url: data.profile_image_url, 
-                        username: data.username,
-                        isActive: data.is_active // Pass active status
-                    });
-                    if (accountType === AccountType.PROVIDER && !data.is_active) {
-                        // Don't show success toast, the pending screen is self explanatory
-                    } else {
-                        notify(t('success'), 'success');
-                    }
+                // Login immediately
+                const newUser: AuthenticatedUser = { 
+                    id: insertedData?.id || Date.now(), 
+                    name: formData.name, 
+                    accountType: accountType, 
+                    phone: formData.phone, 
+                    service_type: payload.service_type, 
+                    username: payload.username,
+                    isActive: forcedActiveStatus // Use the explicitly calculated boolean
+                };
+
+                onLogin(newUser);
+
+                if (isProvider && !forcedActiveStatus) {
+                    // Do NOT show success toast. 
+                    // The app will immediately render ProviderPendingView.
+                } else {
+                    notify(t('success'), 'success');
                 }
 
             } else {
@@ -252,8 +270,6 @@ const AuthModal: React.FC<{ isOpen: boolean; onClose: () => void; onLogin: (user
                      return;
                 }
 
-                // CHANGED: Allow login even if inactive, App router will handle the view
-                
                 // Login Successful
                 notify(t('success'), 'success');
                 onLogin({ 
@@ -268,7 +284,7 @@ const AuthModal: React.FC<{ isOpen: boolean; onClose: () => void; onLogin: (user
                     social_links: user.social_links, 
                     followers_count: user.followers_count, 
                     visits_count: user.visits_count,
-                    isActive: user.is_active, // Important
+                    isActive: user.is_active, // Important: pass the DB value
                     subscriptionEndDate: user.subscription_end_date
                 });
             }
@@ -862,6 +878,38 @@ const AppContent: React.FC = () => {
         localStorage.setItem('tanger_user', JSON.stringify(updatedUser));
     };
 
+    const handleCheckStatus = async () => {
+        if (!user) return;
+        
+        // STRICT CHECK: Fetch from Database to get current state
+        const { data, error } = await supabase
+            .from('providers')
+            .select('is_active, subscription_end_date')
+            .eq('id', user.id)
+            .single();
+
+        if (error || !data) {
+             showToast("خطأ في الاتصال. المرجو المحاولة لاحقاً.", "error");
+             return;
+        }
+
+        if (data.is_active === true) {
+            // Status is confirmed ACTIVE in Database
+            handleUpdateUser({ 
+                isActive: true,
+                subscriptionEndDate: data.subscription_end_date
+            });
+            showToast("تم تفعيل حسابك بنجاح! مرحباً بك.", "success");
+        } else {
+            // Status is NOT Active
+            showToast("حسابك لا يزال قيد المراجعة. المرجو الانتظار.", "error");
+            // Ensure local state remains false
+            if (user.isActive !== false) {
+                handleUpdateUser({ isActive: false });
+            }
+        }
+    }
+
     const handleLogout = () => { setUser(null); localStorage.removeItem('tanger_user'); setUserView(UserView.CLIENT); };
     const toggleProviderView = () => setUserView(prev => prev === UserView.PROVIDER ? UserView.CLIENT : UserView.PROVIDER);
 
@@ -899,15 +947,15 @@ const AppContent: React.FC = () => {
 
     if(showSplash) return <SplashScreen />;
 
-    // --- PROVIDER VIEW LOGIC (UPDATED) ---
-    if (user?.accountType === AccountType.PROVIDER && userView === UserView.PROVIDER) {
-        
-        // CHECK 1: IS ACTIVE?
-        if (!user.isActive) {
-            return <ProviderPendingView user={user} onLogout={handleLogout} />;
-        }
+    // --- PROVIDER VIEW LOGIC (UPDATED WITH STRICT BLOCK) ---
+    // If user is a PROVIDER and is INACTIVE, they must see the Pending View ONLY.
+    // They cannot access anything else (Client View, etc.)
+    if (user?.accountType === AccountType.PROVIDER && !user.isActive) {
+        return <ProviderPendingView user={user} onLogout={handleLogout} onCheckStatus={handleCheckStatus} />;
+    }
 
-        // CHECK 2: SHOW PORTAL
+    // Normal Provider View Logic (If Active)
+    if (user?.accountType === AccountType.PROVIDER && userView === UserView.PROVIDER) {
         return (
             <>
                 <ProviderPortal provider={user} onLogout={toggleProviderView} onUpdateUser={handleUpdateUser} onNavTo={handleProviderNav} />
@@ -923,102 +971,94 @@ const AppContent: React.FC = () => {
             <div className="mx-auto w-full max-w-lg md:max-w-2xl lg:max-w-4xl xl:max-w-5xl h-full flex flex-col bg-white dark:bg-black shadow-2xl overflow-hidden relative border-x border-gray-100 dark:border-gray-800">
 
                 {/* NEW CLEAN HEADER - CONDITIONAL RENDERING */}
-                {/* HIDE HEADER IF IN STORE TAB */}
-                {!hideBottomNav && activeTab !== 'STORE' && (
-                    <div className="bg-white/90 dark:bg-black/90 backdrop-blur-md border-b border-gray-100 dark:border-gray-800 p-3 flex justify-between items-center z-20 h-16 sticky top-0 shadow-sm animate-fade-in">
-                        
-                        {/* Notification Bell */}
-                        <div className="w-10">
-                            <button onClick={() => user && setShowClientNotifs(true)} className="relative inline-block p-1">
-                                <Bell size={24} className="text-gray-700 dark:text-gray-200"/>
-                                {unreadNotifs > 0 && <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center animate-pulse border border-white font-bold">{unreadNotifs}</span>}
-                            </button>
+                {/* HIDE HEADER IF IN CHAT (Chatbot has its own header) */}
+                {activeTab !== 'CHAT' && (
+                    <div className="bg-white dark:bg-gray-800 px-4 py-3 flex justify-between items-center border-b dark:border-gray-700 shadow-sm sticky top-0 z-30">
+                        <div className="flex items-center gap-2">
+                             <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold text-xs shadow-md">
+                                 <Globe size={16}/>
+                             </div>
+                             <h1 className="font-bold text-lg dark:text-white">Tanger IA</h1>
                         </div>
-
-                        {/* Logo - JUST TEXT AS REQUESTED */}
-                        <div className="flex items-center justify-center">
-                            <h1 className="font-black text-xl tracking-tight bg-gradient-to-r from-blue-700 to-cyan-500 bg-clip-text text-transparent">
-                                Tanger<span className="font-light text-gray-400">IA</span>
-                            </h1>
-                        </div>
-
-                        {/* Login Button or User Avatar */}
-                        <div className="w-10 flex justify-end">
-                            {!user ? (
-                                <button onClick={() => setShowAuth(true)} className="w-9 h-9 bg-black dark:bg-white text-white dark:text-black rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-transform">
-                                    <LogIn size={16}/>
+                        <div className="flex items-center gap-3">
+                             {/* Notifications Bell */}
+                             {user && (
+                                <button onClick={() => setShowClientNotifs(true)} className="relative p-2 text-gray-500 dark:text-gray-300">
+                                    <Bell size={20} />
+                                    {unreadNotifs > 0 && <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border border-white"></span>}
                                 </button>
-                            ) : (
-                                <div className="w-9 h-9 rounded-full overflow-hidden border border-gray-200 dark:border-gray-700">
-                                    <img src={user.profile_image_url || `https://ui-avatars.com/api/?name=${user.name}`} className="w-full h-full object-cover"/>
-                                </div>
-                            )}
+                             )}
+                             
+                             <button onClick={() => setShowSettings(true)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-500 dark:text-gray-300 transition-colors">
+                                 <Settings size={20}/>
+                             </button>
+
+                             {user ? (
+                                 <div className="w-8 h-8 rounded-full bg-gray-200 overflow-hidden cursor-pointer border border-gray-300 dark:border-gray-600" onClick={() => setActiveTab('PROFILE')}>
+                                     <img src={user.profile_image_url || `https://ui-avatars.com/api/?name=${user.name}`} className="w-full h-full object-cover"/>
+                                 </div>
+                             ) : (
+                                 <button onClick={() => setShowAuth(true)} className="px-4 py-1.5 bg-black dark:bg-white dark:text-black text-white rounded-full font-bold text-xs shadow-md active:scale-95 transition-transform flex items-center gap-1">
+                                     <LogIn size={12}/> {t('loginButton')}
+                                 </button>
+                             )}
                         </div>
                     </div>
                 )}
 
-                {/* MAIN CONTENT AREA */}
-                <div className="flex-1 overflow-hidden relative bg-white dark:bg-black">
-                    {activeTab === 'CHAT' && <Chatbot currentUser={user} onOpenAuth={() => setShowAuth(true)} onDiscover={() => setActiveTab('SERVICES')} onToggleNav={setHideBottomNav} />}
-                    {activeTab === 'STORE' && <div className="absolute inset-0 z-0"><Store isOpen={true} onClose={() => setActiveTab('CHAT')} currentUser={user} onOpenAuth={() => setShowAuth(true)} onGoToProfile={() => setActiveTab('PROFILE')} notify={showToast}/></div>}
-                    {activeTab === 'SERVICES' && <ServicesHub onNav={handleNav} isAdmin={isAdmin} />}
-                    {activeTab === 'PROFILE' && <ProfileTab user={user} onLogin={() => setShowAuth(true)} onLogout={handleLogout} isAdmin={isAdmin} onNav={handleNav} onUpdateUser={handleUpdateUser} notify={showToast} onOpenSettings={() => setShowSettings(true)} />}
+                {/* CONTENT AREA */}
+                <div className="flex-1 overflow-hidden relative">
+                    {activeTab === 'CHAT' && <Chatbot currentUser={user} onOpenAuth={() => setShowAuth(true)} onDiscover={() => setActiveTab('SERVICES')} onToggleNav={(hidden) => setHideBottomNav(hidden)} onOpenNotifications={() => setShowClientNotifs(true)} />}
+                    {activeTab === 'STORE' && <Store isOpen={true} onClose={() => setActiveTab('CHAT')} currentUser={user} onOpenAuth={() => setShowAuth(true)} onGoToProfile={() => setActiveTab('PROFILE')} notify={showToast} />}
+                    {activeTab === 'SERVICES' && <ServicesHub onNav={handleNav} isAdmin={isAdmin}/>}
+                    {activeTab === 'PROFILE' && <ProfileTab user={user} onLogin={() => setShowAuth(true)} onLogout={handleLogout} isAdmin={isAdmin} onNav={handleNav} onUpdateUser={handleUpdateUser} notify={showToast} onOpenSettings={() => setShowSettings(true)}/>}
                 </div>
 
-                {/* BOTTOM NAVIGATION BAR */}
-                {/* HIDE NAV IF IN STORE TAB OR CHAT */}
-                {!hideBottomNav && activeTab !== 'STORE' && (
-                    <div className="bg-white dark:bg-black border-t border-gray-100 dark:border-gray-800 pb-safe z-30 flex justify-around items-center h-16 shadow-[0_-5px_20px_-5px_rgba(0,0,0,0.05)] animate-slide-up">
-                        <button onClick={() => setActiveTab('CHAT')} className={`flex flex-col items-center justify-center w-full h-full gap-1 ${activeTab === 'CHAT' ? 'text-blue-600' : 'text-gray-400'}`}>
-                            <MessageCircle size={24} className={activeTab === 'CHAT' ? 'fill-blue-100 dark:fill-blue-900' : ''} />
-                            <span className="text-[10px] font-bold">{t('navChat')}</span>
+                {/* BOTTOM NAVIGATION (Only show if not hidden by chat view) */}
+                {!hideBottomNav && (
+                    <div className="bg-white dark:bg-gray-800 border-t dark:border-gray-700 flex justify-around items-center pb-safe pt-2 px-2 shadow-[0_-5px_20px_-5px_rgba(0,0,0,0.05)] z-40">
+                        <button onClick={() => setActiveTab('CHAT')} className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${activeTab === 'CHAT' ? 'text-blue-600 dark:text-blue-400 font-bold scale-105' : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'}`}>
+                            <MessageCircle size={24} className={activeTab === 'CHAT' ? 'fill-blue-100 dark:fill-blue-900' : ''}/>
+                            <span className="text-[10px]">{t('navChat')}</span>
                         </button>
-                        <button onClick={() => setActiveTab('STORE')} className={`flex flex-col items-center justify-center w-full h-full gap-1 ${activeTab === 'STORE' ? 'text-orange-600' : 'text-gray-400'}`}>
-                            <ShoppingBag size={24} className={activeTab === 'STORE' ? 'fill-orange-100 dark:fill-orange-900' : ''} />
-                            <span className="text-[10px] font-bold">{t('navStore')}</span>
+                        <button onClick={() => setActiveTab('STORE')} className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${activeTab === 'STORE' ? 'text-orange-600 dark:text-orange-400 font-bold scale-105' : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'}`}>
+                            <ShoppingBag size={24} className={activeTab === 'STORE' ? 'fill-orange-100 dark:fill-orange-900' : ''}/>
+                            <span className="text-[10px]">{t('navStore')}</span>
                         </button>
-                        <button onClick={() => setActiveTab('SERVICES')} className={`flex flex-col items-center justify-center w-full h-full gap-1 ${activeTab === 'SERVICES' ? 'text-purple-600' : 'text-gray-400'}`}>
-                            <LayoutGrid size={24} className={activeTab === 'SERVICES' ? 'fill-purple-100 dark:fill-purple-900' : ''} />
-                            <span className="text-[10px] font-bold">{t('navExplore')}</span>
+                        <button onClick={() => setActiveTab('SERVICES')} className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${activeTab === 'SERVICES' ? 'text-purple-600 dark:text-purple-400 font-bold scale-105' : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'}`}>
+                            <LayoutGrid size={24} className={activeTab === 'SERVICES' ? 'fill-purple-100 dark:fill-purple-900' : ''}/>
+                            <span className="text-[10px]">{t('navExplore')}</span>
                         </button>
-                        <button onClick={() => setActiveTab('PROFILE')} className={`flex flex-col items-center justify-center w-full h-full gap-1 ${activeTab === 'PROFILE' ? 'text-black dark:text-white' : 'text-gray-400'}`}>
-                            {user?.profile_image_url ? (
-                                <img src={user.profile_image_url} className={`w-6 h-6 rounded-full object-cover border-2 ${activeTab === 'PROFILE' ? 'border-black dark:border-white' : 'border-transparent'}`}/>
-                            ) : (
-                                <User size={24} className={activeTab === 'PROFILE' ? 'fill-gray-200 dark:fill-gray-700' : ''} />
-                            )}
-                            <span className="text-[10px] font-bold">{t('navProfile')}</span>
+                        <button onClick={() => setActiveTab('PROFILE')} className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${activeTab === 'PROFILE' ? 'text-green-600 dark:text-green-400 font-bold scale-105' : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'}`}>
+                            <User size={24} className={activeTab === 'PROFILE' ? 'fill-green-100 dark:fill-green-900' : ''}/>
+                            <span className="text-[10px]">{t('navProfile')}</span>
                         </button>
                     </div>
                 )}
             </div>
+
+            {/* GLOBAL MODALS */}
+            <AuthModal isOpen={showAuth} onClose={() => setShowAuth(false)} onLogin={handleLogin} notify={showToast} />
+            <RealEstate isOpen={showRealEstate} onClose={() => setShowRealEstate(false)} currentUser={user}/>
+            <JobBoard isOpen={showJobBoard} onClose={() => setShowJobBoard(false)} currentUser={user} notify={showToast}/>
+            <AppointmentsDrawer isOpen={showAppointments} onClose={() => setShowAppointments(false)} user={user}/>
+            <DatabaseSetup isOpen={showDB} onClose={() => setShowDB(false)}/>
+            <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)}/>
             
+            {/* DIRECTORY & NOTIFICATIONS */}
+            <ProviderDirectory isOpen={showDirectory} onClose={() => setShowDirectory(false)} currentUser={user} />
+            {user && <ClientNotificationsModal isOpen={showClientNotifs} onClose={() => setShowClientNotifs(false)} userId={user.id} />}
+
             {/* GLOBAL TOAST */}
             {toast && <ToastNotification message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-
-            <AuthModal isOpen={showAuth} onClose={() => setShowAuth(false)} onLogin={handleLogin} notify={showToast} />
-            <RealEstate isOpen={showRealEstate} onClose={() => setShowRealEstate(false)} currentUser={user} />
-            <JobBoard isOpen={showJobBoard} onClose={() => setShowJobBoard(false)} currentUser={user} notify={showToast} />
-            <AppointmentsDrawer isOpen={showAppointments} onClose={() => setShowAppointments(false)} user={user} />
-            <DatabaseSetup isOpen={showDB} onClose={() => setShowDB(false)} />
-            <ProviderDirectory isOpen={showDirectory} onClose={() => setShowDirectory(false)} currentUser={user} />
-            <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
-            
-            {/* NEW ADMIN DASHBOARD MODAL */}
-            {isAdmin && <AdminDashboard isOpen={showAdminDashboard} onClose={() => setShowAdminDashboard(false)} />}
-            
-            {/* CLIENT NOTIFICATIONS MODAL */}
-            {user && <ClientNotificationsModal isOpen={showClientNotifs} onClose={() => setShowClientNotifs(false)} userId={user.id} />}
         </div>
     );
-};
+}
 
-const App: React.FC = () => {
-    return (
-        <LocalizationProvider>
-            <AppContent />
-        </LocalizationProvider>
-    );
-};
-
-export default App;
+export default function App() {
+  return (
+    <LocalizationProvider>
+      <AppContent />
+    </LocalizationProvider>
+  );
+}
