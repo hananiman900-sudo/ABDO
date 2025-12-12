@@ -16,6 +16,11 @@ export interface AuthenticatedUser {
   latitude?: number;
   longitude?: number;
   bio?: string;
+  // NEW CATEGORY FIELDS
+  category?: string;
+  specialty?: string;
+  neighborhood?: string;
+  
   // NEW AI FIELDS
   custom_ai_instructions?: string; 
   price_info?: string;
@@ -67,6 +72,20 @@ export interface ProductReview {
     user_name: string;
     comment: string;
     created_at: string;
+}
+
+// Dynamic Categories Types
+export interface AppCategory {
+    id: number;
+    name: string;
+    created_at?: string;
+}
+
+export interface AppSpecialty {
+    id: number;
+    category_id: number;
+    name: string;
+    created_at?: string;
 }
 
 export interface Category { id: number; name: string; created_at: string; }

@@ -1,15 +1,16 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Message, Role, AuthenticatedUser, SystemAnnouncement, UrgentAd, Offer } from '../types';
+import { Message, Role, AuthenticatedUser, SystemAnnouncement, UrgentAd, Offer, AppCategory, AppSpecialty } from '../types';
 import { getChatResponse } from '../services/geminiService';
 import { useLocalization } from '../hooks/useLocalization';
 import { supabase } from '../services/supabaseClient';
 import QRCodeDisplay from './QRCodeDisplay';
-import { Send, Mic, Paperclip, Camera, Loader2, X, Globe, Search, ArrowLeft, MoreVertical, Calendar, Info, Phone, MapPin, Instagram, Facebook, Tag, UserPlus, UserCheck, Megaphone, Star, Check, ChevronDown, CheckCircle, StopCircle, Sparkles, Banknote, Clock, Zap, Bell } from 'lucide-react';
+import { Send, Mic, Paperclip, Camera, Loader2, X, Globe, Search, ArrowLeft, MoreVertical, Calendar, Info, Phone, MapPin, Instagram, Facebook, Tag, UserPlus, UserCheck, Megaphone, Star, Check, ChevronDown, CheckCircle, StopCircle, Sparkles, Banknote, Clock, Zap, Bell, ChevronRight, RotateCcw } from 'lucide-react';
 
 // ... (Existing Sub-components: BookingModal, ChatProfileModal remain unchanged)
 
-export const UrgentTicker: React.FC<{ onClick: () => void }> = ({ onClick }) => {
+export const UrgentTicker: React.FC<{ onClick: () => void; currentUser: AuthenticatedUser | null }> = ({ onClick, currentUser }) => {
+    // ... same code ...
     const { t } = useLocalization();
     const [ads, setAds] = useState<UrgentAd[]>([]);
     const [currentIndex, setCurrentIndex] = useState(0);
@@ -17,11 +18,22 @@ export const UrgentTicker: React.FC<{ onClick: () => void }> = ({ onClick }) => 
 
     useEffect(() => {
         const fetch = async () => {
-            const { data } = await supabase.from('urgent_ads').select('*, providers(name)').eq('is_active', true);
-            setAds(data as any || []);
+            if (!currentUser) return;
+            
+            // 1. Get providers I follow
+            const { data: follows } = await supabase.from('follows').select('provider_id').eq('client_id', currentUser.id);
+            if (follows && follows.length > 0) {
+                const providerIds = follows.map(f => f.provider_id);
+                // 2. Fetch active ads ONLY from followed providers
+                const { data } = await supabase.from('urgent_ads')
+                    .select('*, providers(name)')
+                    .in('provider_id', providerIds)
+                    .eq('is_active', true);
+                setAds(data as any || []);
+            }
         }
         fetch();
-    }, []);
+    }, [currentUser]);
 
     useEffect(() => {
         if (ads.length <= 1) return;
@@ -85,6 +97,7 @@ export const UrgentTicker: React.FC<{ onClick: () => void }> = ({ onClick }) => 
 }
 
 export const BookingModal: React.FC<{ provider: any; onClose: () => void; currentUser: AuthenticatedUser | null; onBooked: (details: any) => void; initialOffer?: Offer | null }> = ({ provider, onClose, currentUser, onBooked, initialOffer }) => {
+    // ... same code ...
     const { t } = useLocalization();
     const [offers, setOffers] = useState<Offer[]>([]);
     const [selectedOffer, setSelectedOffer] = useState<Offer | null>(null);
@@ -133,6 +146,7 @@ export const BookingModal: React.FC<{ provider: any; onClose: () => void; curren
 }
 
 export const ChatProfileModal: React.FC<{ provider: any; onClose: () => void; currentUser: AuthenticatedUser | null; onBookOffer?: (offer: Offer) => void }> = ({ provider, onClose, currentUser, onBookOffer }) => {
+    // ... same code ...
     const { t } = useLocalization();
     const [offers, setOffers] = useState<Offer[]>([]);
     const [isFollowing, setIsFollowing] = useState(false);
@@ -190,14 +204,41 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
     const [showBooking, setShowBooking] = useState(false);
     const [preSelectedOffer, setPreSelectedOffer] = useState<Offer | null>(null);
     const [isRecording, setIsRecording] = useState(false);
-    const [suggestions, setSuggestions] = useState<string[]>([]); // Smart Chips
+    const [suggestions, setSuggestions] = useState<string[]>([]);
+
+    // --- FILTER STATE (WhatsApp Style Drill Down) ---
+    // Level 0: Categories (Professions)
+    // Level 1: Specialties (If Doctor or any other category has specialties)
+    // Level 2: Neighborhoods (Final Filter)
+    const [filterLevel, setFilterLevel] = useState(0);
+    const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+    const [selectedSpecialty, setSelectedSpecialty] = useState<string | null>(null);
+    const [selectedNeighborhood, setSelectedNeighborhood] = useState<string | null>(null);
+
+    // Fetched Lists
+    const [fetchedCategories, setFetchedCategories] = useState<AppCategory[]>([]);
+    const [fetchedSpecialties, setFetchedSpecialties] = useState<AppSpecialty[]>([]);
+    const neighborhoods = t('neighborhoods').split(',').map(s => s.trim());
 
     // Speech Recognition Reference
     const recognitionRef = useRef<any>(null);
 
+    // Initial Data Fetch
     useEffect(() => {
-        const fetchProviders = async () => { const { data } = await supabase.from('providers').select('*').eq('is_active', true); setProviders(data || []); }
-        fetchProviders();
+        const init = async () => {
+            // Providers
+            const { data: pData } = await supabase.from('providers').select('*').eq('is_active', true);
+            setProviders(pData || []);
+
+            // Categories
+            const { data: cData } = await supabase.from('app_categories').select('*').order('name');
+            setFetchedCategories(cData || []);
+
+            // Specialties
+            const { data: sData } = await supabase.from('app_specialties').select('*').order('name');
+            setFetchedSpecialties(sData || []);
+        }
+        init();
     }, []);
 
     useEffect(() => { onToggleNav(view === 'CHAT'); }, [view]);
@@ -229,7 +270,6 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
             setMessages([]);
         }
         
-        // Initial Suggestions
         if(view === 'CHAT') {
             if (selectedChat) {
                 const dynamicSuggestions = ['📅 حجز موعد'];
@@ -252,9 +292,118 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
         setShowBooking(false);
     };
 
+    // --- FILTER HANDLERS ---
+    const handleCategorySelect = (catName: string) => {
+        setSelectedCategory(catName);
+        
+        // Find if this category has specialties
+        const catObj = fetchedCategories.find(c => c.name === catName);
+        const hasSpecs = catObj && fetchedSpecialties.some(s => s.category_id === catObj.id);
+
+        if (hasSpecs) {
+            setFilterLevel(1); // Go to Specialties
+        } else {
+            setFilterLevel(2); // Go directly to Neighborhoods
+        }
+    };
+
+    const handleSpecialtySelect = (spec: string) => {
+        setSelectedSpecialty(spec);
+        setFilterLevel(2); // Go to Neighborhoods
+    };
+
+    const handleNeighborhoodSelect = (hood: string) => {
+        setSelectedNeighborhood(hood);
+        // Filter is complete, list updates automatically below
+    };
+
+    const resetFilters = () => {
+        setFilterLevel(0);
+        setSelectedCategory(null);
+        setSelectedSpecialty(null);
+        setSelectedNeighborhood(null);
+    };
+
+    // --- RENDER FILTER CHIPS ---
+    const renderFilterChips = () => {
+        if (filterLevel === 0) {
+            // Show Categories
+            return (
+                <div className="flex gap-2 overflow-x-auto no-scrollbar py-2 px-1">
+                    {fetchedCategories.length > 0 ? fetchedCategories.map(cat => (
+                        <button key={cat.id} onClick={() => handleCategorySelect(cat.name)} className="px-4 py-1.5 bg-gray-100 text-gray-700 rounded-full text-xs font-bold whitespace-nowrap border border-gray-200 hover:bg-blue-50 hover:text-blue-600 transition-colors">
+                            {cat.name}
+                        </button>
+                    )) : (
+                        <p className="text-xs text-gray-400 p-2">Loading categories...</p>
+                    )}
+                </div>
+            );
+        } else if (filterLevel === 1) {
+            // Show Specialties based on Selected Category
+            const catObj = fetchedCategories.find(c => c.name === selectedCategory);
+            const currentSpecs = catObj ? fetchedSpecialties.filter(s => s.category_id === catObj.id) : [];
+
+            return (
+                <div className="flex gap-2 overflow-x-auto no-scrollbar py-2 px-1 items-center">
+                    <button onClick={() => setFilterLevel(0)} className="p-1.5 bg-gray-200 rounded-full mr-2 shrink-0"><ArrowLeft size={12}/></button>
+                    {currentSpecs.map(spec => (
+                        <button key={spec.id} onClick={() => handleSpecialtySelect(spec.name)} className="px-4 py-1.5 bg-blue-50 text-blue-700 rounded-full text-xs font-bold whitespace-nowrap border border-blue-200">
+                            {spec.name}
+                        </button>
+                    ))}
+                </div>
+            );
+        } else if (filterLevel === 2) {
+            // Show Neighborhoods
+            // Determine Back Button Logic: Go back to specialties (1) if they exist, else categories (0)
+            const catObj = fetchedCategories.find(c => c.name === selectedCategory);
+            const hasSpecs = catObj && fetchedSpecialties.some(s => s.category_id === catObj.id);
+            const backLevel = hasSpecs ? 1 : 0;
+
+            return (
+                <div className="flex gap-2 overflow-x-auto no-scrollbar py-2 px-1 items-center">
+                    <button onClick={() => setFilterLevel(backLevel)} className="p-1.5 bg-gray-200 rounded-full mr-2 shrink-0"><ArrowLeft size={12}/></button>
+                    <button onClick={() => setSelectedNeighborhood(null)} className={`px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap border ${selectedNeighborhood === null ? 'bg-black text-white' : 'bg-gray-100 text-gray-500'}`}>الكل</button>
+                    {neighborhoods.map(hood => (
+                        <button key={hood} onClick={() => handleNeighborhoodSelect(hood)} className={`px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap border transition-colors ${selectedNeighborhood === hood ? 'bg-green-600 text-white border-green-600' : 'bg-gray-100 text-gray-700 hover:bg-green-50'}`}>
+                            {hood}
+                        </button>
+                    ))}
+                </div>
+            );
+        }
+    };
+
+    // Filter Logic Implementation
+    const filteredProviders = providers.filter(p => {
+        // 1. Search Term
+        const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.service_type.toLowerCase().includes(searchTerm.toLowerCase());
+        
+        // 2. Category Filter
+        let matchesCategory = true;
+        if (selectedCategory) {
+            matchesCategory = p.category === selectedCategory || (!p.category && p.service_type === selectedCategory); // Fallback for old data
+        }
+
+        // 3. Specialty Filter
+        let matchesSpecialty = true;
+        if (selectedSpecialty) {
+            matchesSpecialty = p.specialty === selectedSpecialty;
+        }
+
+        // 4. Neighborhood Filter
+        let matchesNeighborhood = true;
+        if (selectedNeighborhood) {
+            matchesNeighborhood = p.neighborhood === selectedNeighborhood || p.location.includes(selectedNeighborhood);
+        }
+
+        return matchesSearch && matchesCategory && matchesSpecialty && matchesNeighborhood;
+    });
+
+
     const handleChipClick = async (text: string) => {
         setInput(text);
-        
         if (selectedChat) {
             let localAnswer = null;
             if (text === '💰 الأثمنة' && selectedChat.price_info) localAnswer = selectedChat.price_info;
@@ -326,16 +475,10 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
             
             let displayText = responseText;
             const suggestionMatch = responseText.match(/SUGGESTIONS\|(.*)/);
-            
             if (suggestionMatch) {
                 displayText = responseText.replace(suggestionMatch[0], '').trim();
                 const rawOptions = suggestionMatch[1].split('|');
                 setSuggestions(rawOptions.map(o => o.trim()).filter(o => o.length > 0));
-            } else {
-                // Keep persistent hybrid suggestions if no new ones
-                if(selectedChat) {
-                    // Logic to restore original chips if not specified
-                }
             }
 
             let botMsg: Message = { role: Role.BOT, text: displayText };
@@ -377,49 +520,21 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
         e.target.value = '';
     }
 
-    // --- NEW WEB SPEECH API IMPLEMENTATION ---
     const toggleRecording = () => {
         if (isRecording) {
-            if (recognitionRef.current) {
-                recognitionRef.current.stop();
-            }
+            if (recognitionRef.current) recognitionRef.current.stop();
             setIsRecording(false);
         } else {
-            // Start Recording
             const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-            
-            if (!SpeechRecognition) {
-                alert("Your browser does not support voice recognition.");
-                return;
-            }
-
+            if (!SpeechRecognition) { alert("Your browser does not support voice recognition."); return; }
             recognitionRef.current = new SpeechRecognition();
-            recognitionRef.current.continuous = false; // Stop after one sentence
-            recognitionRef.current.lang = 'ar-MA'; // Target Moroccan Arabic if possible, or 'ar'
+            recognitionRef.current.continuous = false; 
+            recognitionRef.current.lang = 'ar-MA'; 
             recognitionRef.current.interimResults = false;
-
-            recognitionRef.current.onstart = () => {
-                setIsRecording(true);
-            };
-
-            recognitionRef.current.onresult = (event: any) => {
-                const transcript = event.results[0][0].transcript;
-                if (transcript) {
-                    setInput(transcript);
-                    // Optional: Auto Send
-                    // setTimeout(() => handleSend(transcript), 500); 
-                }
-            };
-
-            recognitionRef.current.onerror = (event: any) => {
-                console.error("Speech Error", event.error);
-                setIsRecording(false);
-            };
-
-            recognitionRef.current.onend = () => {
-                setIsRecording(false);
-            };
-
+            recognitionRef.current.onstart = () => setIsRecording(true);
+            recognitionRef.current.onresult = (event: any) => { const transcript = event.results[0][0].transcript; if (transcript) setInput(transcript); };
+            recognitionRef.current.onerror = () => setIsRecording(false);
+            recognitionRef.current.onend = () => setIsRecording(false);
             recognitionRef.current.start();
         }
     }
@@ -446,25 +561,25 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
 
     // --- VIEW 1: CHAT LIST ---
     if (view === 'LIST') {
-        const filteredProviders = providers.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.service_type.toLowerCase().includes(searchTerm.toLowerCase()));
-
         return (
             <div className="flex flex-col h-full bg-white relative">
-                <UrgentTicker onClick={onOpenNotifications} />
+                
+                {/* URGENT TICKER (Hidden if in chat) */}
+                <UrgentTicker onClick={onOpenNotifications} currentUser={currentUser} />
+                
                 <div className="p-4 pb-2">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 mb-2">
                         <div className="bg-gray-100 rounded-full flex items-center px-4 py-2 flex-1">
                             <Search size={18} className="text-gray-400"/>
                             <input placeholder={t('search')} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="bg-transparent border-none outline-none flex-1 ml-2 text-sm"/>
                         </div>
-                        {/* RESTORED BOOST/AD ICON with GRADIENT */}
-                        <button 
-                            onClick={onOpenNotifications}
-                            className="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-500 to-blue-500 text-white flex items-center justify-center shadow-md active:scale-95 transition-transform"
-                        >
-                            <Megaphone size={18} />
-                        </button>
+                        {selectedCategory && (
+                            <button onClick={resetFilters} className="p-2 bg-red-100 rounded-full text-red-500 shadow-sm animate-fade-in"><RotateCcw size={18}/></button>
+                        )}
                     </div>
+
+                    {/* NEW FILTER CHIPS (Drill Down) */}
+                    {renderFilterChips()}
                 </div>
 
                 <div className="flex-1 overflow-y-auto pb-20">
@@ -472,10 +587,19 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
                         <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white shadow-md shrink-0"><Globe size={28}/></div>
                         <div className="flex-1 min-w-0"><div className="flex justify-between items-center mb-1"><h3 className="font-bold text-gray-900">Tanger IA</h3><span className="text-[10px] text-gray-400">Now</span></div><p className="text-sm text-gray-500 line-clamp-1">{t('appDesc')}</p></div>
                     </div>
+                    
+                    {filteredProviders.length === 0 && <p className="text-center text-gray-400 py-10">No providers found matching filters.</p>}
+
                     {filteredProviders.map(p => (
                         <div key={p.id} onClick={() => openChat(p)} className="flex items-center gap-4 p-4 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
                             <div className="w-14 h-14 rounded-full bg-gray-200 overflow-hidden border border-gray-100 relative shrink-0"><img src={p.profile_image_url || `https://ui-avatars.com/api/?name=${p.name}`} className="w-full h-full object-cover"/><span className="absolute bottom-1 right-1 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></span></div>
-                            <div className="flex-1 min-w-0"><div className="flex justify-between items-center mb-1"><h3 className="font-bold text-gray-900 truncate">{p.name}</h3><span className="text-[10px] text-gray-400">Online</span></div><p className="text-sm text-gray-500 flex items-center gap-1 truncate"><span className="font-semibold text-blue-600">{p.service_type}</span></p></div>
+                            <div className="flex-1 min-w-0">
+                                <div className="flex justify-between items-center mb-1"><h3 className="font-bold text-gray-900 truncate">{p.name}</h3><span className="text-[10px] text-gray-400">Online</span></div>
+                                <p className="text-sm text-gray-500 flex items-center gap-1 truncate">
+                                    <span className="font-semibold text-blue-600">{p.service_type}</span>
+                                    {p.neighborhood && <span className="text-[10px] bg-gray-100 px-1 rounded text-gray-600">📍 {p.neighborhood}</span>}
+                                </p>
+                            </div>
                         </div>
                     ))}
                 </div>
@@ -486,7 +610,9 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
     // --- VIEW 2: CONVERSATION WINDOW ---
     return (
         <div className="flex flex-col h-full bg-[#EFE7DD] relative">
-            <UrgentTicker onClick={onOpenNotifications} />
+            
+            {/* URGENT TICKER HIDDEN IN CHAT VIEW AS REQUESTED */}
+            
             <div className="bg-white py-3 px-2 border-b flex items-center gap-2 shadow-sm z-20">
                 <button onClick={() => setView('LIST')} className="p-2"><ArrowLeft size={20}/></button>
                 <div onClick={() => selectedChat && setShowProfile(true)} className="flex items-center gap-3 flex-1 cursor-pointer">

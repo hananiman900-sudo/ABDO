@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { UserView, Language, AuthenticatedUser, AccountType, Role, Offer, UrgentAd } from './types';
+import { UserView, Language, AuthenticatedUser, AccountType, Role, Offer, UrgentAd, AppCategory, AppSpecialty } from './types';
 import Chatbot, { ChatProfileModal } from './components/Chatbot';
 import ProviderPortal from './components/QRScanner';
 import AppointmentsDrawer from './components/AppointmentsDrawer';
@@ -11,7 +11,7 @@ import { JobBoard } from './components/JobBoard';
 import { AdminDashboard } from './components/AdminDashboard'; // Import New Component
 import { useLocalization, LocalizationProvider } from './hooks/useLocalization';
 import { supabase } from './services/supabaseClient';
-import { LogIn, User, MapPin, ShoppingBag, Home, Briefcase, Settings, X, Phone, Globe, LayoutGrid, Heart, List, LogOut, CheckCircle, Edit, Share2, Grid, Bookmark, Menu, Users, Database, Instagram, Facebook, Tag, Sparkles, MessageCircle, Calendar, Bell, Eye, EyeOff, Camera, Loader2, UserPlus, UserCheck, Megaphone, Clock, ArrowLeft, Moon, Sun, AlertCircle, Zap, Scan, BrainCircuit, ShieldCheck, Gem, RefreshCw, Copy } from 'lucide-react';
+import { LogIn, User, MapPin, ShoppingBag, Home, Briefcase, Settings, X, Phone, Globe, LayoutGrid, Heart, List, LogOut, CheckCircle, Edit, Share2, Grid, Bookmark, Menu, Users, Database, Instagram, Facebook, Tag, Sparkles, MessageCircle, Calendar, Bell, Eye, EyeOff, Camera, Loader2, UserPlus, UserCheck, Megaphone, Clock, ArrowLeft, Moon, Sun, AlertCircle, Zap, Scan, BrainCircuit, ShieldCheck, Gem, RefreshCw, Copy, Terminal, Star, CheckSquare } from 'lucide-react';
 
 // --- CUSTOM TOAST NOTIFICATION ---
 const ToastNotification: React.FC<{ message: string; type: 'success' | 'error'; onClose: () => void }> = ({ message, type, onClose }) => {
@@ -30,17 +30,23 @@ const ToastNotification: React.FC<{ message: string; type: 'success' | 'error'; 
     );
 }
 
-// --- NEW COMPONENT: PROVIDER PENDING VIEW ---
-const ProviderPendingView: React.FC<{ user: AuthenticatedUser; onLogout: () => void; onCheckStatus: () => void }> = ({ user, onLogout, onCheckStatus }) => {
+// ... (ProviderPendingView, SettingsModal remain unchanged)
+const ProviderPendingView: React.FC<{ user: AuthenticatedUser; onLogout: () => void; onCheckStatus: () => Promise<string> }> = ({ user, onLogout, onCheckStatus }) => {
     const [checking, setChecking] = useState(false);
-    
-    // We removed the internal interval here because AppContent now handles the polling globally.
-    // This prevents duplicate requests and ensures state is updated at the source.
+    const [diagnosticLog, setDiagnosticLog] = useState<string>('');
 
+    // Internal check handler to manage UI state and display logs
     const handleCheck = async () => {
         setChecking(true);
-        await onCheckStatus();
-        setTimeout(() => setChecking(false), 500);
+        try {
+            const resultMsg = await onCheckStatus();
+            // Don't show log anymore, user wants simple Arabic feedback
+            // setDiagnosticLog(resultMsg); 
+        } catch (e: any) {
+            setDiagnosticLog(`خطأ غير متوقع: ${e.message}`);
+        } finally {
+            setChecking(false);
+        }
     }
 
     return (
@@ -59,9 +65,28 @@ const ProviderPendingView: React.FC<{ user: AuthenticatedUser; onLogout: () => v
                 </div>
                 
                 <h1 className="text-2xl font-black mb-2 text-center">مرحباً، {user.name}</h1>
-                <p className="text-blue-200 text-sm text-center mb-4 px-4 leading-relaxed">
-                    حسابك قيد المراجعة. المرجو الانتظار حتى يقوم المسؤول بتفعيل اشتراكك.
+                <p className="text-blue-200 text-sm text-center mb-6 px-4 leading-relaxed">
+                    حسابك في طور المراجعة من طرف الإدارة. سيتم تفعيله قريباً.
                 </p>
+
+                {/* Feature Preview List */}
+                <div className="w-full bg-black/40 p-4 rounded-xl border border-white/10 mb-6 space-y-3">
+                    <h3 className="text-xs text-yellow-400 font-bold uppercase mb-2 text-center flex items-center justify-center gap-1">
+                        <Star size={12}/> مميزات حسابك المهني
+                    </h3>
+                    <div className="flex items-center gap-3 text-xs text-gray-300">
+                        <div className="p-1.5 bg-blue-500/20 rounded-full text-blue-400"><Calendar size={14}/></div>
+                        <span>استقبال الحجوزات وتنظيم المواعيد</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-gray-300">
+                        <div className="p-1.5 bg-green-500/20 rounded-full text-green-400"><Tag size={14}/></div>
+                        <span>نشر العروض وتخفيضات للزبناء</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-gray-300">
+                        <div className="p-1.5 bg-purple-500/20 rounded-full text-purple-400"><Megaphone size={14}/></div>
+                        <span>نشر إعلانات عاجلة في التطبيق</span>
+                    </div>
+                </div>
 
                 {/* Admin Info Box */}
                 <div className="w-full bg-black/40 p-3 rounded-xl border border-white/10 mb-6 text-center">
@@ -71,24 +96,7 @@ const ProviderPendingView: React.FC<{ user: AuthenticatedUser; onLogout: () => v
                     </p>
                 </div>
 
-                <div className="w-full space-y-3 mb-8">
-                    <div className="bg-black/30 p-4 rounded-2xl flex items-center gap-4 border border-white/10 hover:bg-black/40 transition-colors">
-                        <div className="bg-blue-500/20 p-2.5 rounded-xl text-blue-300"><BrainCircuit size={20}/></div>
-                        <div>
-                            <h3 className="font-bold text-sm text-white">الذكاء الاصطناعي (AI)</h3>
-                            <p className="text-[10px] text-gray-300">رد آلي ذكي على استفسارات الزبناء 24/7.</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="text-center w-full bg-gradient-to-r from-white/10 to-transparent p-4 rounded-2xl border border-white/10 mb-6">
-                    <p className="text-xs text-gray-300 uppercase tracking-widest mb-1">ثمن الاشتراك الشهري</p>
-                    <div className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-orange-400 drop-shadow-sm">
-                        50 DH
-                    </div>
-                </div>
-                
-                <div className="w-full flex gap-3">
+                <div className="w-full flex gap-3 mb-4">
                     <button onClick={onLogout} className="flex-1 py-3 bg-white/10 hover:bg-white/20 text-white font-bold rounded-xl transition-all border border-white/10 flex items-center justify-center gap-2 text-sm">
                         <LogOut size={16}/> خروج
                     </button>
@@ -101,7 +109,6 @@ const ProviderPendingView: React.FC<{ user: AuthenticatedUser; onLogout: () => v
     );
 }
 
-// --- APP SETTINGS MODAL ---
 const SettingsModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ isOpen, onClose }) => {
     const { t, language, setLanguage } = useLocalization();
     const [isDark, setIsDark] = useState(document.documentElement.classList.contains('dark'));
@@ -176,41 +183,78 @@ const AuthModal: React.FC<{ isOpen: boolean; onClose: () => void; onLogin: (user
     // Default to CLIENT, user must explicitly switch to PROVIDER
     const [accountType, setAccountType] = useState<AccountType>(AccountType.CLIENT);
     
-    const [formData, setFormData] = useState({ phone: '', password: '', name: '', service_type: '', username: '', location: '' });
+    // Updated Form Data
+    const [formData, setFormData] = useState({ phone: '', password: '', name: '', service_type: '', username: '', location: '', category: '', specialty: '', neighborhood: '' });
+
+    // Fetched Data
+    const [fetchedCategories, setFetchedCategories] = useState<AppCategory[]>([]);
+    const [fetchedSpecialties, setFetchedSpecialties] = useState<AppSpecialty[]>([]);
+    
+    // Lists for Tangier
+    const neighborhoods = t('neighborhoods').split(',').map(s => s.trim());
+
+    // Fetch Categories on Mount
+    useEffect(() => {
+        if (isOpen && accountType === AccountType.PROVIDER) {
+            const fetchCats = async () => {
+                const { data } = await supabase.from('app_categories').select('*').order('name');
+                setFetchedCategories(data || []);
+            };
+            fetchCats();
+        }
+    }, [isOpen, accountType]);
+
+    // Fetch Specialties when Category Changes
+    useEffect(() => {
+        if (formData.category) {
+            const fetchSpecs = async () => {
+                const selectedCat = fetchedCategories.find(c => c.name === formData.category);
+                if (selectedCat) {
+                    const { data } = await supabase.from('app_specialties').select('*').eq('category_id', selectedCat.id).order('name');
+                    setFetchedSpecialties(data || []);
+                } else {
+                    setFetchedSpecialties([]);
+                }
+            };
+            fetchSpecs();
+        } else {
+            setFetchedSpecialties([]);
+        }
+    }, [formData.category, fetchedCategories]);
 
     // Reset form when switching types
     useEffect(() => {
-        setFormData({ phone: '', password: '', name: '', service_type: '', username: '', location: '' });
+        setFormData({ phone: '', password: '', name: '', service_type: '', username: '', location: '', category: '', specialty: '', neighborhood: '' });
         setIsRegister(false); 
     }, [accountType]);
 
     const handleSubmit = async () => {
         setLoading(true);
         try {
-            // Determine table based on explicitly selected tab
             const table = accountType === AccountType.CLIENT ? 'clients' : 'providers';
 
             if (isRegister) {
                 // REGISTRATION LOGIC
                 const payload: any = { phone: formData.phone, password: formData.password, [accountType === AccountType.CLIENT ? 'full_name' : 'name']: formData.name };
                 
-                // Logic to enforce strict active status
                 const isProvider = accountType === AccountType.PROVIDER;
                 const isAdmin = formData.phone === '0617774846';
                 
-                // Providers are FALSE unless admin, Clients are TRUE
                 let forcedActiveStatus = true; 
                 if (isProvider) {
                     forcedActiveStatus = isAdmin ? true : false;
                 }
 
                 if (isProvider) {
-                    payload.service_type = formData.service_type || 'General';
-                    // If no username provided, use phone as username fallback
+                    // Use chosen category and neighborhood
+                    payload.service_type = formData.category || 'General';
+                    payload.category = formData.category;
+                    payload.neighborhood = formData.neighborhood;
+                    // Only add specialty if it was selected from list
+                    if(formData.specialty) payload.specialty = formData.specialty;
+
                     payload.username = formData.username || formData.phone; 
-                    payload.location = formData.location || 'Tangier'; // Default location to fix NOT NULL constraint
-                    
-                    // CRITICAL: Force NEW providers to be INACTIVE (explicitly set false)
+                    payload.location = formData.neighborhood || 'Tangier'; 
                     payload.is_active = forcedActiveStatus; 
                 }
                 
@@ -225,27 +269,26 @@ const AuthModal: React.FC<{ isOpen: boolean; onClose: () => void; onLogin: (user
                     phone: formData.phone, 
                     service_type: payload.service_type, 
                     username: payload.username,
-                    isActive: forcedActiveStatus // Use the explicitly calculated boolean
+                    isActive: forcedActiveStatus,
+                    category: payload.category,
+                    specialty: payload.specialty,
+                    neighborhood: payload.neighborhood
                 };
 
                 onLogin(newUser);
 
                 if (isProvider && !forcedActiveStatus) {
-                    // Do NOT show success toast. 
-                    // The app will immediately render ProviderPendingView.
+                    // Pending View will show
                 } else {
                     notify(t('success'), 'success');
                 }
 
             } else {
-                // LOGIN LOGIC (Strictly checks the selected table)
+                // LOGIN LOGIC
                 let query = supabase.from(table).select('*');
-                
                 if (accountType === AccountType.PROVIDER) {
-                    // Providers can login with phone OR username
                     query = query.or(`phone.eq.${formData.phone},username.eq.${formData.phone}`);
                 } else {
-                    // Clients login with phone
                     query = query.eq('phone', formData.phone);
                 }
 
@@ -263,16 +306,11 @@ const AuthModal: React.FC<{ isOpen: boolean; onClose: () => void; onLogin: (user
                      return;
                 }
 
-                // DETERMINE ACTIVE STATUS STRICTLY
                 let finalIsActive = true;
                 if (accountType === AccountType.PROVIDER) {
-                     // IMPORTANT: Cast to boolean strictly. 
-                     // null or undefined or false => false.
-                     // Only true => true.
-                     finalIsActive = user.is_active === true;
+                     finalIsActive = user.is_active === true || user.is_active === 'true';
                 }
 
-                // Login Successful
                 notify(t('success'), 'success');
                 onLogin({ 
                     id: user.id, 
@@ -286,12 +324,20 @@ const AuthModal: React.FC<{ isOpen: boolean; onClose: () => void; onLogin: (user
                     social_links: user.social_links, 
                     followers_count: user.followers_count, 
                     visits_count: user.visits_count,
-                    isActive: finalIsActive, // Important: pass the strictly calculated value
-                    subscriptionEndDate: user.subscription_end_date
+                    isActive: finalIsActive, 
+                    subscriptionEndDate: user.subscription_end_date,
+                    category: user.category,
+                    specialty: user.specialty,
+                    neighborhood: user.neighborhood
                 });
             }
         } catch (e: any) { 
-            notify(e.message || t('errorMessage'), 'error'); 
+            // CATCH MISSING COLUMN ERROR
+            if (e.message && (e.message.includes("category") || e.message.includes("column"))) {
+                notify("خطأ في قاعدة البيانات. يرجى من الأدمن تحديث Supabase (SQL V24).", 'error');
+            } else {
+                notify(e.message || t('errorMessage'), 'error'); 
+            }
         } finally { 
             setLoading(false); 
         }
@@ -304,30 +350,14 @@ const AuthModal: React.FC<{ isOpen: boolean; onClose: () => void; onLogin: (user
             <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-3xl overflow-hidden shadow-2xl relative flex flex-col max-h-[90vh]">
                 <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 z-10"><X/></button>
                 
-                {/* TOP TABS - CLEAR SEPARATION */}
                 <div className="flex border-b">
-                    <button 
-                        onClick={() => setAccountType(AccountType.CLIENT)}
-                        className={`flex-1 py-4 text-center font-bold text-sm transition-colors flex flex-col items-center gap-2 ${accountType === AccountType.CLIENT ? 'bg-white text-blue-600 border-b-2 border-blue-600' : 'bg-gray-50 text-gray-500'}`}
-                    >
-                        <User size={20} />
-                        {t('client')} (Zobana2)
-                    </button>
-                    <button 
-                        onClick={() => setAccountType(AccountType.PROVIDER)}
-                        className={`flex-1 py-4 text-center font-bold text-sm transition-colors flex flex-col items-center gap-2 ${accountType === AccountType.PROVIDER ? 'bg-white text-purple-600 border-b-2 border-purple-600' : 'bg-gray-50 text-gray-500'}`}
-                    >
-                        <Briefcase size={20} />
-                        {t('provider')} (Mihani)
-                    </button>
+                    <button onClick={() => setAccountType(AccountType.CLIENT)} className={`flex-1 py-4 text-center font-bold text-sm transition-colors flex flex-col items-center gap-2 ${accountType === AccountType.CLIENT ? 'bg-white text-blue-600 border-b-2 border-blue-600' : 'bg-gray-50 text-gray-500'}`}><User size={20} />{t('client')} (Zobana2)</button>
+                    <button onClick={() => setAccountType(AccountType.PROVIDER)} className={`flex-1 py-4 text-center font-bold text-sm transition-colors flex flex-col items-center gap-2 ${accountType === AccountType.PROVIDER ? 'bg-white text-purple-600 border-b-2 border-purple-600' : 'bg-gray-50 text-gray-500'}`}><Briefcase size={20} />{t('provider')} (Mihani)</button>
                 </div>
 
                 <div className="p-8 overflow-y-auto">
                     <h2 className="text-xl font-black mb-6 text-center dark:text-white flex items-center justify-center gap-2">
                          {isRegister ? t('registerTitle') : t('loginTitle')}
-                         <span className={`text-xs px-2 py-1 rounded-full ${accountType === AccountType.CLIENT ? 'bg-blue-100 text-blue-600' : 'bg-purple-100 text-purple-600'}`}>
-                             {accountType === AccountType.CLIENT ? t('client') : t('provider')}
-                         </span>
                     </h2>
 
                     <div className="space-y-4">
@@ -337,59 +367,46 @@ const AuthModal: React.FC<{ isOpen: boolean; onClose: () => void; onLogin: (user
                                 {accountType === AccountType.PROVIDER && (
                                     <>
                                         <input placeholder={t('username')} value={formData.username} onChange={e => setFormData({...formData, username: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl outline-none border focus:border-black transition-colors"/>
-                                        <input placeholder="Service Type (e.g. Doctor, Plumber)" value={formData.service_type} onChange={e => setFormData({...formData, service_type: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl outline-none border focus:border-black transition-colors"/>
-                                        <input placeholder="Location (e.g. City Center)" value={formData.location} onChange={e => setFormData({...formData, location: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl outline-none border focus:border-black transition-colors"/>
+                                        
+                                        {/* Category Selection (Dynamic) */}
+                                        <select value={formData.category} onChange={e => setFormData({...formData, category: e.target.value, specialty: ''})} className="w-full p-3 bg-gray-50 rounded-xl outline-none border focus:border-black transition-colors">
+                                            <option value="">اختر المهنة (Category)</option>
+                                            {fetchedCategories.length > 0 ? (
+                                                fetchedCategories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)
+                                            ) : (
+                                                <option disabled>Loading...</option>
+                                            )}
+                                        </select>
+
+                                        {/* Conditional Specialty (Dynamic) */}
+                                        {fetchedSpecialties.length > 0 && (
+                                            <select value={formData.specialty} onChange={e => setFormData({...formData, specialty: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl outline-none border focus:border-black transition-colors animate-fade-in">
+                                                <option value="">اختر التخصص (Specialty)</option>
+                                                {fetchedSpecialties.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+                                            </select>
+                                        )}
+
+                                        {/* Neighborhood Selection */}
+                                        <select value={formData.neighborhood} onChange={e => setFormData({...formData, neighborhood: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl outline-none border focus:border-black transition-colors">
+                                            <option value="">اختر الحي في طنجة</option>
+                                            {neighborhoods.map(n => <option key={n} value={n}>{n}</option>)}
+                                        </select>
                                     </>
                                 )}
                             </>
                         )}
                         
-                        <input 
-                            type="text" 
-                            placeholder={accountType === AccountType.PROVIDER ? t('phoneOrUsername') : t('phone')} 
-                            value={formData.phone} 
-                            onChange={e => setFormData({...formData, phone: e.target.value})} 
-                            className="w-full p-3 bg-gray-50 rounded-xl outline-none border focus:border-black transition-colors"
-                        />
+                        <input type="text" placeholder={accountType === AccountType.PROVIDER ? t('phoneOrUsername') : t('phone')} value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl outline-none border focus:border-black transition-colors"/>
                         
-                        {/* PASSWORD INPUT */}
                         <div className="relative">
-                            <input 
-                                type={showPassword ? "text" : "password"} 
-                                placeholder={t('password')} 
-                                value={formData.password} 
-                                onChange={e => setFormData({...formData, password: e.target.value})} 
-                                className="w-full p-3 bg-gray-50 rounded-xl outline-none pr-10 border focus:border-black transition-colors" 
-                                style={{ direction: 'ltr' }}
-                            />
-                            <button 
-                                onClick={() => setShowPassword(!showPassword)} 
-                                className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 z-10"
-                                tabIndex={-1}
-                            >
-                                {showPassword ? <EyeOff size={20}/> : <Eye size={20}/>}
-                            </button>
+                            <input type={showPassword ? "text" : "password"} placeholder={t('password')} value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl outline-none pr-10 border focus:border-black transition-colors" style={{ direction: 'ltr' }}/>
+                            <button onClick={() => setShowPassword(!showPassword)} className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 z-10" tabIndex={-1}>{showPassword ? <EyeOff size={20}/> : <Eye size={20}/>}</button>
                         </div>
 
-                        <button 
-                            onClick={handleSubmit} 
-                            disabled={loading} 
-                            className={`w-full py-3 text-white font-bold rounded-xl shadow-lg active:scale-95 transition-transform flex justify-center items-center gap-2 ${accountType === AccountType.CLIENT ? 'bg-blue-600 hover:bg-blue-700' : 'bg-purple-600 hover:bg-purple-700'}`}
-                        >
-                            {loading ? <Loader2 className="animate-spin"/> : (isRegister ? t('registerButton') : t('loginButton'))}
-                        </button>
+                        <button onClick={handleSubmit} disabled={loading} className={`w-full py-3 text-white font-bold rounded-xl shadow-lg active:scale-95 transition-transform flex justify-center items-center gap-2 ${accountType === AccountType.CLIENT ? 'bg-blue-600 hover:bg-blue-700' : 'bg-purple-600 hover:bg-purple-700'}`}>{loading ? <Loader2 className="animate-spin"/> : (isRegister ? t('registerButton') : t('loginButton'))}</button>
                         
-                        <div className="relative py-2">
-                             <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200"></div></div>
-                             <div className="relative flex justify-center text-sm"><span className="px-2 bg-white text-gray-500">Or</span></div>
-                        </div>
-
-                        <button 
-                            onClick={() => setIsRegister(!isRegister)}
-                            className="w-full py-3 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition-colors"
-                        >
-                            {isRegister ? t('loginTitle') : t('registerTitle')}
-                        </button>
+                        <div className="relative py-2"><div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200"></div></div><div className="relative flex justify-center text-sm"><span className="px-2 bg-white text-gray-500">Or</span></div></div>
+                        <button onClick={() => setIsRegister(!isRegister)} className="w-full py-3 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition-colors">{isRegister ? t('loginTitle') : t('registerTitle')}</button>
                     </div>
                 </div>
             </div>
@@ -397,6 +414,7 @@ const AuthModal: React.FC<{ isOpen: boolean; onClose: () => void; onLogin: (user
     );
 };
 
+// ... (Rest of App.tsx remains the same)
 // ... (ClientNotificationsModal, ProviderDirectory, ServicesHub, EditClientProfileModal, SuggestedProviders, ProfileTab, SplashScreen remain unchanged)
 const ClientNotificationsModal: React.FC<{ isOpen: boolean; onClose: () => void; userId: number }> = ({ isOpen, onClose, userId }) => {
     // ... same code ...
@@ -443,6 +461,7 @@ const SplashScreen: React.FC = () => {
     return (<div className="fixed inset-0 bg-white z-[100] flex flex-col items-center justify-center animate-fade-in"><div className="w-24 h-24 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white shadow-xl mb-6 animate-slide-up"><Globe size={48} className="animate-spin-slow"/></div><h1 className="text-2xl font-black text-gray-900 tracking-tight animate-pulse">Tanger IA</h1><p className="text-gray-400 text-sm mt-2">Connect. Smart. Easy.</p></div>);
 }
 
+// ... (AppContent remains the same)
 // --- MAIN APP CONTENT ---
 const AppContent: React.FC = () => {
     const { t, language, setLanguage } = useLocalization();
@@ -511,7 +530,9 @@ const AppContent: React.FC = () => {
         if (user?.accountType === AccountType.PROVIDER && user.isActive === false) {
             const check = async () => {
                  const { data } = await supabase.from('providers').select('is_active, subscription_end_date').eq('id', user.id).single();
-                 if (data && data.is_active === true) {
+                 
+                 // CRITICAL FIX: Handle boolean true OR string "true"
+                 if (data && (data.is_active === true || data.is_active === 'true')) {
                      // ACTIVATION DETECTED! Update state immediately.
                      const activeUser = { ...user, isActive: true, subscriptionEndDate: data.subscription_end_date };
                      setUser(activeUser);
@@ -574,33 +595,28 @@ const AppContent: React.FC = () => {
         localStorage.setItem('tanger_user', JSON.stringify(updatedUser));
     };
 
-    const handleCheckStatus = async () => {
-        if (!user) return;
+    const handleCheckStatus = async (): Promise<string> => {
+        if (!user) return "لا يوجد مستخدم مسجل";
         
-        // Manual check triggered by button
-        const { data, error } = await supabase
-            .from('providers')
-            .select('is_active, subscription_end_date')
-            .eq('id', user.id)
-            .single();
+        try {
+            const { data, error } = await supabase.from('providers').select('id, is_active, subscription_end_date').eq('id', user.id).single();
 
-        if (error || !data) {
-             showToast("خطأ في الاتصال. المرجو المحاولة لاحقاً.", "error");
-             return;
-        }
+            if (!data) return "لم يتم العثور على الحساب";
 
-        if (data.is_active === true) {
-            // Update state in place without reload
-            const updatedUser = { 
-                ...user,
-                isActive: true,
-                subscriptionEndDate: data.subscription_end_date
-            };
-            setUser(updatedUser);
-            localStorage.setItem('tanger_user', JSON.stringify(updatedUser));
-            showToast("تم تفعيل حسابك بنجاح!", "success");
-        } else {
-            showToast("حسابك لا يزال قيد المراجعة", "error");
+            const rawValue = data.is_active;
+
+            if (rawValue === true || rawValue === 'true') {
+                const updatedUser = { ...user, isActive: true, subscriptionEndDate: data.subscription_end_date };
+                setUser(updatedUser);
+                localStorage.setItem('tanger_user', JSON.stringify(updatedUser));
+                showToast("تم تفعيل حسابك بنجاح!", "success");
+                return "تم التفعيل";
+            } else {
+                showToast("الحساب لا يزال قيد المراجعة", "error");
+                return "الحساب قيد المراجعة";
+            }
+        } catch (e: any) {
+            return "خطأ في الاتصال";
         }
     }
 
@@ -642,8 +658,6 @@ const AppContent: React.FC = () => {
     if(showSplash) return <SplashScreen />;
 
     // --- PROVIDER VIEW LOGIC (UPDATED WITH STRICT BLOCK) ---
-    // If user is a PROVIDER and is INACTIVE, they must see the Pending View ONLY.
-    // They cannot access anything else (Client View, etc.)
     if (user?.accountType === AccountType.PROVIDER && !user.isActive) {
         return <ProviderPendingView user={user} onLogout={handleLogout} onCheckStatus={handleCheckStatus} />;
     }
@@ -665,7 +679,6 @@ const AppContent: React.FC = () => {
             <div className="mx-auto w-full max-w-lg md:max-w-2xl lg:max-w-4xl xl:max-w-5xl h-full flex flex-col bg-white dark:bg-black shadow-2xl overflow-hidden relative border-x border-gray-100 dark:border-gray-800">
 
                 {/* NEW CLEAN HEADER - CONDITIONAL RENDERING */}
-                {/* HIDE HEADER IF IN CHAT (Chatbot has its own header) */}
                 {activeTab !== 'CHAT' && (
                     <div className="bg-white dark:bg-gray-800 px-4 py-3 flex justify-between items-center border-b dark:border-gray-700 shadow-sm sticky top-0 z-30">
                         <div className="flex items-center gap-2">
