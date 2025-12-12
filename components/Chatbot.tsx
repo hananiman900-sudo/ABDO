@@ -5,7 +5,7 @@ import { getChatResponse } from '../services/geminiService';
 import { useLocalization } from '../hooks/useLocalization';
 import { supabase } from '../services/supabaseClient';
 import QRCodeDisplay from './QRCodeDisplay';
-import { Send, Mic, Paperclip, Camera, Loader2, X, Globe, Search, ArrowLeft, MoreVertical, Calendar, Info, Phone, MapPin, Instagram, Facebook, Tag, UserPlus, UserCheck, Megaphone, Star, Check, ChevronDown, CheckCircle, StopCircle, Sparkles, Banknote, Clock, Zap, Bell, ChevronRight, RotateCcw, Stethoscope, Wrench, HardHat, Scissors, Utensils, Truck, GraduationCap, Gavel, Syringe, Home, Briefcase, Pill } from 'lucide-react';
+import { Send, Mic, Paperclip, Camera, Loader2, X, Globe, Search, ArrowLeft, MoreVertical, Calendar, Info, Phone, MapPin, Instagram, Facebook, Tag, UserPlus, UserCheck, Megaphone, Star, Check, ChevronDown, CheckCircle, StopCircle, Sparkles, Banknote, Clock, Zap, Bell, ChevronRight, RotateCcw, Stethoscope, Wrench, HardHat, Scissors, Utensils, Truck, GraduationCap, Gavel, Syringe, Home, Briefcase, Pill, MessageSquare } from 'lucide-react';
 
 // ... (Existing Sub-components: BookingModal, ChatProfileModal remain unchanged)
 
@@ -422,17 +422,18 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
                 if (selectedChat.booking_info) dynamicSuggestions.push('📝 شروط الحجز');
                 setSuggestions(dynamicSuggestions);
 
-                // --- V27: FETCH & DISPLAY UNSEEN ADS (STORIES) ---
+                // --- MODIFIED: FETCH & DISPLAY ALL ACTIVE ADS (STORIES) AT THE BOTTOM ---
                 const fetchAndMarkAds = async () => {
-                    // Fetch ACTIVE ads for this provider
+                    // Fetch ALL ACTIVE ads for this provider (ordered oldest to newest to appear in sequence)
                     const { data: ads } = await supabase.from('provider_ads')
                         .select('*')
                         .eq('provider_id', selectedChat.id)
                         .eq('is_active', true)
-                        .order('created_at', { ascending: false }); // Newest first
+                        .order('created_at', { ascending: true }); 
 
                     if (ads && ads.length > 0 && currentUser) {
-                        // Check which ones are NOT viewed
+                        
+                        // 1. Check for unread ones just to update the "Read" status in DB (clear badge)
                         const { data: views } = await supabase.from('ad_views')
                             .select('ad_id')
                             .eq('user_id', currentUser.id)
@@ -441,43 +442,37 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
                         const viewedIds = new Set(views?.map(v => v.ad_id) || []);
                         const unreadAds = ads.filter(a => !viewedIds.has(a.id));
 
-                        // If unread exist, show them and mark as read
                         if (unreadAds.length > 0) {
-                            setMessages(prev => {
-                                const newMessages = unreadAds.map(ad => ({
-                                    role: Role.BOT,
-                                    text: ad.message,
-                                    imageUrl: ad.image_url,
-                                    isWelcomeAd: true
-                                }));
-                                // Avoid duplication if strict mode
-                                return [...prev, ...newMessages];
-                            });
-
-                            // Mark as read in DB
+                            // Mark unread ads as read in DB
                             const inserts = unreadAds.map(ad => ({ user_id: currentUser.id, ad_id: ad.id }));
                             await supabase.from('ad_views').insert(inserts);
                             
                             // Update local badge state immediately
                             setUnreadCounts(prev => ({...prev, [selectedChat.id]: 0}));
-                        } else {
-                            // OPTIONAL: Even if read, show the VERY LATEST ad as a "sticky" welcome if list is empty?
-                            // For now, let's stick to "Only show unread" to be like WhatsApp status updates, 
-                            // OR show the latest one if chat is empty.
-                            if (messages.length === 0 && ads.length > 0) {
-                                // Show latest ad as welcome if chat is empty
-                                setMessages([{
-                                    role: Role.BOT,
-                                    text: ads[0].message,
-                                    imageUrl: ads[0].image_url,
-                                    isWelcomeAd: true
-                                }]);
-                            }
                         }
+
+                        // 2. DISPLAY ALL ADS (Persist them in chat view)
+                        // We filter out any duplicate "WelcomeAd" that might already be in the state to avoid double rendering
+                        setMessages(prev => {
+                            const existingAdIds = new Set(prev.filter(m => m.isWelcomeAd && (m as any)._adId).map(m => (m as any)._adId));
+                            
+                            const newAdMessages = ads
+                                .filter(ad => !existingAdIds.has(ad.id))
+                                .map(ad => ({
+                                    role: Role.BOT,
+                                    text: ad.message,
+                                    imageUrl: ad.image_url,
+                                    isWelcomeAd: true,
+                                    _adId: ad.id // Internal helper ID
+                                }));
+                            
+                            return [...prev, ...newAdMessages];
+                        });
                     }
                 };
                 
-                fetchAndMarkAds();
+                // Add a small delay to ensure history loads first
+                setTimeout(fetchAndMarkAds, 500);
 
             } else {
                 setSuggestions(['🏥 أبحث عن طبيب', '🔧 أحتاج سباك', '🏠 سمسار عقارات']);
@@ -858,15 +853,18 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
                 {messages.map((m, i) => (
                     <div key={i} className={`flex mb-2 ${m.role === Role.USER ? 'justify-end' : 'justify-start'}`}>
                         {m.isWelcomeAd ? (
-                            // --- WELCOME AD STYLE ---
-                            <div className="w-full max-w-[85%] bg-white rounded-xl overflow-hidden shadow-md border border-pink-100 mb-2">
+                            // --- WELCOME AD STYLE (PERSISTENT STORY) ---
+                            <div className="w-full max-w-[85%] bg-white rounded-xl overflow-hidden shadow-md border border-pink-200 mb-4 transform transition-all hover:scale-[1.01]">
+                                <div className="bg-pink-50 p-2 flex items-center gap-2 border-b border-pink-100">
+                                    <MessageSquare size={14} className="text-pink-600"/>
+                                    <span className="text-[10px] font-bold text-pink-600 uppercase tracking-wide">قصة جديدة (Story)</span>
+                                </div>
                                 {m.imageUrl && (
-                                    <div className="w-full h-40 bg-gray-100 relative">
+                                    <div className="w-full h-48 bg-gray-100 relative">
                                         <img src={m.imageUrl} className="w-full h-full object-cover" alt="Welcome"/>
-                                        <span className="absolute top-2 right-2 bg-pink-600 text-white text-[10px] px-2 py-1 rounded-full font-bold shadow-sm">إعلان</span>
                                     </div>
                                 )}
-                                <div className="p-3">
+                                <div className="p-3 bg-white">
                                     <p className="text-sm font-bold text-gray-800 leading-relaxed whitespace-pre-line">{m.text}</p>
                                 </div>
                             </div>
