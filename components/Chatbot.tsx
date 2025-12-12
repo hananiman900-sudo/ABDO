@@ -46,77 +46,60 @@ const ProviderAvatar = ({ provider }: { provider: any }) => {
     );
 };
 
-// --- UPDATED URGENT TICKER (BRANDING + ADS LOOP) ---
+// --- UPDATED URGENT TICKER (WHITE BG + COLORED LABEL + PRO TRANSITION) ---
 export const UrgentTicker: React.FC<{ onClick: () => void; currentUser: AuthenticatedUser | null }> = ({ onClick, currentUser }) => {
     const { t } = useLocalization();
     const [ads, setAds] = useState<UrgentAd[]>([]);
     const [currentAdIndex, setCurrentAdIndex] = useState(0);
     
-    // Modes: 'BRANDING' (Blue) or 'ADS' (Red)
+    // Modes: 'BRANDING' (Blue Label) or 'ADS' (Red Label)
     const [mode, setMode] = useState<'BRANDING' | 'ADS'>('BRANDING');
-    const [fade, setFade] = useState(true); // For text transition effect
+    const [animate, setAnimate] = useState(true); 
 
     // 1. Fetch Ads
     useEffect(() => {
         const fetch = async () => {
-            // Determine active ads to show (Global or Followed)
-            // Strategy: Show ALL active urgent ads to everyone to populate the ticker, or keep it followed-only.
-            // Requirement said "List of providers in main screen", usually implies global ads or followed.
-            // Let's stick to 'Followed' logic for personalization, but if empty, maybe show system ads?
-            // For now, adhere to previous logic: Followed providers.
             if (!currentUser) return; 
-            
-            const { data: follows } = await supabase.from('follows').select('provider_id').eq('client_id', currentUser.id);
-            const providerIds = follows?.map(f => f.provider_id) || [];
-            
-            // Allow showing ALL active ads if user has no follows? Or just show followed?
-            // To make the ticker lively as requested, let's fetch ALL active urgent ads limited to 10 newest.
-            // This matches "News" ticker behavior better.
             const { data } = await supabase.from('urgent_ads')
                 .select('*, providers(name)')
                 .eq('is_active', true)
                 .order('created_at', { ascending: false })
                 .limit(10);
-                
             setAds(data as any || []);
         }
         fetch();
     }, [currentUser]);
 
-    // 2. Loop Logic
+    // 2. Loop Logic with Professional Timing
     useEffect(() => {
         let timer: any;
 
         const loop = () => {
-            setFade(false); // Start fade out
+            setAnimate(false); // Trigger exit animation
 
             setTimeout(() => {
-                // Logic to switch content
+                // Logic to switch content AFTER exit animation
                 if (ads.length === 0) {
-                    // No ads: Stay in BRANDING mode forever
                     setMode('BRANDING');
                 } else {
-                    // Have ads: Cycle
                     if (mode === 'BRANDING') {
-                        setMode('ADS'); // Switch to Ads
+                        setMode('ADS'); 
                     } else {
-                        // In ADS mode
                         if (currentAdIndex < ads.length - 1) {
-                            setCurrentAdIndex(prev => prev + 1); // Next Ad
+                            setCurrentAdIndex(prev => prev + 1);
                         } else {
-                            setCurrentAdIndex(0); // Reset Ads
-                            setMode('BRANDING'); // Go back to Branding
+                            setCurrentAdIndex(0);
+                            setMode('BRANDING');
                         }
                     }
                 }
-                setFade(true); // Fade in
-            }, 500); // 0.5s fade transition
+                setAnimate(true); // Trigger entrance animation
+            }, 600); // Wait for exit transition to finish
         };
 
-        // Determine duration based on NEXT state target (current state duration)
-        const duration = mode === 'BRANDING' ? 4000 : 10000; // 4s for Branding, 10s for Ads
+        // Duration: 6 Seconds for Branding, 8 Seconds for Ads
+        const duration = mode === 'BRANDING' ? 6000 : 8000;
         
-        // If no ads, just static, no timer needed unless we want to animate branding text
         if (ads.length === 0) {
             setMode('BRANDING');
             return; 
@@ -127,43 +110,59 @@ export const UrgentTicker: React.FC<{ onClick: () => void; currentUser: Authenti
 
     }, [ads, mode, currentAdIndex]);
 
-    const brandingStyle = "bg-blue-800 border-b-blue-900";
-    const adsStyle = "bg-red-600 border-b-red-700";
-
     return (
-        <div onClick={onClick} className={`border-b shadow-sm z-10 flex items-stretch h-10 overflow-hidden relative cursor-pointer transition-colors duration-1000 ease-in-out ${mode === 'BRANDING' ? brandingStyle : adsStyle}`}>
+        <div onClick={onClick} className="bg-white border-b border-gray-100 shadow-sm z-10 flex items-stretch h-10 overflow-hidden relative cursor-pointer group">
             
-            {/* LABEL AREA */}
-            <div className={`${mode === 'BRANDING' ? 'bg-blue-900' : 'bg-red-700'} text-white px-3 flex items-center justify-center relative z-20 shrink-0 transition-colors duration-1000`}>
-                <div className={`absolute inset-0 ${mode === 'ADS' ? 'animate-pulse' : ''} z-0 opacity-20 bg-white`}></div>
-                <div className="relative z-10 flex items-center gap-1 font-black text-xs">
-                    {mode === 'BRANDING' ? <Globe size={12} className="text-cyan-300"/> : <Zap size={12} className="fill-yellow-300 text-yellow-300"/>}
-                    <span>{mode === 'BRANDING' ? 'Tanger IA' : 'عاجل'}</span>
+            {/* 1. THE COLORED LABEL (Left/Right side) */}
+            <div className={`${mode === 'BRANDING' ? 'bg-blue-600' : 'bg-red-600'} text-white px-3 flex items-center justify-center relative z-20 shrink-0 transition-colors duration-700 ease-in-out`}>
+                
+                {/* Icon & Text */}
+                <div className="relative z-10 flex items-center gap-1 font-black text-xs transition-all duration-500">
+                    {mode === 'BRANDING' ? (
+                        <div className="flex items-center gap-1 animate-fade-in">
+                            <Globe size={12} className="text-white"/>
+                            <span>Tanger IA</span>
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-1 animate-fade-in">
+                            <Zap size={12} className="fill-yellow-300 text-yellow-300 animate-pulse"/>
+                            <span>عاجل</span>
+                        </div>
+                    )}
                 </div>
-                {/* Slanted Edge */}
-                <div className={`absolute top-0 -left-3 w-0 h-0 border-t-[40px] ${mode === 'BRANDING' ? 'border-t-blue-900' : 'border-t-red-700'} border-l-[15px] border-l-transparent pointer-events-none ltr:hidden transition-colors duration-1000`}></div>
-                <div className={`absolute top-0 -right-3 w-0 h-0 border-t-[40px] ${mode === 'BRANDING' ? 'border-t-blue-900' : 'border-t-red-700'} border-r-[15px] border-r-transparent pointer-events-none rtl:hidden transition-colors duration-1000`}></div>
+
+                {/* Slanted Edge (CSS Triangle) - Matches BG Color */}
+                <div className={`absolute top-0 -right-3 w-0 h-0 border-t-[40px] ${mode === 'BRANDING' ? 'border-t-blue-600' : 'border-t-red-600'} border-r-[15px] border-r-transparent pointer-events-none rtl:hidden transition-colors duration-700`}></div>
+                <div className={`absolute top-0 -left-3 w-0 h-0 border-t-[40px] ${mode === 'BRANDING' ? 'border-t-blue-600' : 'border-t-red-600'} border-l-[15px] border-l-transparent pointer-events-none ltr:hidden transition-colors duration-700`}></div>
             </div>
 
-            {/* CONTENT AREA */}
-            <div className="flex-1 flex items-center px-4 overflow-hidden relative text-white">
-                <div className={`flex items-center gap-2 text-xs w-full transition-all duration-500 ease-in-out transform ${fade ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}`}>
+            {/* 2. THE CONTENT AREA (White BG) */}
+            <div className="flex-1 flex items-center px-4 overflow-hidden relative bg-white">
+                
+                {/* 3. PROFESSIONAL TRANSITION CONTAINER */}
+                <div 
+                    className={`w-full transition-all duration-700 ease-[cubic-bezier(0.34,1.56,0.64,1)] transform ${
+                        animate ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0'
+                    }`}
+                >
                     {mode === 'BRANDING' ? (
                         <div className="flex items-center gap-2 w-full">
-                            <span className="font-bold text-cyan-200">الذكاء الاصطناعي:</span>
-                            {/* Simple Marquee for branding description */}
+                            <span className="font-bold text-blue-600 text-xs">مساعدك الذكي:</span>
+                            {/* Scrolling Text for Description */}
                             <div className="overflow-hidden relative w-full h-4">
-                                <span className="absolute animate-marquee whitespace-nowrap">
-                                    مساعدك الذكي في طنجة • حجز مواعيد • صيدليات الحراسة • عقارات • وظائف • خدمات القرب
+                                <span className="absolute animate-marquee whitespace-nowrap text-xs text-gray-500 font-medium">
+                                    مساعدك الذكي في طنجة • حجز مواعيد • صيدليات الحراسة • عقارات • وظائف • خدمات القرب • عروض حصرية
                                 </span>
                             </div>
                         </div>
                     ) : (
                         <div className="flex items-center gap-2 w-full">
-                            <span className="font-black text-yellow-300 whitespace-nowrap bg-black/20 px-1 rounded">
-                                {ads[currentAdIndex]?.providers?.name || 'مجهول'}:
+                            {/* Provider Name Tag */}
+                            <span className="font-black text-[10px] text-white bg-gray-800 px-2 py-0.5 rounded shadow-sm whitespace-nowrap">
+                                {ads[currentAdIndex]?.providers?.name || 'مجهول'}
                             </span>
-                            <span className="font-medium truncate flex-1">
+                            {/* Ad Message */}
+                            <span className="text-xs font-bold text-gray-800 truncate flex-1">
                                 {ads[currentAdIndex]?.message}
                             </span>
                         </div>
