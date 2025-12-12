@@ -1,6 +1,6 @@
 
 export enum Role { USER = 'USER', BOT = 'BOT', SYSTEM = 'SYSTEM' }
-export interface Message { role: Role; text: string; imageUrl?: string; bookingDetails?: BookingDetails; isComponent?: boolean; }
+export interface Message { role: Role; text: string; imageUrl?: string; bookingDetails?: BookingDetails; isComponent?: boolean; isWelcomeAd?: boolean; }
 export enum UserView { CLIENT = 'CLIENT', PROVIDER = 'PROVIDER' }
 export enum AccountType { CLIENT = 'CLIENT', PROVIDER = 'PROVIDER' }
 export enum Language { AR = 'ar', EN = 'en', FR = 'fr' }
@@ -26,13 +26,23 @@ export interface AuthenticatedUser {
   price_info?: string;
   location_info?: string;
   working_hours?: string;
-  booking_info?: string; // New field for Booking Conditions/Details
+  booking_info?: string; 
   
   profile_image_url?: string;
   social_links?: { instagram?: string; facebook?: string; gps?: string; };
   service_type?: string;
   followers_count?: number;
   visits_count?: number;
+}
+
+// NEW AD TYPE
+export interface ProviderAd {
+    id: number;
+    provider_id: number;
+    message: string;
+    image_url?: string;
+    created_at: string;
+    is_active: boolean;
 }
 
 export interface BookingDetails { name: string; phone: string; service: string; provider: string; location: string; discount: string; appointmentId: number; offerTitle?: string; price?: number; }

@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { useLocalization } from '../hooks/useLocalization';
-import { ArrowLeft, Loader2, Plus, Trash2, Edit, CheckCircle, XCircle, ShoppingBag, Users, Megaphone, Image as ImageIcon, Settings, Save, BarChart3, X, FileText, Phone, CreditCard, RefreshCw, Power, Layers, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowLeft, Loader2, Plus, Trash2, Edit, CheckCircle, XCircle, ShoppingBag, Users, Megaphone, Image as ImageIcon, Settings, Save, BarChart3, X, FileText, Phone, CreditCard, RefreshCw, Power, Layers, ChevronDown, ChevronUp, Clock, AlertTriangle } from 'lucide-react';
 import { Product, AdRequest, Order, AppCategory, AppSpecialty } from '../types';
 
 interface AdminDashboardProps {
@@ -55,15 +55,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
             const { data } = await supabase.from('products').select('*').order('created_at', { ascending: false });
             setProducts(data || []);
         } else if (activeTab === 'PROVIDERS') {
+            // Fetch ALL providers ordered by creation date
             const { data } = await supabase.from('providers').select('*').order('created_at', { ascending: false });
             setAllProviders(data || []);
         } else if (activeTab === 'ADS') {
             const { data } = await supabase.from('provider_ad_requests').select('*, providers(name, phone)').order('created_at', { ascending: false });
             setAdRequests(data as any || []);
         } else if (activeTab === 'STATS') {
-            // Stats logic...
             const { data: providers } = await supabase.from('providers').select('id, name, service_type, visits_count, profile_image_url').order('visits_count', { ascending: false });
-            const today = new Date(); today.setHours(0, 0, 0, 0);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
             const { data: todayScans } = await supabase.from('scan_history').select('provider_id').gte('created_at', today.toISOString());
             const todayCounts: Record<number, number> = {};
             todayScans?.forEach((scan: any) => { todayCounts[scan.provider_id] = (todayCounts[scan.provider_id] || 0) + 1; });
@@ -84,37 +85,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
         setLoading(false);
     };
 
-    // --- CATEGORY MANAGEMENT ---
-    const handleAddCategory = async () => {
-        if(!newCategoryName.trim()) return;
-        setLoading(true);
-        const { error } = await supabase.from('app_categories').insert({ name: newCategoryName.trim() });
-        if(!error) { setNewCategoryName(''); fetchData(); } else alert('Error adding category');
-        setLoading(false);
-    };
-
-    const handleDeleteCategory = async (id: number) => {
-        if(!confirm('Delete this category? All related specialties will be deleted.')) return;
-        setLoading(true);
-        await supabase.from('app_categories').delete().eq('id', id);
-        fetchData();
-    };
-
-    const handleAddSpecialty = async (categoryId: number) => {
-        if(!newSpecialtyName.trim()) return;
-        setLoading(true);
-        const { error } = await supabase.from('app_specialties').insert({ category_id: categoryId, name: newSpecialtyName.trim() });
-        if(!error) { setNewSpecialtyName(''); fetchData(); } else alert('Error adding specialty');
-        setLoading(false);
-    };
-
-    const handleDeleteSpecialty = async (id: number) => {
-        if(!confirm('Delete specialty?')) return;
-        await supabase.from('app_specialties').delete().eq('id', id);
-        fetchData();
-    };
-
-    // ... (Existing Product, Provider, Ad, Order Logic)
     // --- PRODUCT LOGIC ---
     const handleSaveProduct = async () => { /* ... existing code ... */ 
         if (!newProduct.name || !newProduct.price) return alert(t('errorMessage')); setLoading(true); const sizesArray = newProduct.sizes ? newProduct.sizes.split(',').map(s => s.trim()).filter(s => s !== '') : []; const payload = { name: newProduct.name, price: parseFloat(newProduct.price), category: newProduct.category, description: newProduct.description, image_url: newProduct.image, images: newProduct.images, sizes: sizesArray }; let error; if (editingProductId) { const { error: err } = await supabase.from('products').update(payload).eq('id', editingProductId); error = err; } else { const { error: err } = await supabase.from('products').insert(payload); error = err; } if (!error) { alert(editingProductId ? t('success') : t('addProductSuccess')); handleCancelEdit(); fetchData(); } else { alert(t('errorMessage')); } setLoading(false);
@@ -124,21 +94,65 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
     const handleDeleteProduct = async (id: number) => { if(confirm(t('delete') + '?')) { await supabase.from('products').delete().eq('id', id); fetchData(); } };
     const handleProductImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => { const file = e.target.files?.[0]; if(!file) return; setLoading(true); try { const fileName = `prod_${Date.now()}`; await supabase.storage.from('product-images').upload(fileName, file); const { data } = supabase.storage.from('product-images').getPublicUrl(fileName); if (!newProduct.image) setNewProduct(prev => ({ ...prev, image: data.publicUrl })); else setNewProduct(prev => ({ ...prev, images: [...prev.images, data.publicUrl] })); } catch(e) {} finally { setLoading(false); } };
     const removeImage = (index: number) => { const newImages = [...newProduct.images]; newImages.splice(index, 1); setNewProduct(prev => ({ ...prev, images: newImages })); }
-    
-    // --- PROVIDER LOGIC ---
-    const toggleProviderActivation = async (provider: any) => { setLoading(true); const newStatus = !provider.is_active; let updateData: any = { is_active: newStatus }; if (newStatus && (!provider.subscription_end_date || new Date(provider.subscription_end_date) < new Date())) { const endDate = new Date(); endDate.setDate(endDate.getDate() + 30); updateData.subscription_end_date = endDate.toISOString(); } const { error } = await supabase.from('providers').update(updateData).eq('id', provider.id); if(!error) { setAllProviders(prev => prev.map(p => p.id === provider.id ? {...p, is_active: newStatus} : p)); } else { alert(t('errorMessage')); } setLoading(false); };
-    const handleDeleteProvider = async (id: number) => { if(confirm(t('delete') + ' Provider?')) { await supabase.from('providers').delete().eq('id', id); fetchData(); } };
 
-    // --- SUBSCRIPTIONS ---
-    const handleRenewSubscription = async (provider: any) => { setLoading(true); let currentEnd = provider.subscription_end_date ? new Date(provider.subscription_end_date) : new Date(); const now = new Date(); if (currentEnd < now) currentEnd = now; currentEnd.setDate(currentEnd.getDate() + 30); await supabase.from('providers').update({ subscription_end_date: currentEnd.toISOString() }).eq('id', provider.id); fetchData(); alert(`تم تجديد اشتراك ${provider.name} لمدة شهر بنجاح.`); setLoading(false); }
-    const calculateDaysLeft = (dateStr: string) => { if(!dateStr) return 0; const end = new Date(dateStr); const now = new Date(); const diff = end.getTime() - now.getTime(); return Math.ceil(diff / (1000 * 60 * 60 * 24)); }
+    // --- CATEGORY MANAGEMENT ---
+    const handleAddCategory = async () => { if(!newCategoryName.trim()) return; setLoading(true); const { error } = await supabase.from('app_categories').insert({ name: newCategoryName.trim() }); if(!error) { setNewCategoryName(''); fetchData(); } else alert('Error adding category'); setLoading(false); };
+    const handleDeleteCategory = async (id: number) => { if(!confirm('Delete category?')) return; setLoading(true); await supabase.from('app_categories').delete().eq('id', id); fetchData(); };
+    const handleAddSpecialty = async (categoryId: number) => { if(!newSpecialtyName.trim()) return; setLoading(true); const { error } = await supabase.from('app_specialties').insert({ category_id: categoryId, name: newSpecialtyName.trim() }); if(!error) { setNewSpecialtyName(''); fetchData(); } else alert('Error adding specialty'); setLoading(false); };
+    const handleDeleteSpecialty = async (id: number) => { if(!confirm('Delete specialty?')) return; await supabase.from('app_specialties').delete().eq('id', id); fetchData(); };
 
-    // --- ADS & ORDERS ---
+    // --- PROVIDER TOGGLE LOGIC ---
+    const toggleProviderActivation = async (provider: any) => {
+        setLoading(true);
+        const newStatus = !provider.is_active;
+        
+        let updateData: any = { is_active: newStatus };
+        // If activating, and subscription is invalid, give 30 days
+        if (newStatus && (!provider.subscription_end_date || new Date(provider.subscription_end_date) < new Date())) {
+             const endDate = new Date();
+             endDate.setDate(endDate.getDate() + 30);
+             updateData.subscription_end_date = endDate.toISOString();
+        }
+
+        const { error } = await supabase.from('providers').update(updateData).eq('id', provider.id);
+        
+        if(!error) {
+            // Update local list instantly
+            setAllProviders(prev => prev.map(p => p.id === provider.id ? {...p, is_active: newStatus} : p));
+        } else {
+            alert(t('errorMessage'));
+        }
+        setLoading(false);
+    };
+
+    const handleDeleteProvider = async (id: number) => {
+        if(confirm(t('delete') + ' Provider? This will remove all their data.')) {
+            await supabase.from('providers').delete().eq('id', id);
+            fetchData();
+        }
+    };
+
+    // --- AD LOGIC ---
     const handleApproveAd = async (req: AdRequest) => { await supabase.from('system_announcements').insert({ title: req.providers?.name || 'Offer', message: req.message, image_url: req.image_url, is_active: true }); await supabase.from('provider_ad_requests').update({ status: 'approved' }).eq('id', req.id); fetchData(); };
     const handleRejectAd = async (id: number) => { await supabase.from('provider_ad_requests').update({ status: 'rejected' }).eq('id', id); fetchData(); };
     const handleDeleteAdRequest = async (id: number) => { if(confirm(t('delete') + '?')) { await supabase.from('provider_ad_requests').delete().eq('id', id); fetchData(); } };
+
+    // --- ORDERS LOGIC ---
     const handleUpdateOrderStatus = async (id: number, status: string) => { setLoading(true); await supabase.from('orders').update({ status: status }).eq('id', id); fetchData(); setLoading(false); }
 
+    // --- SUBSCRIPTION LOGIC ---
+    const handleRenewSubscription = async (provider: any) => {
+        setLoading(true);
+        let currentEnd = provider.subscription_end_date ? new Date(provider.subscription_end_date) : new Date();
+        const now = new Date();
+        if (currentEnd < now) currentEnd = now;
+        currentEnd.setDate(currentEnd.getDate() + 30);
+        await supabase.from('providers').update({ subscription_end_date: currentEnd.toISOString() }).eq('id', provider.id);
+        fetchData();
+        alert(`تم تجديد اشتراك ${provider.name} لمدة شهر بنجاح.`);
+        setLoading(false);
+    }
+    const calculateDaysLeft = (dateStr: string) => { if(!dateStr) return 0; const end = new Date(dateStr); const now = new Date(); const diff = end.getTime() - now.getTime(); return Math.ceil(diff / (1000 * 60 * 60 * 24)); }
 
     if(!isOpen) return null;
 
@@ -154,7 +168,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
             <div className="flex border-b bg-gray-100 overflow-x-auto no-scrollbar">
                 <button onClick={() => setActiveTab('PRODUCTS')} className={`flex-1 py-4 px-2 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'PRODUCTS' ? 'bg-white text-orange-600 border-b-2 border-orange-600' : 'text-gray-500'}`}><ShoppingBag size={18}/> المنتجات</button>
                 <button onClick={() => setActiveTab('ORDERS')} className={`flex-1 py-4 px-2 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'ORDERS' ? 'bg-white text-teal-600 border-b-2 border-teal-600' : 'text-gray-500'}`}><FileText size={18}/> الطلبات</button>
-                <button onClick={() => setActiveTab('PROVIDERS')} className={`flex-1 py-4 px-2 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'PROVIDERS' ? 'bg-white text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}><Users size={18}/> المهنيين</button>
+                <button onClick={() => setActiveTab('PROVIDERS')} className={`flex-1 py-4 px-2 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'PROVIDERS' ? 'bg-white text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}><Users size={18}/> المهنيين (All)</button>
                 <button onClick={() => setActiveTab('SUBS')} className={`flex-1 py-4 px-2 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'SUBS' ? 'bg-white text-pink-600 border-b-2 border-pink-600' : 'text-gray-500'}`}><CreditCard size={18}/> الاشتراكات</button>
                 <button onClick={() => setActiveTab('ADS')} className={`flex-1 py-4 px-2 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'ADS' ? 'bg-white text-purple-600 border-b-2 border-purple-600' : 'text-gray-500'}`}><Megaphone size={18}/> الإشهار</button>
                 <button onClick={() => setActiveTab('SETTINGS')} className={`flex-1 py-4 px-2 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'SETTINGS' ? 'bg-white text-gray-800 border-b-2 border-gray-800' : 'text-gray-500'}`}><Layers size={18}/> الإعدادات</button>
@@ -162,26 +176,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
 
             <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
                 
-                {/* SETTINGS TAB (Categories & Specialties) */}
+                {/* SETTINGS TAB */}
                 {activeTab === 'SETTINGS' && (
                     <div className="space-y-6">
                         <div className="bg-gray-100 p-4 rounded-xl border border-gray-200 mb-2">
                              <h3 className="font-bold text-gray-800">إدارة أصناف المهن (Categories)</h3>
                              <p className="text-xs text-gray-600">يمكنك هنا إضافة أو حذف المهن، وإضافة تخصصات لكل مهنة.</p>
                         </div>
-
-                        {/* Add New Category */}
                         <div className="flex gap-2">
-                            <input 
-                                value={newCategoryName} 
-                                onChange={e => setNewCategoryName(e.target.value)} 
-                                placeholder="إسم مهنة جديدة (مثلاً: مهندس)" 
-                                className="flex-1 p-3 rounded-xl border outline-none"
-                            />
+                            <input value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} placeholder="إسم مهنة جديدة" className="flex-1 p-3 rounded-xl border outline-none"/>
                             <button onClick={handleAddCategory} disabled={loading} className="bg-black text-white px-6 rounded-xl font-bold">إضافة</button>
                         </div>
-
-                        {/* Categories List */}
                         <div className="space-y-3">
                             {appCategories.map(cat => (
                                 <div key={cat.id} className="bg-white rounded-xl border overflow-hidden">
@@ -192,13 +197,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                                         </div>
                                         <button onClick={(e) => { e.stopPropagation(); handleDeleteCategory(cat.id); }} className="text-red-500 bg-red-50 p-2 rounded-full hover:bg-red-100"><Trash2 size={16}/></button>
                                     </div>
-                                    
-                                    {/* Specialties Section */}
                                     {expandedCategory === cat.id && (
                                         <div className="bg-gray-50 p-4 border-t">
                                             <h4 className="font-bold text-xs text-gray-500 uppercase mb-3">التخصصات (Specialties)</h4>
-                                            
-                                            {/* List of Specialties */}
                                             <div className="flex flex-wrap gap-2 mb-4">
                                                 {appSpecialties.filter(s => s.category_id === cat.id).map(spec => (
                                                     <div key={spec.id} className="bg-white px-3 py-1 rounded-full border flex items-center gap-2 text-sm shadow-sm">
@@ -208,15 +209,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                                                 ))}
                                                 {appSpecialties.filter(s => s.category_id === cat.id).length === 0 && <span className="text-xs text-gray-400 italic">لا توجد تخصصات مضافة</span>}
                                             </div>
-
-                                            {/* Add Specialty */}
                                             <div className="flex gap-2">
-                                                <input 
-                                                    value={newSpecialtyName} 
-                                                    onChange={e => setNewSpecialtyName(e.target.value)} 
-                                                    placeholder={`أضف تخصص لـ ${cat.name}...`} 
-                                                    className="flex-1 p-2 rounded-lg border text-sm outline-none"
-                                                />
+                                                <input value={newSpecialtyName} onChange={e => setNewSpecialtyName(e.target.value)} placeholder={`أضف تخصص لـ ${cat.name}...`} className="flex-1 p-2 rounded-lg border text-sm outline-none"/>
                                                 <button onClick={() => handleAddSpecialty(cat.id)} disabled={loading} className="bg-blue-600 text-white px-4 rounded-lg font-bold text-sm">إضافة</button>
                                             </div>
                                         </div>
@@ -227,7 +221,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                     </div>
                 )}
 
-                {/* ... (Existing Tabs: Products, Orders, Providers, Subs, Ads, Stats) ... */}
+                {/* PRODUCTS TAB */}
                 {activeTab === 'PRODUCTS' && (
                     <div className="space-y-6">
                         <div className="bg-white p-4 rounded-xl shadow-sm border">
@@ -245,26 +239,114 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                         <div className="space-y-2">{products.map(p => (<div key={p.id} className="bg-white p-2 rounded-lg border flex justify-between items-center shadow-sm"><div className="flex items-center gap-3"><img src={p.image_url} className="w-12 h-12 rounded bg-gray-100 object-cover"/><div><p className="font-bold text-sm">{p.name}</p><p className="text-xs text-orange-600 font-bold">{p.price} DH</p></div></div><div className="flex gap-2"><button onClick={() => handleEditProduct(p)} className="p-2 text-blue-500 hover:bg-blue-50 rounded"><Edit size={18}/></button><button onClick={() => handleDeleteProduct(p.id)} className="p-2 text-red-500 hover:bg-red-50 rounded"><Trash2 size={18}/></button></div></div>))}</div>
                     </div>
                 )}
-                {activeTab === 'ORDERS' && (
-                    <div className="space-y-4">
-                        <div className="bg-teal-50 p-4 rounded-xl border border-teal-200"><h3 className="font-bold text-teal-800">{t('storeOrders')}</h3><p className="text-xs text-teal-600">Review requests and contact customers.</p></div>
-                        {orders.length === 0 && <p className="text-center text-gray-400 py-10">No orders yet.</p>}
-                        {orders.map(o => (<div key={o.id} className="bg-white p-4 rounded-xl border shadow-sm space-y-3"><div className="flex justify-between items-start"><div><h4 className="font-bold flex items-center gap-2">{o.customer_details?.name || 'Unknown User'} <span className={`text-[10px] px-2 py-0.5 rounded-full ${o.status === 'delivered' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{o.status}</span></h4><p className="text-sm text-gray-600 flex items-center gap-1 mt-1"><Phone size={12}/> <a href={`tel:${o.customer_details?.phone}`} className="hover:underline">{o.customer_details?.phone || 'No phone'}</a></p><p className="text-[10px] text-gray-400">{new Date(o.created_at).toLocaleString()}</p></div><div className="text-right"><span className="font-black text-lg text-orange-600">{o.total_amount} DH</span></div></div><div className="bg-gray-50 p-3 rounded-lg text-sm border"><ul className="space-y-1">{o.items.map((item: any, idx: number) => (<li key={idx} className="flex justify-between text-xs"><span>{item.name} <span className="text-gray-500">x{item.quantity}</span> {item.selectedSize && <span className="font-bold bg-white px-1 border rounded">{item.selectedSize}</span>}</span><span className="font-bold">{item.price * item.quantity} DH</span></li>))}</ul></div>{o.status === 'pending' && (<button onClick={() => handleUpdateOrderStatus(o.id, 'delivered')} className="w-full py-2 bg-green-600 text-white rounded-lg font-bold text-xs flex items-center justify-center gap-2 hover:bg-green-700 transition-colors"><CheckCircle size={14}/> {t('markDelivered')} (Connect)</button>)}</div>))}
-                    </div>
-                )}
+
+                {/* PROVIDERS TAB (UPDATED FOR CLEARER ACTIVATION) */}
                 {activeTab === 'PROVIDERS' && (
                     <div className="space-y-4">
-                        <div className="bg-blue-50 p-4 rounded-xl border border-blue-200"><h3 className="font-bold text-blue-800">إدارة المهنيين (All Providers)</h3><p className="text-xs text-blue-600">Activate or deactivate accounts directly.</p></div>
+                        <div className="bg-blue-50 p-4 rounded-xl border border-blue-200">
+                             <h3 className="font-bold text-blue-800">إدارة المهنيين (All Providers)</h3>
+                             <p className="text-xs text-blue-600">تفعيل وتعطيل الحسابات مع إظهار مدة الاشتراك.</p>
+                        </div>
                         {allProviders.length === 0 && <p className="text-center text-gray-400 py-10">No providers found.</p>}
-                        {allProviders.map(p => (<div key={p.id} className={`bg-white p-4 rounded-xl border shadow-sm ${!p.is_active ? 'border-red-200 bg-red-50/30' : 'border-green-200'}`}><div className="flex justify-between items-start mb-2"><div><div className="flex items-center gap-2"><h4 className="font-bold">{p.name}</h4>{p.is_active ? <CheckCircle size={14} className="text-green-500"/> : <XCircle size={14} className="text-red-500"/>}</div><p className="text-sm text-gray-600 font-mono">{p.phone}</p><p className="text-xs text-blue-500 font-bold">{p.service_type} <span className="text-gray-400">|</span> {p.category || 'N/A'}</p><p className="text-[10px] text-gray-400">{new Date(p.created_at).toLocaleDateString()}</p></div><div className="flex flex-col gap-2"><button onClick={() => toggleProviderActivation(p)} className={`w-10 h-6 rounded-full transition-colors flex items-center px-1 ${p.is_active ? 'bg-green-500 justify-end' : 'bg-gray-300 justify-start'}`}><div className="w-4 h-4 bg-white rounded-full shadow-sm"></div></button></div></div><div className="flex gap-2 mt-3 pt-3 border-t border-dashed"><button onClick={() => handleDeleteProvider(p.id)} className="text-red-500 text-xs font-bold flex items-center gap-1 hover:bg-red-50 px-2 py-1 rounded"><Trash2 size={12}/> Delete</button>{!p.is_active && (<button onClick={() => toggleProviderActivation(p)} className="ml-auto bg-green-600 text-white text-xs px-3 py-1 rounded-full font-bold shadow-sm">تفعيل الآن</button>)}</div></div>))}
+                        
+                        {allProviders.map(p => {
+                            const daysLeft = calculateDaysLeft(p.subscription_end_date);
+                            const isActive = p.is_active === true || p.is_active === 'true'; // Strict check
+
+                            return (
+                                <div key={p.id} className={`bg-white p-4 rounded-xl border shadow-sm ${!isActive ? 'border-red-200 bg-red-50/10' : 'border-green-200'}`}>
+                                    <div className="flex justify-between items-start mb-3">
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <h4 className="font-bold text-lg">{p.name}</h4>
+                                                {isActive ? <CheckCircle size={16} className="text-green-500"/> : <AlertTriangle size={16} className="text-red-500"/>}
+                                            </div>
+                                            <p className="text-sm text-gray-600 font-mono mt-1 flex items-center gap-1"><Phone size={12}/> {p.phone}</p>
+                                            <p className="text-xs text-blue-500 font-bold mt-1">{p.service_type} <span className="text-gray-400">|</span> {p.category || 'N/A'}</p>
+                                            
+                                            {/* Days Left Indicator */}
+                                            <div className="flex items-center gap-2 mt-2">
+                                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold border flex items-center gap-1 ${daysLeft > 0 ? 'bg-green-100 text-green-700 border-green-200' : 'bg-red-100 text-red-700 border-red-200'}`}>
+                                                    <Clock size={10}/> {daysLeft > 0 ? `بقي ${daysLeft} يوم` : 'منتهي الصلاحية'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="flex gap-2 pt-3 border-t border-dashed">
+                                        <button onClick={() => handleDeleteProvider(p.id)} className="p-2 bg-gray-100 text-red-500 rounded-lg hover:bg-red-100 transition-colors"><Trash2 size={18}/></button>
+                                        
+                                        {/* Distinct Activation Buttons */}
+                                        <div className="flex-1 flex gap-2">
+                                            {isActive ? (
+                                                <button 
+                                                    onClick={() => toggleProviderActivation(p)} 
+                                                    className="flex-1 bg-red-100 text-red-600 font-bold py-2 rounded-lg text-xs hover:bg-red-200 border border-red-200 flex items-center justify-center gap-2"
+                                                >
+                                                    <XCircle size={14}/> تعطيل الحساب (Deactivate)
+                                                </button>
+                                            ) : (
+                                                <button 
+                                                    onClick={() => toggleProviderActivation(p)} 
+                                                    className="flex-1 bg-green-600 text-white font-bold py-2 rounded-lg text-xs hover:bg-green-700 shadow-md flex items-center justify-center gap-2"
+                                                >
+                                                    <CheckCircle size={14}/> تفعيل الحساب (Activate)
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 )}
+
+                {/* SUBSCRIPTIONS TAB */}
                 {activeTab === 'SUBS' && (
                     <div className="space-y-4">
-                        <div className="bg-pink-50 p-4 rounded-xl border border-pink-200 mb-2"><h3 className="font-bold text-pink-800">إدارة الاشتراكات</h3><p className="text-xs text-pink-600">تتبع المدة المتبقية لكل مهني وتجديد الاشتراكات.</p></div>
-                        <div className="bg-white rounded-xl shadow-sm border overflow-hidden"><table className="w-full text-sm"><thead className="bg-gray-100 text-gray-600 font-bold"><tr><th className="p-3 text-right">المهني</th><th className="p-3 text-right">الهاتف</th><th className="p-3 text-center">الأيام المتبقية</th><th className="p-3 text-center">إجراء</th></tr></thead><tbody>{activeProviders.map((p) => { const daysLeft = calculateDaysLeft(p.subscription_end_date); return (<tr key={p.id} className="border-t hover:bg-gray-50"><td className="p-3 font-bold"><div className="flex items-center gap-2"><div className={`w-2 h-2 rounded-full ${daysLeft > 5 ? 'bg-green-500' : 'bg-red-500'}`}></div>{p.name}</div><span className="text-xs text-gray-400 font-normal block">{p.service_type}</span></td><td className="p-3 text-gray-600 text-xs"><a href={`tel:${p.phone}`} className="hover:text-blue-600 hover:underline">{p.phone}</a></td><td className="p-3 text-center"><span className={`px-2 py-1 rounded-full text-xs font-bold ${daysLeft > 5 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{daysLeft} يوم</span><span className="block text-[9px] text-gray-400 mt-1">{p.subscription_end_date ? new Date(p.subscription_end_date).toLocaleDateString() : 'N/A'}</span></td><td className="p-3 text-center"><button onClick={() => handleRenewSubscription(p)} className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors" title="تجديد شهر واحد"><RefreshCw size={16}/></button></td></tr>) })}</tbody></table></div>
+                        <div className="bg-pink-50 p-4 rounded-xl border border-pink-200 mb-2">
+                             <h3 className="font-bold text-pink-800">إدارة الاشتراكات</h3>
+                             <p className="text-xs text-pink-600">تتبع المدة المتبقية لكل مهني وتجديد الاشتراكات.</p>
+                        </div>
+
+                        <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+                             <table className="w-full text-sm">
+                                 <thead className="bg-gray-100 text-gray-600 font-bold">
+                                     <tr>
+                                         <th className="p-3 text-right">المهني</th>
+                                         <th className="p-3 text-right">الهاتف</th>
+                                         <th className="p-3 text-center">الأيام المتبقية</th>
+                                         <th className="p-3 text-center">إجراء</th>
+                                     </tr>
+                                 </thead>
+                                 <tbody>
+                                     {activeProviders.map((p) => {
+                                         const daysLeft = calculateDaysLeft(p.subscription_end_date);
+                                         return (
+                                             <tr key={p.id} className="border-t hover:bg-gray-50">
+                                                 <td className="p-3 font-bold">
+                                                     <div className="flex items-center gap-2">
+                                                         <div className={`w-2 h-2 rounded-full ${daysLeft > 5 ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                                                         {p.name}
+                                                     </div>
+                                                     <span className="text-xs text-gray-400 font-normal block">{p.service_type}</span>
+                                                 </td>
+                                                 <td className="p-3 text-gray-600 text-xs"><a href={`tel:${p.phone}`} className="hover:text-blue-600 hover:underline">{p.phone}</a></td>
+                                                 <td className="p-3 text-center">
+                                                     <span className={`px-2 py-1 rounded-full text-xs font-bold ${daysLeft > 5 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{daysLeft} يوم</span>
+                                                     <span className="block text-[9px] text-gray-400 mt-1">{p.subscription_end_date ? new Date(p.subscription_end_date).toLocaleDateString() : 'N/A'}</span>
+                                                 </td>
+                                                 <td className="p-3 text-center"><button onClick={() => handleRenewSubscription(p)} className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors" title="تجديد شهر واحد"><RefreshCw size={16}/></button></td>
+                                             </tr>
+                                         )
+                                     })}
+                                 </tbody>
+                             </table>
+                        </div>
                     </div>
                 )}
+
+                {/* ADS & ORDERS & STATS (Unchanged) */}
                 {activeTab === 'ADS' && (
                     <div className="space-y-4">
                          <div className="bg-purple-50 p-4 rounded-xl border border-purple-200 mb-2"><h3 className="font-bold text-purple-800">{t('adRequests')}</h3><p className="text-xs text-purple-600">Archive of all requests.</p></div>

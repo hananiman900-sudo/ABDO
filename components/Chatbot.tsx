@@ -1,96 +1,174 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Message, Role, AuthenticatedUser, SystemAnnouncement, UrgentAd, Offer, AppCategory, AppSpecialty } from '../types';
+import { Message, Role, AuthenticatedUser, SystemAnnouncement, UrgentAd, Offer, AppCategory, AppSpecialty, ProviderAd } from '../types';
 import { getChatResponse } from '../services/geminiService';
 import { useLocalization } from '../hooks/useLocalization';
 import { supabase } from '../services/supabaseClient';
 import QRCodeDisplay from './QRCodeDisplay';
-import { Send, Mic, Paperclip, Camera, Loader2, X, Globe, Search, ArrowLeft, MoreVertical, Calendar, Info, Phone, MapPin, Instagram, Facebook, Tag, UserPlus, UserCheck, Megaphone, Star, Check, ChevronDown, CheckCircle, StopCircle, Sparkles, Banknote, Clock, Zap, Bell, ChevronRight, RotateCcw } from 'lucide-react';
+import { Send, Mic, Paperclip, Camera, Loader2, X, Globe, Search, ArrowLeft, MoreVertical, Calendar, Info, Phone, MapPin, Instagram, Facebook, Tag, UserPlus, UserCheck, Megaphone, Star, Check, ChevronDown, CheckCircle, StopCircle, Sparkles, Banknote, Clock, Zap, Bell, ChevronRight, RotateCcw, Stethoscope, Wrench, HardHat, Scissors, Utensils, Truck, GraduationCap, Gavel, Syringe, Home, Briefcase, Pill } from 'lucide-react';
 
 // ... (Existing Sub-components: BookingModal, ChatProfileModal remain unchanged)
 
+// --- HELPER: GET CATEGORY ICON ---
+const getProviderIcon = (serviceType: string, category: string) => {
+    const term = (category || serviceType || '').toLowerCase();
+    
+    if (term.includes('طبيب') || term.includes('doctor') || term.includes('médecin') || term.includes('dentist')) return <Stethoscope size={24} className="text-white"/>;
+    if (term.includes('ميكانيك') || term.includes('mechanic') || term.includes('plumb') || term.includes('electri')) return <Wrench size={24} className="text-white"/>;
+    if (term.includes('بناء') || term.includes('construct') || term.includes('peintre') || term.includes('sbagh')) return <HardHat size={24} className="text-white"/>;
+    if (term.includes('حلاق') || term.includes('barber') || term.includes('coiff') || term.includes('beauty')) return <Scissors size={24} className="text-white"/>;
+    if (term.includes('مطعم') || term.includes('food') || term.includes('restaur') || term.includes('snack')) return <Utensils size={24} className="text-white"/>;
+    if (term.includes('نقل') || term.includes('transport') || term.includes('driver')) return <Truck size={24} className="text-white"/>;
+    if (term.includes('مدرسة') || term.includes('school') || term.includes('prof') || term.includes('teacher')) return <GraduationCap size={24} className="text-white"/>;
+    if (term.includes('محامي') || term.includes('lawyer') || term.includes('avocat') || term.includes('aadoul')) return <Gavel size={24} className="text-white"/>;
+    if (term.includes('مختبر') || term.includes('lab') || term.includes('analys')) return <Syringe size={24} className="text-white"/>;
+    if (term.includes('عقار') || term.includes('real estate') || term.includes('immo') || term.includes('samsar')) return <Home size={24} className="text-white"/>;
+    if (term.includes('صيدل') || term.includes('pharmacy')) return <Pill size={24} className="text-white"/>;
+    
+    return <Briefcase size={24} className="text-white"/>; // Default
+};
+
+// --- HELPER: RENDER AVATAR ---
+const ProviderAvatar = ({ provider }: { provider: any }) => {
+    if (provider.profile_image_url) {
+        return <img src={provider.profile_image_url} className="w-full h-full object-cover"/>;
+    }
+    
+    // Generate a consistent background color based on name length
+    const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500', 'bg-teal-500', 'bg-pink-500'];
+    const colorIndex = (provider.name?.length || 0) % colors.length;
+    const bgColor = colors[colorIndex];
+
+    return (
+        <div className={`w-full h-full ${bgColor} flex items-center justify-center`}>
+            {getProviderIcon(provider.service_type, provider.category)}
+        </div>
+    );
+};
+
+// --- UPDATED URGENT TICKER (BRANDING + ADS LOOP) ---
 export const UrgentTicker: React.FC<{ onClick: () => void; currentUser: AuthenticatedUser | null }> = ({ onClick, currentUser }) => {
-    // ... same code ...
     const { t } = useLocalization();
     const [ads, setAds] = useState<UrgentAd[]>([]);
-    const [currentIndex, setCurrentIndex] = useState(0);
-    const [isVisible, setIsVisible] = useState(true);
+    const [currentAdIndex, setCurrentAdIndex] = useState(0);
+    
+    // Modes: 'BRANDING' (Blue) or 'ADS' (Red)
+    const [mode, setMode] = useState<'BRANDING' | 'ADS'>('BRANDING');
+    const [fade, setFade] = useState(true); // For text transition effect
 
+    // 1. Fetch Ads
     useEffect(() => {
         const fetch = async () => {
-            if (!currentUser) return;
+            // Determine active ads to show (Global or Followed)
+            // Strategy: Show ALL active urgent ads to everyone to populate the ticker, or keep it followed-only.
+            // Requirement said "List of providers in main screen", usually implies global ads or followed.
+            // Let's stick to 'Followed' logic for personalization, but if empty, maybe show system ads?
+            // For now, adhere to previous logic: Followed providers.
+            if (!currentUser) return; 
             
-            // 1. Get providers I follow
             const { data: follows } = await supabase.from('follows').select('provider_id').eq('client_id', currentUser.id);
-            if (follows && follows.length > 0) {
-                const providerIds = follows.map(f => f.provider_id);
-                // 2. Fetch active ads ONLY from followed providers
-                const { data } = await supabase.from('urgent_ads')
-                    .select('*, providers(name)')
-                    .in('provider_id', providerIds)
-                    .eq('is_active', true);
-                setAds(data as any || []);
-            }
+            const providerIds = follows?.map(f => f.provider_id) || [];
+            
+            // Allow showing ALL active ads if user has no follows? Or just show followed?
+            // To make the ticker lively as requested, let's fetch ALL active urgent ads limited to 10 newest.
+            // This matches "News" ticker behavior better.
+            const { data } = await supabase.from('urgent_ads')
+                .select('*, providers(name)')
+                .eq('is_active', true)
+                .order('created_at', { ascending: false })
+                .limit(10);
+                
+            setAds(data as any || []);
         }
         fetch();
     }, [currentUser]);
 
+    // 2. Loop Logic
     useEffect(() => {
-        if (ads.length <= 1) return;
+        let timer: any;
 
-        const interval = setInterval(() => {
-            // 1. Fade Out
-            setIsVisible(false);
-            
+        const loop = () => {
+            setFade(false); // Start fade out
+
             setTimeout(() => {
-                // 2. Change Content
-                setCurrentIndex((prev) => (prev + 1) % ads.length);
-                // 3. Fade In
-                setIsVisible(true);
-            }, 500); // Wait for fade out to finish (0.5s)
+                // Logic to switch content
+                if (ads.length === 0) {
+                    // No ads: Stay in BRANDING mode forever
+                    setMode('BRANDING');
+                } else {
+                    // Have ads: Cycle
+                    if (mode === 'BRANDING') {
+                        setMode('ADS'); // Switch to Ads
+                    } else {
+                        // In ADS mode
+                        if (currentAdIndex < ads.length - 1) {
+                            setCurrentAdIndex(prev => prev + 1); // Next Ad
+                        } else {
+                            setCurrentAdIndex(0); // Reset Ads
+                            setMode('BRANDING'); // Go back to Branding
+                        }
+                    }
+                }
+                setFade(true); // Fade in
+            }, 500); // 0.5s fade transition
+        };
 
-        }, 4000); // Total cycle 4s
+        // Determine duration based on NEXT state target (current state duration)
+        const duration = mode === 'BRANDING' ? 4000 : 10000; // 4s for Branding, 10s for Ads
+        
+        // If no ads, just static, no timer needed unless we want to animate branding text
+        if (ads.length === 0) {
+            setMode('BRANDING');
+            return; 
+        }
 
-        return () => clearInterval(interval);
-    }, [ads]);
+        timer = setInterval(loop, duration);
+        return () => clearInterval(timer);
 
-    if(ads.length === 0) return null;
+    }, [ads, mode, currentAdIndex]);
 
-    const currentAd = ads[currentIndex];
+    const brandingStyle = "bg-blue-800 border-b-blue-900";
+    const adsStyle = "bg-red-600 border-b-red-700";
 
     return (
-        <div onClick={onClick} className="bg-white border-b border-gray-100 shadow-sm z-10 flex items-stretch h-10 overflow-hidden relative cursor-pointer active:opacity-90 transition-opacity">
-            {/* FIXED RED LABEL */}
-            <div className="bg-red-600 text-white px-3 flex items-center justify-center relative z-20 shrink-0">
-                <div className="absolute inset-0 bg-red-600 animate-pulse z-0"></div>
+        <div onClick={onClick} className={`border-b shadow-sm z-10 flex items-stretch h-10 overflow-hidden relative cursor-pointer transition-colors duration-1000 ease-in-out ${mode === 'BRANDING' ? brandingStyle : adsStyle}`}>
+            
+            {/* LABEL AREA */}
+            <div className={`${mode === 'BRANDING' ? 'bg-blue-900' : 'bg-red-700'} text-white px-3 flex items-center justify-center relative z-20 shrink-0 transition-colors duration-1000`}>
+                <div className={`absolute inset-0 ${mode === 'ADS' ? 'animate-pulse' : ''} z-0 opacity-20 bg-white`}></div>
                 <div className="relative z-10 flex items-center gap-1 font-black text-xs">
-                    <Zap size={12} className="fill-white"/>
-                    <span>خبر عاجل</span>
+                    {mode === 'BRANDING' ? <Globe size={12} className="text-cyan-300"/> : <Zap size={12} className="fill-yellow-300 text-yellow-300"/>}
+                    <span>{mode === 'BRANDING' ? 'Tanger IA' : 'عاجل'}</span>
                 </div>
-                {/* Slanted Edge Effect */}
-                <div className="absolute top-0 -left-3 w-0 h-0 border-t-[40px] border-t-red-600 border-l-[15px] border-l-transparent pointer-events-none ltr:hidden"></div>
-                <div className="absolute top-0 -right-3 w-0 h-0 border-t-[40px] border-t-red-600 border-r-[15px] border-r-transparent pointer-events-none rtl:hidden"></div>
+                {/* Slanted Edge */}
+                <div className={`absolute top-0 -left-3 w-0 h-0 border-t-[40px] ${mode === 'BRANDING' ? 'border-t-blue-900' : 'border-t-red-700'} border-l-[15px] border-l-transparent pointer-events-none ltr:hidden transition-colors duration-1000`}></div>
+                <div className={`absolute top-0 -right-3 w-0 h-0 border-t-[40px] ${mode === 'BRANDING' ? 'border-t-blue-900' : 'border-t-red-700'} border-r-[15px] border-r-transparent pointer-events-none rtl:hidden transition-colors duration-1000`}></div>
             </div>
 
-            {/* ANIMATED CONTENT AREA */}
-            <div className="flex-1 flex items-center px-4 bg-gray-50 overflow-hidden relative">
-                <div 
-                    className={`flex items-center gap-2 text-xs w-full transition-all duration-500 ease-in-out transform ${
-                        isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'
-                    }`}
-                >
-                    <span className="font-black text-blue-800 whitespace-nowrap">
-                        {currentAd?.providers?.name || 'مجهول'}:
-                    </span>
-                    <span className="text-gray-700 font-medium truncate">
-                        {currentAd?.message}
-                    </span>
+            {/* CONTENT AREA */}
+            <div className="flex-1 flex items-center px-4 overflow-hidden relative text-white">
+                <div className={`flex items-center gap-2 text-xs w-full transition-all duration-500 ease-in-out transform ${fade ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}`}>
+                    {mode === 'BRANDING' ? (
+                        <div className="flex items-center gap-2 w-full">
+                            <span className="font-bold text-cyan-200">الذكاء الاصطناعي:</span>
+                            {/* Simple Marquee for branding description */}
+                            <div className="overflow-hidden relative w-full h-4">
+                                <span className="absolute animate-marquee whitespace-nowrap">
+                                    مساعدك الذكي في طنجة • حجز مواعيد • صيدليات الحراسة • عقارات • وظائف • خدمات القرب
+                                </span>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-2 w-full">
+                            <span className="font-black text-yellow-300 whitespace-nowrap bg-black/20 px-1 rounded">
+                                {ads[currentAdIndex]?.providers?.name || 'مجهول'}:
+                            </span>
+                            <span className="font-medium truncate flex-1">
+                                {ads[currentAdIndex]?.message}
+                            </span>
+                        </div>
+                    )}
                 </div>
-                
-                {/* Progress Bar (Optional Visual cue) */}
-                {ads.length > 1 && (
-                     <div key={currentIndex} className="absolute bottom-0 left-0 h-0.5 bg-red-500 animate-[width_4s_linear]"></div>
-                )}
             </div>
         </div>
     );
@@ -107,10 +185,7 @@ export const BookingModal: React.FC<{ provider: any; onClose: () => void; curren
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        const fetchOffers = async () => {
-             const { data } = await supabase.from('provider_offers').select('*').eq('provider_id', provider.id);
-             setOffers(data || []);
-        }
+        const fetchOffers = async () => { const { data } = await supabase.from('provider_offers').select('*').eq('provider_id', provider.id); setOffers(data || []); }
         fetchOffers();
     }, [provider]);
 
@@ -122,9 +197,7 @@ export const BookingModal: React.FC<{ provider: any; onClose: () => void; curren
         setLoading(true);
         const appointmentId = Date.now();
         const clientName = currentUser ? currentUser.name : guestName; 
-        if (currentUser) {
-            await supabase.from('appointments').insert({ client_id: currentUser.id, provider_id: provider.id, created_at: new Date().toISOString() });
-        }
+        if (currentUser) { await supabase.from('appointments').insert({ client_id: currentUser.id, provider_id: provider.id, created_at: new Date().toISOString() }); }
         await supabase.from('provider_notifications').insert({ provider_id: provider.id, message: `New Booking: ${clientName} for ${selectedOffer?.title || 'General Visit'} on ${date} at ${time}`, type: 'BOOKING', status: 'pending' });
         const bookingDetails = { appointmentId, clientName: clientName, providerId: provider.id, provider: provider.name, service: provider.service_type, date: date, time: time, offerTitle: selectedOffer?.title, price: selectedOffer?.discount_price, message: `${t('bookingSuccessMessage')} ${t('keepQR')}` };
         onBooked(bookingDetails);
@@ -175,7 +248,11 @@ export const ChatProfileModal: React.FC<{ provider: any; onClose: () => void; cu
         <div className="absolute inset-0 bg-white z-[60] flex flex-col animate-slide-up overflow-y-auto">
              <div className="p-4 bg-gray-50 border-b sticky top-0 flex items-center gap-3"><button onClick={onClose}><ArrowLeft/></button><h2 className="font-bold">{t('navProfile')}</h2></div>
              <div className="p-4">
-                 <div className="flex flex-col items-center mb-6"><div className="w-24 h-24 rounded-full p-0.5 bg-gradient-to-tr from-yellow-400 to-purple-600 mb-2"><img src={provider.profile_image_url || `https://ui-avatars.com/api/?name=${provider.name}`} className="w-full h-full rounded-full border-4 border-white object-cover"/></div><h2 className="font-bold text-xl">{provider.name}</h2><p className="text-gray-500">{provider.service_type}</p><button onClick={handleFollow} className={`mt-3 px-8 py-2 rounded-full font-bold text-sm flex items-center gap-2 shadow-sm transition-all ${isFollowing ? 'bg-gray-100 text-black border border-gray-300' : 'bg-blue-600 text-white'}`}>{isFollowing ? <UserCheck size={16}/> : <UserPlus size={16}/>}{isFollowing ? t('unfollow') : t('follow')}</button></div>
+                 <div className="flex flex-col items-center mb-6">
+                    <div className="w-24 h-24 rounded-full p-0.5 bg-gradient-to-tr from-yellow-400 to-purple-600 mb-2 overflow-hidden border-4 border-white shadow-lg">
+                        <ProviderAvatar provider={provider} />
+                    </div>
+                    <h2 className="font-bold text-xl">{provider.name}</h2><p className="text-gray-500">{provider.service_type}</p><button onClick={handleFollow} className={`mt-3 px-8 py-2 rounded-full font-bold text-sm flex items-center gap-2 shadow-sm transition-all ${isFollowing ? 'bg-gray-100 text-black border border-gray-300' : 'bg-blue-600 text-white'}`}>{isFollowing ? <UserCheck size={16}/> : <UserPlus size={16}/>}{isFollowing ? t('unfollow') : t('follow')}</button></div>
                  <div className="flex justify-center gap-8 mb-6 text-center"><div className="flex flex-col items-center"><div className="font-black text-xl">{stats.followers}</div><div className="text-xs text-gray-500 font-bold uppercase tracking-wide">{t('followers')}</div></div><div className="w-px bg-gray-200 h-10"></div><div className="flex flex-col items-center"><div className="font-black text-xl">{stats.posts}</div><div className="text-xs text-gray-500 font-bold uppercase tracking-wide">{t('offers')}</div></div></div>
                  <div className="space-y-4 mb-6"><h3 className="font-bold border-b pb-2">{t('bioLabel')}</h3><p className="text-sm text-gray-600 whitespace-pre-line">{provider.bio || "No bio available."}</p><h3 className="font-bold border-b pb-2">{t('socialLinks')}</h3><div className="flex gap-4 justify-center">{provider.social_links?.instagram && <a href={`https://instagram.com/${provider.social_links.instagram}`} className="text-pink-600 bg-pink-50 p-2 rounded-full"><Instagram/></a>}{provider.social_links?.facebook && <a href={`https://facebook.com/${provider.social_links.facebook}`} className="text-blue-600 bg-blue-50 p-2 rounded-full"><Facebook/></a>}{provider.social_links?.gps && <a href={`https://maps.google.com/?q=${provider.social_links.gps}`} className="text-green-600 bg-green-50 p-2 rounded-full"><MapPin/></a>}</div></div>
                  <h3 className="font-bold border-b pb-2 mb-4 flex items-center gap-2"><Tag size={18}/> {t('offers')}</h3>
@@ -205,11 +282,11 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
     const [preSelectedOffer, setPreSelectedOffer] = useState<Offer | null>(null);
     const [isRecording, setIsRecording] = useState(false);
     const [suggestions, setSuggestions] = useState<string[]>([]);
+    
+    // Unread counts state
+    const [unreadCounts, setUnreadCounts] = useState<Record<number, number>>({});
 
     // --- FILTER STATE (WhatsApp Style Drill Down) ---
-    // Level 0: Categories (Professions)
-    // Level 1: Specialties (If Doctor or any other category has specialties)
-    // Level 2: Neighborhoods (Final Filter)
     const [filterLevel, setFilterLevel] = useState(0);
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [selectedSpecialty, setSelectedSpecialty] = useState<string | null>(null);
@@ -226,26 +303,92 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
     // Initial Data Fetch
     useEffect(() => {
         const init = async () => {
-            // Providers
+            // 1. Fetch active providers
             const { data: pData } = await supabase.from('providers').select('*').eq('is_active', true);
-            setProviders(pData || []);
+            
+            // 2. Fetch latest ad timestamp for each provider (for sorting)
+            // Note: Since Supabase basic query doesn't do complex joins easily in one go without a view,
+            // we will fetch all active ads and map them.
+            const { data: adsData } = await supabase.from('provider_ads')
+                .select('provider_id, created_at')
+                .eq('is_active', true)
+                .order('created_at', { ascending: false });
 
-            // Categories
+            // Create a map of provider_id -> latest_ad_date
+            const lastAdMap: Record<number, string> = {};
+            if (adsData) {
+                adsData.forEach(ad => {
+                    if (!lastAdMap[ad.provider_id]) {
+                        lastAdMap[ad.provider_id] = ad.created_at;
+                    }
+                });
+            }
+
+            // 3. Process Providers with sorting logic
+            let processedProviders = pData || [];
+            processedProviders = processedProviders.map(p => ({
+                ...p,
+                last_ad_at: lastAdMap[p.id] || null // Attach ad date or null
+            }));
+
+            // SORT: 
+            // - Providers with ads first (sorted by ad date desc)
+            // - Providers without ads second (sorted by visits or name)
+            processedProviders.sort((a, b) => {
+                // If both have ads, compare dates
+                if (a.last_ad_at && b.last_ad_at) {
+                    return new Date(b.last_ad_at).getTime() - new Date(a.last_ad_at).getTime();
+                }
+                // If A has ad, A comes first
+                if (a.last_ad_at) return -1;
+                // If B has ad, B comes first
+                if (b.last_ad_at) return 1;
+                
+                // If neither has ad, sort by visits count (desc)
+                return (b.visits_count || 0) - (a.visits_count || 0);
+            });
+
+            setProviders(processedProviders);
+
+            // Categories & Specialties
             const { data: cData } = await supabase.from('app_categories').select('*').order('name');
             setFetchedCategories(cData || []);
 
-            // Specialties
             const { data: sData } = await supabase.from('app_specialties').select('*').order('name');
             setFetchedSpecialties(sData || []);
+            
+            // Calculate Unread Badges (If User logged in)
+            if (currentUser && processedProviders) {
+                calculateUnreadBadges(currentUser.id);
+            }
         }
         init();
-    }, []);
+    }, [currentUser]);
+
+    const calculateUnreadBadges = async (userId: number) => {
+        // 1. Get ALL active ads
+        const { data: allAds } = await supabase.from('provider_ads').select('id, provider_id').eq('is_active', true);
+        if (!allAds) return;
+
+        // 2. Get views for this user
+        const { data: myViews } = await supabase.from('ad_views').select('ad_id').eq('user_id', userId);
+        const viewedAdIds = new Set(myViews?.map(v => v.ad_id) || []);
+
+        // 3. Count unread
+        const counts: Record<number, number> = {};
+        allAds.forEach(ad => {
+            if (!viewedAdIds.has(ad.id)) {
+                counts[ad.provider_id] = (counts[ad.provider_id] || 0) + 1;
+            }
+        });
+        setUnreadCounts(counts);
+    };
 
     useEffect(() => { onToggleNav(view === 'CHAT'); }, [view]);
 
     useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, view, suggestions]);
 
-    // LOAD HISTORY WHEN CHAT OPENS
+    // LOAD HISTORY & ADS WHEN CHAT OPENS
     useEffect(() => {
         if (view === 'CHAT' && currentUser) {
             const loadHistory = async () => {
@@ -272,12 +415,71 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
         
         if(view === 'CHAT') {
             if (selectedChat) {
+                // SUGGESTIONS
                 const dynamicSuggestions = ['📅 حجز موعد'];
                 if (selectedChat.price_info) dynamicSuggestions.unshift('💰 الأثمنة');
                 if (selectedChat.location_info) dynamicSuggestions.push('📍 الموقع');
                 if (selectedChat.working_hours) dynamicSuggestions.push('🕒 التوقيت');
                 if (selectedChat.booking_info) dynamicSuggestions.push('📝 شروط الحجز');
                 setSuggestions(dynamicSuggestions);
+
+                // --- V27: FETCH & DISPLAY UNSEEN ADS (STORIES) ---
+                const fetchAndMarkAds = async () => {
+                    // Fetch ACTIVE ads for this provider
+                    const { data: ads } = await supabase.from('provider_ads')
+                        .select('*')
+                        .eq('provider_id', selectedChat.id)
+                        .eq('is_active', true)
+                        .order('created_at', { ascending: false }); // Newest first
+
+                    if (ads && ads.length > 0 && currentUser) {
+                        // Check which ones are NOT viewed
+                        const { data: views } = await supabase.from('ad_views')
+                            .select('ad_id')
+                            .eq('user_id', currentUser.id)
+                            .in('ad_id', ads.map(a => a.id));
+                        
+                        const viewedIds = new Set(views?.map(v => v.ad_id) || []);
+                        const unreadAds = ads.filter(a => !viewedIds.has(a.id));
+
+                        // If unread exist, show them and mark as read
+                        if (unreadAds.length > 0) {
+                            setMessages(prev => {
+                                const newMessages = unreadAds.map(ad => ({
+                                    role: Role.BOT,
+                                    text: ad.message,
+                                    imageUrl: ad.image_url,
+                                    isWelcomeAd: true
+                                }));
+                                // Avoid duplication if strict mode
+                                return [...prev, ...newMessages];
+                            });
+
+                            // Mark as read in DB
+                            const inserts = unreadAds.map(ad => ({ user_id: currentUser.id, ad_id: ad.id }));
+                            await supabase.from('ad_views').insert(inserts);
+                            
+                            // Update local badge state immediately
+                            setUnreadCounts(prev => ({...prev, [selectedChat.id]: 0}));
+                        } else {
+                            // OPTIONAL: Even if read, show the VERY LATEST ad as a "sticky" welcome if list is empty?
+                            // For now, let's stick to "Only show unread" to be like WhatsApp status updates, 
+                            // OR show the latest one if chat is empty.
+                            if (messages.length === 0 && ads.length > 0) {
+                                // Show latest ad as welcome if chat is empty
+                                setMessages([{
+                                    role: Role.BOT,
+                                    text: ads[0].message,
+                                    imageUrl: ads[0].image_url,
+                                    isWelcomeAd: true
+                                }]);
+                            }
+                        }
+                    }
+                };
+                
+                fetchAndMarkAds();
+
             } else {
                 setSuggestions(['🏥 أبحث عن طبيب', '🔧 أحتاج سباك', '🏠 سمسار عقارات']);
             }
@@ -460,7 +662,7 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
         }
 
         try {
-            const history = messages.filter(m => !m.isComponent).map(m => ({ role: m.role === Role.USER ? 'user' : 'model', parts: [{ text: m.text }] }));
+            const history = messages.filter(m => !m.isComponent && !m.isWelcomeAd).map(m => ({ role: m.role === Role.USER ? 'user' : 'model', parts: [{ text: m.text }] }));
             
             const responseText = await getChatResponse(
                 history, 
@@ -590,18 +792,38 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
                     
                     {filteredProviders.length === 0 && <p className="text-center text-gray-400 py-10">No providers found matching filters.</p>}
 
-                    {filteredProviders.map(p => (
-                        <div key={p.id} onClick={() => openChat(p)} className="flex items-center gap-4 p-4 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
-                            <div className="w-14 h-14 rounded-full bg-gray-200 overflow-hidden border border-gray-100 relative shrink-0"><img src={p.profile_image_url || `https://ui-avatars.com/api/?name=${p.name}`} className="w-full h-full object-cover"/><span className="absolute bottom-1 right-1 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></span></div>
-                            <div className="flex-1 min-w-0">
-                                <div className="flex justify-between items-center mb-1"><h3 className="font-bold text-gray-900 truncate">{p.name}</h3><span className="text-[10px] text-gray-400">Online</span></div>
-                                <p className="text-sm text-gray-500 flex items-center gap-1 truncate">
-                                    <span className="font-semibold text-blue-600">{p.service_type}</span>
-                                    {p.neighborhood && <span className="text-[10px] bg-gray-100 px-1 rounded text-gray-600">📍 {p.neighborhood}</span>}
-                                </p>
+                    {filteredProviders.map(p => {
+                        const unreadCount = unreadCounts[p.id] || 0;
+                        return (
+                            <div key={p.id} onClick={() => openChat(p)} className="flex items-center gap-4 p-4 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
+                                <div className="w-14 h-14 rounded-full bg-gray-200 overflow-hidden border border-gray-100 relative shrink-0">
+                                    <ProviderAvatar provider={p} />
+                                    <span className="absolute bottom-1 right-1 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></span>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex justify-between items-center mb-1">
+                                        <h3 className="font-bold text-gray-900 truncate">{p.name}</h3>
+                                        <div className="flex flex-col items-end">
+                                            {p.last_ad_at ? (
+                                                <span className="text-[10px] text-green-600 font-bold">New Story</span>
+                                            ) : (
+                                                <span className="text-[10px] text-gray-400">Online</span>
+                                            )}
+                                            {unreadCount > 0 && (
+                                                <span className="bg-green-600 text-white text-[10px] font-bold px-1.5 h-4 min-w-[16px] rounded-full flex items-center justify-center mt-1">
+                                                    {unreadCount}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <p className="text-sm text-gray-500 flex items-center gap-1 truncate">
+                                        <span className="font-semibold text-blue-600">{p.service_type}</span>
+                                        {p.neighborhood && <span className="text-[10px] bg-gray-100 px-1 rounded text-gray-600">📍 {p.neighborhood}</span>}
+                                    </p>
+                                </div>
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             </div>
         );
@@ -617,7 +839,7 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
                 <button onClick={() => setView('LIST')} className="p-2"><ArrowLeft size={20}/></button>
                 <div onClick={() => selectedChat && setShowProfile(true)} className="flex items-center gap-3 flex-1 cursor-pointer">
                     <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden border">
-                         {selectedChat ? (<img src={selectedChat.profile_image_url || `https://ui-avatars.com/api/?name=${selectedChat.name}`} className="w-full h-full object-cover"/>) : (<div className="w-full h-full bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white"><Globe size={20}/></div>)}
+                         {selectedChat ? (<ProviderAvatar provider={selectedChat} />) : (<div className="w-full h-full bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white"><Globe size={20}/></div>)}
                     </div>
                     <div><h3 className="font-bold text-sm">{selectedChat ? selectedChat.name : 'Tanger IA'}</h3><p className="text-[10px] text-green-600 font-bold">Online</p></div>
                 </div>
@@ -636,12 +858,27 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
                 )}
                 {messages.map((m, i) => (
                     <div key={i} className={`flex mb-2 ${m.role === Role.USER ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`p-2 px-3 rounded-lg max-w-[80%] text-sm shadow-sm relative ${m.role === Role.USER ? 'bg-[#dcf8c6] text-gray-900 rounded-tr-none' : 'bg-white text-gray-900 rounded-tl-none'}`}>
-                            {m.imageUrl && <img src={m.imageUrl} className="rounded mb-2 max-w-full"/>}
-                            <p className="leading-relaxed whitespace-pre-line">{m.text}</p>
-                            {m.bookingDetails && (<div className="mt-2 bg-gray-50 p-2 rounded border border-gray-200"><p className="font-bold text-xs text-center">Booking ID: {m.bookingDetails.appointmentId}</p><div className="mt-2 flex justify-center"><QRCodeDisplay appointmentId={m.bookingDetails.appointmentId} bookingData={m.bookingDetails} /></div></div>)}
-                            <div className="text-[9px] text-gray-400 text-right mt-1 flex justify-end items-center gap-1">{new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div>
-                        </div>
+                        {m.isWelcomeAd ? (
+                            // --- WELCOME AD STYLE ---
+                            <div className="w-full max-w-[85%] bg-white rounded-xl overflow-hidden shadow-md border border-pink-100 mb-2">
+                                {m.imageUrl && (
+                                    <div className="w-full h-40 bg-gray-100 relative">
+                                        <img src={m.imageUrl} className="w-full h-full object-cover" alt="Welcome"/>
+                                        <span className="absolute top-2 right-2 bg-pink-600 text-white text-[10px] px-2 py-1 rounded-full font-bold shadow-sm">إعلان</span>
+                                    </div>
+                                )}
+                                <div className="p-3">
+                                    <p className="text-sm font-bold text-gray-800 leading-relaxed whitespace-pre-line">{m.text}</p>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className={`p-2 px-3 rounded-lg max-w-[80%] text-sm shadow-sm relative ${m.role === Role.USER ? 'bg-[#dcf8c6] text-gray-900 rounded-tr-none' : 'bg-white text-gray-900 rounded-tl-none'}`}>
+                                {m.imageUrl && <img src={m.imageUrl} className="rounded mb-2 max-w-full"/>}
+                                <p className="leading-relaxed whitespace-pre-line">{m.text}</p>
+                                {m.bookingDetails && (<div className="mt-2 bg-gray-50 p-2 rounded border border-gray-200"><p className="font-bold text-xs text-center">Booking ID: {m.bookingDetails.appointmentId}</p><div className="mt-2 flex justify-center"><QRCodeDisplay appointmentId={m.bookingDetails.appointmentId} bookingData={m.bookingDetails} /></div></div>)}
+                                <div className="text-[9px] text-gray-400 text-right mt-1 flex justify-end items-center gap-1">{new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div>
+                            </div>
+                        )}
                     </div>
                 ))}
                 {isLoading && (<div className="flex justify-start mb-2"><div className="bg-white p-3 rounded-lg rounded-tl-none shadow-sm"><Loader2 size={16} className="animate-spin text-gray-400"/></div></div>)}

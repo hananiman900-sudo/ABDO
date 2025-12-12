@@ -1,12 +1,12 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useLocalization } from '../hooks/useLocalization';
-import { AuthenticatedUser, ProviderNotification, AdRequest, Offer, UrgentAd } from '../types';
+import { AuthenticatedUser, ProviderNotification, AdRequest, Offer, UrgentAd, ProviderAd } from '../types';
 import { supabase } from '../services/supabaseClient';
-import { CheckCircle, XCircle, Camera, Loader2, Upload, MessageCircle, History, Users, Megaphone, Settings, ArrowLeft, Image as ImageIcon, QrCode, Bell, User, LayoutGrid, FileText, Lock, LogOut, Grid, Bookmark, Heart, Plus, Zap, Tag, Instagram, Facebook, MapPin, Edit3, Share2, Info, Trash2, Edit, ShieldAlert, Save, X, Database, BrainCircuit, Sparkles, Banknote, Clock, Map, CalendarCheck, Hourglass } from 'lucide-react';
+import { CheckCircle, XCircle, Camera, Loader2, Upload, MessageCircle, History, Users, Megaphone, Settings, ArrowLeft, Image as ImageIcon, QrCode, Bell, User, LayoutGrid, FileText, Lock, LogOut, Grid, Bookmark, Heart, Plus, Zap, Tag, Instagram, Facebook, MapPin, Edit3, Share2, Info, Trash2, Edit, ShieldAlert, Save, X, Database, BrainCircuit, Sparkles, Banknote, Clock, Map, CalendarCheck, Hourglass, MessageSquare, AlertCircle } from 'lucide-react';
 import jsQR from 'jsqr';
 
-// ... (Previous sub-components: NotificationView, HistoryView, UrgentAdsView, OffersView, AdsView, QRScannerView, EditProfileModal remain unchanged)
+// ... (Previous sub-components: NotificationView, HistoryView, UrgentAdsView, OffersView, AdsView, QRScannerView, EditProfileModal, AIInstructionsView remain unchanged)
 
 // --- SUB-COMPONENTS (FULL SCREEN VIEWS) ---
 
@@ -257,7 +257,7 @@ const AdsView: React.FC<{ providerId: number; onClose: () => void }> = ({ provid
                         {loading ? <Loader2 className="animate-spin mx-auto"/> : t('sendButton')}
                     </button>
                 </div>
-                 <div className="space-y-3"><h3 className="font-bold text-gray-700 dark:text-gray-300 text-sm uppercase">Request History</h3>{requests.length === 0 && <p className="text-gray-400 text-sm text-center">No ad requests sent.</p>}{requests.map(r => (<div key={r.id} className="p-3 bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 flex justify-between items-center shadow-sm"><div className="flex gap-2 items-center">{r.image_url && <img src={r.image_url} className="w-10 h-10 rounded object-cover bg-gray-200"/>}<div><p className="text-sm font-semibold line-clamp-1 dark:text-white">{r.message}</p><p className="text-[10px] text-gray-400">{new Date(r.created_at).toLocaleDateString()}</p></div></div><span className={`text-[10px] px-2 py-1 rounded-full font-bold ${r.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{r.status === 'pending' ? 'في طور الإنجاز' : 'مقبول'}</span></div>))}</div>
+                 <div className="space-y-3"><h3 className="font-bold text-gray-700 dark:text-gray-300 text-sm uppercase">Request History</h3>{requests.length === 0 && <p className="text-gray-400 text-sm text-center">No ad requests sent.</p>}{requests.map(r => (<div key={r.id} className="p-3 bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 flex justify-between items-center shadow-sm"><div className="flex gap-2 items-center">{r.image_url && <img src={r.image_url} className="w-10 h-10 rounded object-cover bg-gray-200"/><div><p className="text-sm font-semibold line-clamp-1 dark:text-white">{r.message}</p><p className="text-[10px] text-gray-400">{new Date(r.created_at).toLocaleDateString()}</p></div></div><span className={`text-[10px] px-2 py-1 rounded-full font-bold ${r.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{r.status === 'pending' ? 'في طور الإنجاز' : 'مقبول'}</span></div>))}</div>
             </div>
         </div>
     );
@@ -418,7 +418,7 @@ const AIInstructionsView: React.FC<{ provider: AuthenticatedUser; onClose: () =>
                 <h2 className="font-bold text-xl flex items-center gap-2 dark:text-white"><BrainCircuit className="text-purple-600"/> إعدادات الذكاء (AI Config)</h2>
             </div>
             <div className="p-4 flex-1 overflow-y-auto space-y-6 bg-gray-50 dark:bg-gray-900">
-                
+                {/* ... fields ... */}
                 {/* Intro Box */}
                 <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-xl border border-purple-200 dark:border-purple-800">
                     <p className="text-sm text-purple-800 dark:text-purple-200 font-bold mb-2 flex items-center gap-2">
@@ -502,10 +502,154 @@ const AIInstructionsView: React.FC<{ provider: AuthenticatedUser; onClose: () =>
     );
 };
 
+// --- UPDATED V27: WELCOME AD SETUP (WITH STORIES ARCHIVE & LIMITS) ---
+const WelcomeAdSetup: React.FC<{ provider: AuthenticatedUser; onClose: () => void; onUpdateUser: (updates: Partial<AuthenticatedUser>) => void }> = ({ provider, onClose, onUpdateUser }) => {
+    const { t } = useLocalization();
+    const [ads, setAds] = useState<ProviderAd[]>([]);
+    const [newMessage, setNewMessage] = useState('');
+    const [newImage, setNewImage] = useState('');
+    const [loading, setLoading] = useState(false);
+    const fileRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => { fetchAds(); }, []);
+
+    const fetchAds = async () => {
+        const { data } = await supabase.from('provider_ads').select('*').eq('provider_id', provider.id).order('created_at', { ascending: false });
+        setAds(data || []);
+    };
+
+    const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]; if(!file) return; setLoading(true);
+        try {
+            const fileName = `story_${provider.id}_${Date.now()}`;
+            await supabase.storage.from('announcement-images').upload(fileName, file);
+            const { data } = supabase.storage.from('announcement-images').getPublicUrl(fileName);
+            setNewImage(data.publicUrl);
+        } catch(e) { alert('Upload Error'); } finally { setLoading(false); }
+    };
+
+    const handleSave = async () => {
+        if (!newMessage.trim() && !newImage) return alert('المرجو كتابة نص أو رفع صورة');
+        
+        // CHECK LIMIT (5 Per Day)
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        const adsToday = ads.filter(a => new Date(a.created_at) >= today).length;
+        
+        if (adsToday >= 5) {
+            alert('⛔ لقد تجاوزت الحد المسموح (5 إعلانات في اليوم). المرجو حذف إعلانات قديمة أو المحاولة غداً.');
+            return;
+        }
+
+        setLoading(true);
+        const { error } = await supabase.from('provider_ads').insert({
+            provider_id: provider.id,
+            message: newMessage,
+            image_url: newImage,
+            is_active: true
+        });
+
+        setLoading(false);
+        if(!error) {
+            setNewMessage('');
+            setNewImage('');
+            fetchAds();
+            alert('تم نشر الإعلان بنجاح! سيظهر الآن لمتابعيك.');
+        } else {
+            alert(t('errorMessage'));
+        }
+    };
+
+    const handleDelete = async (id: number) => {
+        if(!confirm(t('delete') + '?')) return;
+        await supabase.from('provider_ads').delete().eq('id', id);
+        fetchAds();
+    };
+
+    return (
+        <div className="fixed inset-0 bg-white dark:bg-gray-900 z-[70] flex flex-col animate-slide-up">
+            <div className="p-4 border-b dark:border-gray-700 flex items-center gap-3 bg-white dark:bg-gray-800">
+                <button onClick={onClose}><ArrowLeft className="dark:text-white"/></button>
+                <h2 className="font-bold text-xl flex items-center gap-2 dark:text-white"><MessageSquare className="text-pink-600"/> إعلانات المحادثة (Stories)</h2>
+            </div>
+            
+            <div className="p-4 flex-1 overflow-y-auto space-y-6 bg-gray-50 dark:bg-gray-900">
+                
+                {/* 1. INFO BOX */}
+                <div className="bg-pink-50 dark:bg-pink-900/20 p-4 rounded-xl border border-pink-200 dark:border-pink-800">
+                    <p className="text-sm text-pink-800 dark:text-pink-200 leading-relaxed font-bold">
+                        ℹ️ هذه الإعلانات تظهر تلقائياً لأي زبون يدخل للمحادثة. 
+                    </p>
+                    <ul className="text-xs text-pink-700 dark:text-pink-300 mt-2 list-disc list-inside">
+                        <li>الحد الأقصى: 5 إعلانات في اليوم.</li>
+                        <li>سيظهر للزبناء إشعار (رقم أحمر) عند نشر إعلان جديد.</li>
+                        <li>يمكنك حذف الإعلانات القديمة من الأرشيف أسفله.</li>
+                    </ul>
+                </div>
+
+                {/* 2. CREATE NEW AD */}
+                <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border dark:border-gray-700 shadow-sm space-y-4">
+                    <h3 className="font-bold text-sm text-gray-500 uppercase">نشر جديد</h3>
+                    
+                    <textarea 
+                        value={newMessage} 
+                        onChange={e => setNewMessage(e.target.value)} 
+                        placeholder="اكتب رسالة ترحيبية أو عرض جديد..."
+                        className="w-full h-24 p-3 rounded-xl border dark:border-gray-600 dark:bg-gray-700 dark:text-white outline-none resize-none"
+                    />
+                    
+                    {newImage && (
+                        <div className="relative w-full h-32 rounded-lg overflow-hidden bg-gray-100">
+                            <img src={newImage} className="w-full h-full object-cover"/>
+                            <button onClick={() => setNewImage('')} className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full"><X size={14}/></button>
+                        </div>
+                    )}
+
+                    <div className="flex gap-2">
+                        <button onClick={() => fileRef.current?.click()} className="flex-1 py-3 bg-gray-100 dark:bg-gray-700 rounded-xl font-bold text-gray-600 dark:text-gray-300 flex justify-center items-center gap-2">
+                            <ImageIcon size={18}/> {newImage ? 'تغيير' : 'صورة'}
+                        </button>
+                        <input type="file" ref={fileRef} hidden accept="image/*" onChange={handleUpload}/>
+                        
+                        <button onClick={handleSave} disabled={loading} className="flex-[2] bg-pink-600 text-white py-3 rounded-xl font-bold shadow-lg flex justify-center items-center gap-2">
+                            {loading ? <Loader2 className="animate-spin"/> : <><Save size={18}/> نشر الإعلان</>}
+                        </button>
+                    </div>
+                </div>
+
+                {/* 3. ARCHIVE LIST */}
+                <div className="space-y-3">
+                    <h3 className="font-bold text-sm text-gray-500 uppercase">الأرشيف ({ads.length})</h3>
+                    {ads.length === 0 && <p className="text-center text-gray-400 py-4">لا توجد إعلانات سابقة.</p>}
+                    
+                    {ads.map(ad => (
+                        <div key={ad.id} className="bg-white dark:bg-gray-800 p-3 rounded-xl border dark:border-gray-700 shadow-sm flex gap-3 relative">
+                            {ad.image_url ? (
+                                <img src={ad.image_url} className="w-16 h-16 rounded-lg object-cover bg-gray-200"/>
+                            ) : (
+                                <div className="w-16 h-16 rounded-lg bg-pink-100 flex items-center justify-center text-pink-500 font-bold text-xs">نص فقط</div>
+                            )}
+                            
+                            <div className="flex-1">
+                                <p className="text-sm font-bold dark:text-white line-clamp-2">{ad.message}</p>
+                                <p className="text-xs text-gray-400 mt-1">{new Date(ad.created_at).toLocaleString()}</p>
+                            </div>
+
+                            <button onClick={() => handleDelete(ad.id)} className="self-center p-2 text-red-500 hover:bg-red-50 rounded-full">
+                                <Trash2 size={18}/>
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // ... (ProviderPortal main logic)
 const ProviderPortal: React.FC<{ provider: AuthenticatedUser; onLogout: () => void; onUpdateUser: (updates: Partial<AuthenticatedUser>) => void; onNavTo?: (target: string) => void }> = ({ provider, onLogout, onUpdateUser, onNavTo }) => {
     const { t } = useLocalization();
-    const [view, setView] = useState<'scan' | 'notifications' | 'history' | 'ads' | 'offers' | 'urgent' | 'ai_config' | null>(null);
+    const [view, setView] = useState<'scan' | 'notifications' | 'history' | 'ads' | 'offers' | 'urgent' | 'ai_config' | 'welcome_ad' | null>(null);
     const [editMode, setEditMode] = useState(false);
     const [stats, setStats] = useState({ followers: 0, posts: 0, visits: 0 });
     const [daysLeft, setDaysLeft] = useState(0);
@@ -570,6 +714,9 @@ const ProviderPortal: React.FC<{ provider: AuthenticatedUser; onLogout: () => vo
                 <div className="grid grid-cols-3 gap-0.5 mt-0.5">
                     {/* FIXED: Using solid dark purple background to ensure text-white works correctly */}
                     <GridItem icon={BrainCircuit} label="إعدادات الذكاء" onClick={() => setView('ai_config')} color="bg-purple-600 hover:bg-purple-700 text-white"/>
+                    
+                    {/* NEW WELCOME AD TILE */}
+                    <GridItem icon={MessageSquare} label="إعلانات المحادثة" onClick={() => setView('welcome_ad')} color="bg-pink-600 hover:bg-pink-700 text-white"/>
 
                     {isAdmin && <GridItem icon={ShieldAlert} label="الإدارة (Admin)" onClick={handleAdminClick} badge={0} color="bg-red-600 hover:bg-red-700 text-white" />}
                     <GridItem icon={QrCode} label={t('qrScannerTitle')} onClick={() => setView('scan')}/>
@@ -588,6 +735,7 @@ const ProviderPortal: React.FC<{ provider: AuthenticatedUser; onLogout: () => vo
             {view === 'offers' && <OffersView providerId={provider.id} onClose={() => setView(null)} />}
             {view === 'urgent' && <UrgentAdsView providerId={provider.id} onClose={() => setView(null)} />}
             {view === 'ai_config' && <AIInstructionsView provider={provider} onClose={() => setView(null)} onUpdateUser={onUpdateUser} />}
+            {view === 'welcome_ad' && <WelcomeAdSetup provider={provider} onClose={() => setView(null)} onUpdateUser={onUpdateUser} />}
             {editMode && <EditProfileModal provider={provider} onClose={() => setEditMode(false)} onUpdateUser={onUpdateUser} />}
         </div>
     );
