@@ -10,8 +10,8 @@ interface StoreProps {
     onClose: () => void;
     currentUser: AuthenticatedUser | null;
     onOpenAuth: () => void;
-    onGoToProfile: () => void; // New prop for navigation
-    notify: (msg: string, type: 'success' | 'error') => void; // New Prop
+    onGoToProfile: () => void;
+    notify: (msg: string, type: 'success' | 'error') => void;
 }
 
 const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth, onGoToProfile, notify }) => {
@@ -44,26 +44,38 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
 
     const isAdmin = currentUser?.phone === '0617774846' && currentUser?.accountType === 'PROVIDER';
 
+    // --- FIX 1: DYNAMIC CART KEY BASED ON USER ID ---
+    const getCartKey = () => {
+        if (currentUser) return `tanger_cart_${currentUser.id}`;
+        return 'tanger_cart_guest';
+    };
+
     useEffect(() => {
         if(isOpen) fetchProducts();
     }, [isOpen]);
 
-    // LOAD CART FROM LOCAL STORAGE
+    // LOAD CART
     useEffect(() => {
-        const savedCart = localStorage.getItem('tanger_cart');
+        const key = getCartKey();
+        const savedCart = localStorage.getItem(key);
+        
         if (savedCart) {
             try {
                 setCart(JSON.parse(savedCart));
             } catch (e) {
-                console.error("Failed to load cart", e);
+                setCart([]);
             }
+        } else {
+            // Important: If switching users, and new user has no cart, clear the state
+            setCart([]);
         }
-    }, []);
+    }, [currentUser]); // Re-run when currentUser changes
 
-    // SAVE CART TO LOCAL STORAGE
+    // SAVE CART
     useEffect(() => {
-        localStorage.setItem('tanger_cart', JSON.stringify(cart));
-    }, [cart]);
+        const key = getCartKey();
+        localStorage.setItem(key, JSON.stringify(cart));
+    }, [cart, currentUser]);
 
     const fetchProducts = async () => {
         const { data } = await supabase.from('products').select('*').order('created_at', { ascending: false });
@@ -84,14 +96,12 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
     }
     
     const fetchReviews = async (productId: number) => {
-        const { data } = await supabase.from('product_reviews').select('*').eq('product_id', productId).order('created_at', { ascending: true }); // Oldest first for numbering logic
+        const { data } = await supabase.from('product_reviews').select('*').eq('product_id', productId).order('created_at', { ascending: true });
         setReviews(data || []);
     }
 
     const handleApproveAd = async (req: AdRequest) => {
-        // Approve: Move to system announcements
         await supabase.from('system_announcements').insert({ title: req.providers?.name || 'Offer', message: req.message, image_url: req.image_url, is_active: true });
-        // Update request status
         await supabase.from('provider_ad_requests').update({ status: 'approved' }).eq('id', req.id);
         fetchAdRequests();
     }
@@ -100,7 +110,6 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
         if(!currentUser) { onOpenAuth(); return; }
         setLoading(true);
         
-        // Include Name and Phone explicitly in customer_details for the Admin to see
         const { error } = await supabase.from('orders').insert({
             user_id: currentUser.id,
             user_type: currentUser.accountType,
@@ -115,7 +124,7 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
 
         if (!error) {
             setCart([]);
-            localStorage.removeItem('tanger_cart'); // Clear storage only on success
+            localStorage.removeItem(getCartKey()); // Clear correct key
             notify(t('orderPlaced'), 'success');
             setView('catalog');
         } else {
@@ -125,14 +134,12 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
     }
 
     const addToCart = (p: Product) => {
-        // Validation for Size
         if (p.sizes && p.sizes.length > 0 && !selectedSize) {
             notify(t('selectSize'), 'error');
             return;
         }
 
         setCart(prev => {
-            // Check if same product AND same size exists
             const ex = prev.find(i => i.id === p.id && i.selectedSize === selectedSize);
             if(ex) return prev.map(i => (i.id === p.id && i.selectedSize === selectedSize) ? {...i, quantity: i.quantity + 1} : i);
             return [...prev, {...p, quantity: 1, selectedSize: selectedSize || undefined}];
@@ -147,24 +154,28 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
         }
         if(!selectedProduct || !newReview.trim()) return;
         setReviewLoading(true);
-        await supabase.from('product_reviews').insert({
+        
+        const { error } = await supabase.from('product_reviews').insert({
             product_id: selectedProduct.id,
             user_name: currentUser.name,
             comment: newReview
         });
-        setNewReview('');
-        fetchReviews(selectedProduct.id);
+
+        if (error) {
+            notify("خطأ في حفظ التعليق. تأكد من إعداد قاعدة البيانات (V28)", 'error');
+        } else {
+            setNewReview('');
+            fetchReviews(selectedProduct.id);
+        }
         setReviewLoading(false);
     }
     
-    // Filtering Logic
     const filteredProducts = activeCategory === 'category_all' 
         ? products 
         : products.filter(p => p.category === activeCategory);
 
-    // Image Slider Helpers
     const getImages = (p: Product) => {
-        if(p.images && p.images.length > 0) return [p.image_url, ...p.images].filter(Boolean); // Main + extras
+        if(p.images && p.images.length > 0) return [p.image_url, ...p.images].filter(Boolean);
         return [p.image_url];
     }
     
@@ -181,7 +192,7 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
     const openProduct = (p: Product) => {
         setSelectedProduct(p);
         setCurrentImageIndex(0);
-        setSelectedSize(''); // Reset size
+        setSelectedSize('');
         fetchReviews(p.id);
     }
 
@@ -191,12 +202,10 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-0 md:p-4">
             <div className="bg-gray-100 w-full h-full md:rounded-3xl flex flex-col overflow-hidden relative">
                 
-                {/* --- MAIN STORE HEADER --- */}
                 <div className="bg-white p-3 flex justify-between items-center shadow-sm z-10 border-b">
                     <button onClick={onClose} className="p-2"><ArrowLeft/></button>
                     <h2 className="font-bold text-lg text-orange-600">{view === 'admin' ? t('adminPanel') : (view === 'my_orders' ? t('myOrders') : t('shop'))}</h2>
                     <div className="flex items-center gap-2">
-                        {/* Talabati (My Orders) Icon */}
                         {currentUser && (
                             <button 
                                 onClick={() => { setView('my_orders'); fetchMyOrders(); }} 
@@ -205,17 +214,11 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                                 <ListChecks size={20}/>
                             </button>
                         )}
-                        
-                        {/* Admin Icon */}
                         {isAdmin && <button onClick={() => { setView('admin'); fetchAdRequests(); }} className="p-2"><Settings/></button>}
-                        
-                        {/* Cart (Sala) Icon */}
                         <button onClick={() => setView('cart')} className="p-2 bg-black text-white rounded-full relative">
                             <ShoppingBag size={20}/> 
                             {cart.length > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center border border-white font-bold">{cart.length}</span>}
                         </button>
-
-                        {/* User Avatar (New) - CLICKABLE TO GO TO PROFILE */}
                         {currentUser && (
                             <button onClick={onGoToProfile} className="w-8 h-8 rounded-full overflow-hidden border border-gray-200 ml-1">
                                 <img src={currentUser.profile_image_url || `https://ui-avatars.com/api/?name=${currentUser.name}`} className="w-full h-full object-cover"/>
@@ -224,7 +227,6 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                     </div>
                 </div>
 
-                {/* Horizontal Categories */}
                 {view === 'catalog' && (
                     <div className="bg-white border-b overflow-x-auto whitespace-nowrap p-2 flex gap-2 no-scrollbar shadow-sm z-10">
                          {categories.map(c => (
@@ -310,7 +312,6 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                             ))}
                         </div>
                     ) : (
-                        /* TEMU STYLE GRID */
                         <div className="grid grid-cols-2 gap-1 p-1 pb-20">
                              {filteredProducts.map(p => (
                                  <div key={p.id} onClick={() => openProduct(p)} className="bg-white p-2 flex flex-col gap-1 cursor-pointer hover:shadow-md transition-shadow">
@@ -339,11 +340,9 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                     )}
                 </div>
 
-                {/* --- PRODUCT DETAIL FULL SCREEN (IMPROVED LAYOUT) --- */}
+                {/* --- PRODUCT DETAIL FULL SCREEN --- */}
                 {selectedProduct && (
                     <div className="fixed inset-0 z-50 bg-white flex flex-col animate-slide-up">
-                        
-                        {/* 1. Header (Fixed) */}
                         <div className="bg-white border-b p-3 flex justify-between items-center shadow-sm z-10">
                             <button onClick={() => setSelectedProduct(null)} className="p-2 bg-gray-100 rounded-full hover:bg-gray-200">
                                 <ArrowLeft size={20}/>
@@ -354,7 +353,6 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                                     <ShoppingCart size={18}/>
                                     {cart.length > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold">{cart.length}</span>}
                                 </button>
-                                {/* User Avatar in Details Header too - CLICKABLE */}
                                 {currentUser && (
                                     <button onClick={onGoToProfile} className="w-8 h-8 rounded-full overflow-hidden border border-gray-200">
                                         <img src={currentUser.profile_image_url || `https://ui-avatars.com/api/?name=${currentUser.name}`} className="w-full h-full object-cover"/>
@@ -363,10 +361,7 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                             </div>
                         </div>
 
-                        {/* 2. Scrollable Content Area */}
                         <div className="flex-1 overflow-y-auto bg-gray-50 pb-20">
-                            
-                            {/* IMAGE SLIDER */}
                             <div className="relative bg-white aspect-square w-full">
                                 <img src={sliderImages[currentImageIndex]} className="w-full h-full object-contain"/>
                                 {sliderImages.length > 1 && (
@@ -382,7 +377,6 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                                 )}
                             </div>
 
-                            {/* DETAILS SECTION */}
                             <div className="p-4 bg-white mb-2 shadow-sm">
                                 <div className="flex justify-between items-start mb-2">
                                     <div className="text-3xl font-black text-orange-600">{selectedProduct.price} <span className="text-sm text-gray-500 font-normal">DH</span></div>
@@ -390,7 +384,6 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                                 </div>
                                 <h1 className="text-lg font-bold text-gray-900 leading-tight mb-4">{selectedProduct.name}</h1>
                                 
-                                {/* SIZE SELECTOR (New) */}
                                 {selectedProduct.sizes && selectedProduct.sizes.length > 0 && (
                                     <div className="mb-4">
                                         <h4 className="font-bold text-sm mb-2">{t('selectSize')}</h4>
@@ -422,11 +415,8 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                                 </div>
                             </div>
 
-                            {/* REVIEWS SECTION */}
                             <div className="p-4 bg-white shadow-sm">
                                 <h4 className="font-bold text-sm mb-4 flex items-center gap-2"><MessageSquare size={16} className="text-blue-500"/> {t('reviews')} ({reviews.length})</h4>
-                                
-                                {/* Input Bar for Reviews */}
                                 <div className="flex gap-2 mb-6 items-end bg-gray-50 p-2 rounded-xl border">
                                     <textarea 
                                         value={newReview} 
@@ -460,7 +450,6 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                             </div>
                         </div>
 
-                        {/* 3. Footer (Fixed) */}
                         <div className="p-4 bg-white border-t safe-area-bottom shadow-[0_-5px_20px_-5px_rgba(0,0,0,0.1)]">
                              <button onClick={() => addToCart(selectedProduct)} className="w-full py-4 bg-green-600 text-white rounded-full font-bold shadow-lg flex justify-center items-center gap-2 active:scale-95 transition-transform text-lg">
                                  <ShoppingBag size={20}/> {t('addToCart')}
@@ -469,7 +458,6 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                     </div>
                 )}
 
-                {/* Welcome Modal */}
                 {showWelcome && view === 'catalog' && (
                     <div className="absolute inset-0 z-30 bg-black/80 flex items-center justify-center p-6 backdrop-blur-sm">
                         <div className="bg-white p-6 rounded-3xl max-w-xs text-center relative animate-fade-in">

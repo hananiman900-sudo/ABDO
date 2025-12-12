@@ -6,9 +6,7 @@ import { supabase } from '../services/supabaseClient';
 import { CheckCircle, XCircle, Camera, Loader2, Upload, MessageCircle, History, Users, Megaphone, Settings, ArrowLeft, Image as ImageIcon, QrCode, Bell, User, LayoutGrid, FileText, Lock, LogOut, Grid, Bookmark, Heart, Plus, Zap, Tag, Instagram, Facebook, MapPin, Edit3, Share2, Info, Trash2, Edit, ShieldAlert, Save, X, Database, BrainCircuit, Sparkles, Banknote, Clock, Map, CalendarCheck, Hourglass, MessageSquare, AlertCircle } from 'lucide-react';
 import jsQR from 'jsqr';
 
-// ... (Previous sub-components: NotificationView, HistoryView, UrgentAdsView, OffersView, AdsView, QRScannerView, EditProfileModal, AIInstructionsView remain unchanged)
-
-// --- SUB-COMPONENTS (FULL SCREEN VIEWS) ---
+// ... (Previous sub-components: NotificationView, HistoryView, UrgentAdsView, OffersView remain unchanged)
 
 const NotificationView: React.FC<{ providerId: number; onClose: () => void }> = ({ providerId, onClose }) => {
     const { t } = useLocalization();
@@ -257,12 +255,30 @@ const AdsView: React.FC<{ providerId: number; onClose: () => void }> = ({ provid
                         {loading ? <Loader2 className="animate-spin mx-auto"/> : t('sendButton')}
                     </button>
                 </div>
-                 <div className="space-y-3"><h3 className="font-bold text-gray-700 dark:text-gray-300 text-sm uppercase">Request History</h3>{requests.length === 0 && <p className="text-gray-400 text-sm text-center">No ad requests sent.</p>}{requests.map(r => (<div key={r.id} className="p-3 bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 flex justify-between items-center shadow-sm"><div className="flex gap-2 items-center">{r.image_url && <img src={r.image_url} className="w-10 h-10 rounded object-cover bg-gray-200"/><div><p className="text-sm font-semibold line-clamp-1 dark:text-white">{r.message}</p><p className="text-[10px] text-gray-400">{new Date(r.created_at).toLocaleDateString()}</p></div></div><span className={`text-[10px] px-2 py-1 rounded-full font-bold ${r.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{r.status === 'pending' ? 'في طور الإنجاز' : 'مقبول'}</span></div>))}</div>
+                 <div className="space-y-3">
+                    <h3 className="font-bold text-gray-700 dark:text-gray-300 text-sm uppercase">Request History</h3>
+                    {requests.length === 0 && <p className="text-gray-400 text-sm text-center">No ad requests sent.</p>}
+                    {requests.map(r => (
+                        <div key={r.id} className="p-3 bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 flex justify-between items-center shadow-sm">
+                            <div className="flex gap-2 items-center">
+                                {r.image_url && <img src={r.image_url} className="w-10 h-10 rounded object-cover bg-gray-200"/>}
+                                <div>
+                                    <p className="text-sm font-semibold line-clamp-1 dark:text-white">{r.message}</p>
+                                    <p className="text-[10px] text-gray-400">{new Date(r.created_at).toLocaleDateString()}</p>
+                                </div>
+                            </div>
+                            <span className={`text-[10px] px-2 py-1 rounded-full font-bold ${r.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                {r.status === 'pending' ? 'في طور الإنجاز' : 'مقبول'}
+                            </span>
+                        </div>
+                    ))}
+                </div>
             </div>
         </div>
     );
 }
 
+// ... (Rest of QRScanner.tsx: QRScannerView, EditProfileModal, AIInstructionsView, WelcomeAdSetup, ProviderPortal - unchanged)
 const QRScannerView: React.FC<{ providerId: number; onClose: () => void }> = ({ providerId, onClose }) => {
     // ... (QR Scanner Logic Remains unchanged)
     const { t } = useLocalization();
@@ -364,7 +380,6 @@ const QRScannerView: React.FC<{ providerId: number; onClose: () => void }> = ({ 
     );
 }
 
-// ... (EditProfileModal and AIInstructionsView remain unchanged)
 const EditProfileModal: React.FC<{ provider: AuthenticatedUser; onClose: () => void; onUpdateUser: (updates: Partial<AuthenticatedUser>) => void }> = ({ provider, onClose, onUpdateUser }) => {
     // ... same code ...
     const { t } = useLocalization();
@@ -502,7 +517,7 @@ const AIInstructionsView: React.FC<{ provider: AuthenticatedUser; onClose: () =>
     );
 };
 
-// --- UPDATED V27: WELCOME AD SETUP (WITH STORIES ARCHIVE & LIMITS) ---
+// --- WELCOME AD SETUP (WITH STORIES ARCHIVE & LIMITS) ---
 const WelcomeAdSetup: React.FC<{ provider: AuthenticatedUser; onClose: () => void; onUpdateUser: (updates: Partial<AuthenticatedUser>) => void }> = ({ provider, onClose, onUpdateUser }) => {
     const { t } = useLocalization();
     const [ads, setAds] = useState<ProviderAd[]>([]);
