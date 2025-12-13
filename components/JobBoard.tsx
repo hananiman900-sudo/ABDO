@@ -284,6 +284,9 @@ export const JobBoard: React.FC<{ isOpen: boolean; onClose: () => void; currentU
         return acc;
     }, {} as Record<string, number>);
 
+    // GLOBAL COUNTS FOR TABS
+    const offersCount = safeJobs.filter(j => j.post_type === 'EMPLOYER').length;
+    const seekersCount = safeJobs.filter(j => j.post_type === 'SEEKER').length;
 
     const formatTime = (dateStr: string) => {
         try {
@@ -320,15 +323,19 @@ export const JobBoard: React.FC<{ isOpen: boolean; onClose: () => void; currentU
                             <div className="flex">
                                 <button 
                                     onClick={() => setActiveTab('OFFERS')}
-                                    className={`flex-1 py-4 text-sm font-bold border-b-2 transition-colors ${activeTab === 'OFFERS' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}
+                                    className={`flex-1 py-4 text-sm font-bold border-b-2 transition-colors flex items-center justify-center gap-2 ${activeTab === 'OFFERS' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}
                                 >
                                     {t('tabOffers')}
+                                    {/* GREEN COUNT BADGE */}
+                                    <span className="w-5 h-5 bg-green-500 text-white rounded-full text-[10px] flex items-center justify-center">{offersCount}</span>
                                 </button>
                                 <button 
                                     onClick={() => setActiveTab('TALENT')}
-                                    className={`flex-1 py-4 text-sm font-bold border-b-2 transition-colors ${activeTab === 'TALENT' ? 'border-green-600 text-green-600' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}
+                                    className={`flex-1 py-4 text-sm font-bold border-b-2 transition-colors flex items-center justify-center gap-2 ${activeTab === 'TALENT' ? 'border-green-600 text-green-600' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}
                                 >
                                     {t('tabTalent')}
+                                    {/* GREEN COUNT BADGE */}
+                                    <span className="w-5 h-5 bg-green-500 text-white rounded-full text-[10px] flex items-center justify-center">{seekersCount}</span>
                                 </button>
                             </div>
 
@@ -562,7 +569,7 @@ export const JobBoard: React.FC<{ isOpen: boolean; onClose: () => void; currentU
                                 {/* Sticky Footer Button */}
                                 <div className="absolute bottom-0 left-0 right-0 p-4 bg-white dark:bg-gray-800 border-t dark:border-gray-700 shadow-[0_-5px_20px_-5px_rgba(0,0,0,0.1)] rounded-b-3xl">
                                     <a 
-                                        href={`https://wa.me/${selectedJob.contact_phone?.replace(/\s/g, '').replace(/^0/, '212')}?text=Hello, I saw your post on TangerConnect for: ${selectedJob.title}`} 
+                                        href={`https://wa.me/${selectedJob.contact_phone?.replace(/\s/g, '').replace(/^0/, '212')}?text=Hello, I saw your post on TangerConnect: ${selectedJob.title}`} 
                                         target="_blank" 
                                         rel="noreferrer"
                                         className={`w-full py-4 rounded-full text-white font-bold shadow-lg flex justify-center items-center gap-2 active:scale-95 transition-transform ${selectedJob.post_type === 'EMPLOYER' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'}`}

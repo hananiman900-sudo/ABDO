@@ -3,10 +3,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useLocalization } from '../hooks/useLocalization';
 import { AuthenticatedUser, ProviderNotification, AdRequest, Offer, UrgentAd, ProviderAd } from '../types';
 import { supabase } from '../services/supabaseClient';
-import { CheckCircle, XCircle, Camera, Loader2, Upload, MessageCircle, History, Users, Megaphone, Settings, ArrowLeft, Image as ImageIcon, QrCode, Bell, User, LayoutGrid, FileText, Lock, LogOut, Grid, Bookmark, Heart, Plus, Zap, Tag, Instagram, Facebook, MapPin, Edit3, Share2, Info, Trash2, Edit, ShieldAlert, Save, X, Database, BrainCircuit, Sparkles, Banknote, Clock, Map, CalendarCheck, Hourglass, MessageSquare, AlertCircle } from 'lucide-react';
+import { CheckCircle, XCircle, Camera, Loader2, Upload, MessageCircle, History, Users, Megaphone, Settings, ArrowLeft, Image as ImageIcon, QrCode, Bell, User, LayoutGrid, FileText, Lock, LogOut, Grid, Bookmark, Heart, Plus, Zap, Tag, Instagram, Facebook, MapPin, Edit3, Share2, Info, Trash2, Edit, ShieldAlert, Save, X, Database, BrainCircuit, Sparkles, Banknote, Clock, Map, CalendarCheck, Hourglass, MessageSquare, AlertCircle, Calendar, Phone } from 'lucide-react';
 import jsQR from 'jsqr';
-
-// ... (Previous sub-components: NotificationView, HistoryView, UrgentAdsView, OffersView remain unchanged)
 
 const NotificationView: React.FC<{ providerId: number; onClose: () => void }> = ({ providerId, onClose }) => {
     const { t } = useLocalization();
@@ -45,41 +43,105 @@ const NotificationView: React.FC<{ providerId: number; onClose: () => void }> = 
 
 const HistoryView: React.FC<{ providerId: number; onClose: () => void }> = ({ providerId, onClose }) => {
     const { t } = useLocalization();
+    const [activeTab, setActiveTab] = useState<'SCANNED' | 'BOOKINGS'>('SCANNED');
     const [history, setHistory] = useState<any[]>([]);
+    const [bookings, setBookings] = useState<any[]>([]);
+    const [loading, setLoading] = useState(false);
+
     useEffect(() => {
         const fetch = async () => {
-            const { data } = await supabase.from('scan_history').select('*').eq('provider_id', providerId).order('created_at', { ascending: false });
-            setHistory(data || []);
+            setLoading(true);
+            
+            // Fetch Scans
+            const { data: scanData } = await supabase.from('scan_history').select('*').eq('provider_id', providerId).order('created_at', { ascending: false });
+            setHistory(scanData || []);
+
+            // Fetch Bookings (Appointments table join Clients)
+            const { data: bookingData } = await supabase
+                .from('appointments')
+                .select('*, clients(full_name, phone)')
+                .eq('provider_id', providerId)
+                .order('created_at', { ascending: false });
+            
+            setBookings(bookingData || []);
+            setLoading(false);
         }
         fetch();
-    }, []);
+    }, [providerId]);
+
     return (
         <div className="fixed inset-0 bg-white dark:bg-gray-900 z-50 flex flex-col animate-slide-up">
             <div className="p-4 border-b dark:border-gray-700 flex items-center gap-3 bg-white dark:bg-gray-800">
                 <button onClick={onClose}><ArrowLeft className="dark:text-white"/></button>
                 <h2 className="font-bold text-xl dark:text-white">{t('statsTitle')}</h2>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 bg-gray-50 dark:bg-gray-900">
-                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700 overflow-hidden">
-                    <table className="w-full text-sm text-left rtl:text-right">
-                        <thead className="bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-300">
-                            <tr>
-                                <th className="p-3">{t('clientName')}</th>
-                                <th className="p-3">{t('visitDate')}</th>
-                                <th className="p-3">Details</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                            {history.map((h, i) => (
-                                <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                                    <td className="p-3 font-bold dark:text-white">{h.client_name}</td>
-                                    <td className="p-3 text-gray-500 dark:text-gray-400">{new Date(h.created_at).toLocaleDateString()}</td>
-                                    <td className="p-3 text-xs dark:text-gray-400"><span className="block">{h.client_phone}</span></td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+            
+            {/* Tabs */}
+            <div className="p-4 bg-white dark:bg-gray-800 border-b dark:border-gray-700">
+                <div className="flex bg-gray-100 dark:bg-gray-700 p-1 rounded-xl">
+                    <button 
+                        onClick={() => setActiveTab('SCANNED')} 
+                        className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${activeTab === 'SCANNED' ? 'bg-white dark:bg-gray-600 shadow-sm text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}
+                    >
+                        <CheckCircle size={16}/> {t('statusVerified')} ({history.length})
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('BOOKINGS')} 
+                        className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${activeTab === 'BOOKINGS' ? 'bg-white dark:bg-gray-600 shadow-sm text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'}`}
+                    >
+                        <Calendar size={16}/> سجل الحجوزات ({bookings.length})
+                    </button>
                 </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 bg-gray-50 dark:bg-gray-900">
+                {loading ? (
+                    <div className="flex justify-center py-10"><Loader2 className="animate-spin"/></div>
+                ) : (
+                    <>
+                        {activeTab === 'SCANNED' && (
+                            <div className="space-y-3">
+                                {history.length === 0 && <p className="text-center text-gray-400 mt-10">No scanned visits yet.</p>}
+                                {history.map((h, i) => (
+                                    <div key={i} className="bg-white dark:bg-gray-800 p-4 rounded-xl border dark:border-gray-700 shadow-sm flex items-center justify-between">
+                                        <div>
+                                            <h4 className="font-bold text-gray-900 dark:text-white">{h.client_name}</h4>
+                                            <p className="text-xs text-gray-500 dark:text-gray-400">{new Date(h.created_at).toLocaleString()}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <span className="text-xs font-bold text-green-600 bg-green-50 dark:bg-green-900/30 px-2 py-1 rounded-full">Scanned</span>
+                                            {h.client_phone && <p className="text-[10px] text-gray-400 mt-1">{h.client_phone}</p>}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {activeTab === 'BOOKINGS' && (
+                            <div className="space-y-3">
+                                {bookings.length === 0 && <p className="text-center text-gray-400 mt-10">No bookings found.</p>}
+                                {bookings.map((b, i) => (
+                                    <div key={i} className="bg-white dark:bg-gray-800 p-4 rounded-xl border dark:border-gray-700 shadow-sm flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold">
+                                                {(b.clients?.full_name || 'Guest').charAt(0)}
+                                            </div>
+                                            <div>
+                                                <h4 className="font-bold text-gray-900 dark:text-white">{b.clients?.full_name || 'Guest'}</h4>
+                                                <p className="text-xs text-gray-500 dark:text-gray-400">{new Date(b.created_at).toLocaleDateString()}</p>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <a href={`tel:${b.clients?.phone}`} className="text-xs font-bold text-white bg-blue-600 px-3 py-1.5 rounded-full shadow-sm flex items-center gap-1">
+                                                <Phone size={10}/> {b.clients?.phone || 'N/A'}
+                                            </a>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </>
+                )}
             </div>
         </div>
     );
@@ -278,11 +340,11 @@ const AdsView: React.FC<{ providerId: number; onClose: () => void }> = ({ provid
     );
 }
 
-// ... (Rest of QRScanner.tsx: QRScannerView, EditProfileModal, AIInstructionsView, WelcomeAdSetup, ProviderPortal - unchanged)
+// --- MISSING COMPONENTS RESTORED ---
+
 const QRScannerView: React.FC<{ providerId: number; onClose: () => void }> = ({ providerId, onClose }) => {
-    // ... (QR Scanner Logic Remains unchanged)
     const { t } = useLocalization();
-    const [status, setStatus] = useState<'idle' | 'success' | 'error' | 'wrong_provider'>('idle');
+    const [status, setStatus] = useState<'idle' | 'success' | 'error' | 'wrong_provider' | 'duplicate'>('idle');
     const [scannedClientName, setScannedClientName] = useState('');
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -324,18 +386,34 @@ const QRScannerView: React.FC<{ providerId: number; onClose: () => void }> = ({ 
             const parsed = JSON.parse(data);
             if(!parsed.appointmentId) throw new Error();
             
-            // Allow scanning even if providerId is missing/mismatch for fallback scenarios, 
-            // BUT prefer strict checking if providerId is in QR
+            // SECURITY CHECK 1: VERIFY PROVIDER ID
             if (parsed.providerId && parsed.providerId !== providerId) { 
                 setStatus('wrong_provider'); 
                 return; 
             }
 
+            // DUPLICATE CHECK: CHECK DATABASE IF ALREADY SCANNED
+            const { data: existingScans } = await supabase
+                .from('scan_history')
+                .select('id')
+                .eq('appointment_id', parsed.appointmentId);
+            
+            if (existingScans && existingScans.length > 0) {
+                setScannedClientName(parsed.clientName || "Client");
+                setStatus('duplicate');
+                return;
+            }
+
             const clientName = parsed.clientName || `Client #${parsed.appointmentId}`;
             setScannedClientName(clientName);
             
-            // 1. Log to History
-            await supabase.from('scan_history').insert({ provider_id: providerId, client_name: clientName, client_phone: "Verified" });
+            // 1. Log to History with Appointment ID to prevent future duplicates
+            await supabase.from('scan_history').insert({ 
+                provider_id: providerId, 
+                client_name: clientName, 
+                client_phone: parsed.offerTitle ? `Offer: ${parsed.offerTitle}` : "Verified",
+                appointment_id: parsed.appointmentId
+            });
             
             // 2. Update Provider Stats
             const { data: p } = await supabase.from('providers').select('visits_count').eq('id', providerId).single();
@@ -373,7 +451,36 @@ const QRScannerView: React.FC<{ providerId: number; onClose: () => void }> = ({ 
              <div className="w-full max-w-lg bg-white dark:bg-gray-800 rounded-2xl overflow-hidden relative shadow-2xl">
                  <div className="p-4 bg-black text-white flex justify-between items-center"><button onClick={onClose}><ArrowLeft/></button><span className="font-bold">{t('qrScannerTitle')}</span><div/></div>
                  <div className="p-6 flex flex-col items-center gap-6">
-                    {status === 'success' ? (<div className="text-center py-10"><CheckCircle size={80} className="text-green-500 mx-auto"/><h2 className="text-2xl font-bold mt-4 dark:text-white">{t('verificationSuccess')}</h2><p className="text-lg font-semibold mt-2 text-gray-700 dark:text-gray-300">{scannedClientName}</p><button onClick={() => { setStatus('idle'); setScanning(true); }} className="mt-6 bg-black text-white px-6 py-2 rounded-full font-bold">Next</button></div>) : status === 'error' ? (<div className="text-center py-10"><XCircle size={80} className="text-red-500 mx-auto"/><h2 className="text-2xl font-bold mt-4 dark:text-white">{t('invalidQR')}</h2><button onClick={() => { setStatus('idle'); setScanning(true); }} className="mt-6 bg-black text-white px-6 py-2 rounded-full font-bold">Try Again</button></div>) : status === 'wrong_provider' ? (<div className="text-center py-10"><ShieldAlert size={80} className="text-orange-500 mx-auto"/><h2 className="text-xl font-bold mt-4 text-orange-600">{t('wrongProvider')}</h2><button onClick={() => { setStatus('idle'); setScanning(true); }} className="mt-6 bg-black text-white px-6 py-2 rounded-full font-bold">Try Again</button></div>) : (<><div className="w-full aspect-square max-h-[300px] bg-black rounded-xl overflow-hidden relative">{scanning ? (<><video ref={videoRef} className="absolute inset-0 w-full h-full object-cover"/><div className="absolute inset-0 border-2 border-green-500/50 m-8 rounded-lg animate-pulse"></div><canvas ref={canvasRef} hidden /></>) : (<div className="flex items-center justify-center h-full text-white">Processing Image...</div>)}</div><div className="w-full text-center"><p className="text-sm text-gray-500 mb-4">Align QR code or upload file from gallery</p><button onClick={() => fileRef.current?.click()} className="w-full py-4 border-2 border-dashed border-gray-300 rounded-xl font-bold text-gray-500 hover:border-black hover:text-black transition-colors flex items-center justify-center gap-2 bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300"><Upload size={24}/> {t('uploadQRImage')}</button><input type="file" ref={fileRef} hidden accept="image/*" onChange={handleFileUpload}/></div></>)}
+                    {status === 'success' ? (
+                        <div className="text-center py-10">
+                            <CheckCircle size={80} className="text-green-500 mx-auto"/>
+                            <h2 className="text-2xl font-bold mt-4 dark:text-white">{t('verificationSuccess')}</h2>
+                            <p className="text-lg font-semibold mt-2 text-gray-700 dark:text-gray-300">{scannedClientName}</p>
+                            <button onClick={() => { setStatus('idle'); setScanning(true); }} className="mt-6 bg-black text-white px-6 py-2 rounded-full font-bold">Next</button>
+                        </div>
+                    ) : status === 'duplicate' ? (
+                         <div className="text-center py-10">
+                            <AlertCircle size={80} className="text-blue-500 mx-auto"/>
+                            <h2 className="text-xl font-bold mt-4 text-blue-600">تم المسح مسبقاً (Already Scanned)</h2>
+                            <p className="text-sm mt-2 text-gray-600 dark:text-gray-400">هذا الموعد تم التحقق منه من قبل. لن يتم احتساب زيارة جديدة.</p>
+                            <button onClick={() => { setStatus('idle'); setScanning(true); }} className="mt-6 bg-black text-white px-6 py-2 rounded-full font-bold">OK</button>
+                        </div>
+                    ) : status === 'error' ? (
+                        <div className="text-center py-10">
+                            <XCircle size={80} className="text-red-500 mx-auto"/>
+                            <h2 className="text-2xl font-bold mt-4 dark:text-white">{t('invalidQR')}</h2>
+                            <button onClick={() => { setStatus('idle'); setScanning(true); }} className="mt-6 bg-black text-white px-6 py-2 rounded-full font-bold">Try Again</button>
+                        </div>
+                    ) : status === 'wrong_provider' ? (
+                        <div className="text-center py-10">
+                            <ShieldAlert size={80} className="text-red-600 mx-auto"/>
+                            <h2 className="text-xl font-bold mt-4 text-red-600">{t('wrongProvider')}</h2>
+                            <p className="text-sm mt-2 text-gray-600">هذا الكود خاص بمهني آخر. لا تملك صلاحية مسحه.</p>
+                            <button onClick={() => { setStatus('idle'); setScanning(true); }} className="mt-6 bg-black text-white px-6 py-2 rounded-full font-bold">Try Again</button>
+                        </div>
+                    ) : (
+                        <><div className="w-full aspect-square max-h-[300px] bg-black rounded-xl overflow-hidden relative">{scanning ? (<><video ref={videoRef} className="absolute inset-0 w-full h-full object-cover"/><div className="absolute inset-0 border-2 border-green-500/50 m-8 rounded-lg animate-pulse"></div><canvas ref={canvasRef} hidden /></>) : (<div className="flex items-center justify-center h-full text-white">Processing Image...</div>)}</div><div className="w-full text-center"><p className="text-sm text-gray-500 mb-4">Align QR code or upload file from gallery</p><button onClick={() => fileRef.current?.click()} className="w-full py-4 border-2 border-dashed border-gray-300 rounded-xl font-bold text-gray-500 hover:border-black hover:text-black transition-colors flex items-center justify-center gap-2 bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300"><Upload size={24}/> {t('uploadQRImage')}</button><input type="file" ref={fileRef} hidden accept="image/*" onChange={handleFileUpload}/></div></>
+                    )}
                  </div>
              </div>
         </div>
@@ -381,7 +488,6 @@ const QRScannerView: React.FC<{ providerId: number; onClose: () => void }> = ({ 
 }
 
 const EditProfileModal: React.FC<{ provider: AuthenticatedUser; onClose: () => void; onUpdateUser: (updates: Partial<AuthenticatedUser>) => void }> = ({ provider, onClose, onUpdateUser }) => {
-    // ... same code ...
     const { t } = useLocalization();
     const [form, setForm] = useState({ bio: provider.bio || '', instagram: provider.social_links?.instagram || '', facebook: provider.social_links?.facebook || '', gps: provider.social_links?.gps || '', image: provider.profile_image_url || '' });
     const [loading, setLoading] = useState(false);
@@ -392,7 +498,6 @@ const EditProfileModal: React.FC<{ provider: AuthenticatedUser; onClose: () => v
 }
 
 const AIInstructionsView: React.FC<{ provider: AuthenticatedUser; onClose: () => void; onUpdateUser: (updates: Partial<AuthenticatedUser>) => void }> = ({ provider, onClose, onUpdateUser }) => {
-    // ... same code ...
     const { t } = useLocalization();
     const [instructions, setInstructions] = useState(provider.custom_ai_instructions || '');
     const [priceInfo, setPriceInfo] = useState(provider.price_info || '');
@@ -433,8 +538,6 @@ const AIInstructionsView: React.FC<{ provider: AuthenticatedUser; onClose: () =>
                 <h2 className="font-bold text-xl flex items-center gap-2 dark:text-white"><BrainCircuit className="text-purple-600"/> إعدادات الذكاء (AI Config)</h2>
             </div>
             <div className="p-4 flex-1 overflow-y-auto space-y-6 bg-gray-50 dark:bg-gray-900">
-                {/* ... fields ... */}
-                {/* Intro Box */}
                 <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-xl border border-purple-200 dark:border-purple-800">
                     <p className="text-sm text-purple-800 dark:text-purple-200 font-bold mb-2 flex items-center gap-2">
                         <Sparkles size={16}/> روبوت هجين (Hybrid Bot)
@@ -444,7 +547,6 @@ const AIInstructionsView: React.FC<{ provider: AuthenticatedUser; onClose: () =>
                     </p>
                 </div>
 
-                {/* 1. Price Info */}
                 <div className="space-y-2">
                     <label className="text-sm font-bold text-gray-700 dark:text-gray-300 flex items-center gap-2">
                         <Banknote size={16} className="text-green-600"/> معلومات الأسعار (Prices)
@@ -457,7 +559,6 @@ const AIInstructionsView: React.FC<{ provider: AuthenticatedUser; onClose: () =>
                     />
                 </div>
 
-                {/* 2. Working Hours */}
                 <div className="space-y-2">
                     <label className="text-sm font-bold text-gray-700 dark:text-gray-300 flex items-center gap-2">
                         <Clock size={16} className="text-orange-600"/> التوقيت (Working Hours)
@@ -471,7 +572,6 @@ const AIInstructionsView: React.FC<{ provider: AuthenticatedUser; onClose: () =>
                     />
                 </div>
 
-                {/* 3. Location Info */}
                 <div className="space-y-2">
                     <label className="text-sm font-bold text-gray-700 dark:text-gray-300 flex items-center gap-2">
                         <Map size={16} className="text-blue-600"/> تفاصيل العنوان (Exact Location)
@@ -484,7 +584,6 @@ const AIInstructionsView: React.FC<{ provider: AuthenticatedUser; onClose: () =>
                     />
                 </div>
 
-                {/* 4. Booking Details (New) */}
                 <div className="space-y-2">
                     <label className="text-sm font-bold text-gray-700 dark:text-gray-300 flex items-center gap-2">
                         <CalendarCheck size={16} className="text-red-600"/> تفاصيل وشروط الحجز (Booking Conditions)
@@ -497,7 +596,6 @@ const AIInstructionsView: React.FC<{ provider: AuthenticatedUser; onClose: () =>
                     />
                 </div>
 
-                {/* 5. General Context (Old Field) */}
                 <div className="space-y-2">
                     <label className="text-sm font-bold text-gray-700 dark:text-gray-300">معلومات إضافية (General Bio for AI)</label>
                     <textarea 
@@ -517,7 +615,6 @@ const AIInstructionsView: React.FC<{ provider: AuthenticatedUser; onClose: () =>
     );
 };
 
-// --- WELCOME AD SETUP (WITH STORIES ARCHIVE & LIMITS) ---
 const WelcomeAdSetup: React.FC<{ provider: AuthenticatedUser; onClose: () => void; onUpdateUser: (updates: Partial<AuthenticatedUser>) => void }> = ({ provider, onClose, onUpdateUser }) => {
     const { t } = useLocalization();
     const [ads, setAds] = useState<ProviderAd[]>([]);
@@ -546,7 +643,6 @@ const WelcomeAdSetup: React.FC<{ provider: AuthenticatedUser; onClose: () => voi
     const handleSave = async () => {
         if (!newMessage.trim() && !newImage) return alert('المرجو كتابة نص أو رفع صورة');
         
-        // CHECK LIMIT (5 Per Day)
         const today = new Date();
         today.setHours(0,0,0,0);
         const adsToday = ads.filter(a => new Date(a.created_at) >= today).length;
@@ -589,8 +685,6 @@ const WelcomeAdSetup: React.FC<{ provider: AuthenticatedUser; onClose: () => voi
             </div>
             
             <div className="p-4 flex-1 overflow-y-auto space-y-6 bg-gray-50 dark:bg-gray-900">
-                
-                {/* 1. INFO BOX */}
                 <div className="bg-pink-50 dark:bg-pink-900/20 p-4 rounded-xl border border-pink-200 dark:border-pink-800">
                     <p className="text-sm text-pink-800 dark:text-pink-200 leading-relaxed font-bold">
                         ℹ️ هذه الإعلانات تظهر تلقائياً لأي زبون يدخل للمحادثة. 
@@ -602,7 +696,6 @@ const WelcomeAdSetup: React.FC<{ provider: AuthenticatedUser; onClose: () => voi
                     </ul>
                 </div>
 
-                {/* 2. CREATE NEW AD */}
                 <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border dark:border-gray-700 shadow-sm space-y-4">
                     <h3 className="font-bold text-sm text-gray-500 uppercase">نشر جديد</h3>
                     
@@ -632,7 +725,6 @@ const WelcomeAdSetup: React.FC<{ provider: AuthenticatedUser; onClose: () => voi
                     </div>
                 </div>
 
-                {/* 3. ARCHIVE LIST */}
                 <div className="space-y-3">
                     <h3 className="font-bold text-sm text-gray-500 uppercase">الأرشيف ({ads.length})</h3>
                     {ads.length === 0 && <p className="text-center text-gray-400 py-4">لا توجد إعلانات سابقة.</p>}
@@ -661,8 +753,7 @@ const WelcomeAdSetup: React.FC<{ provider: AuthenticatedUser; onClose: () => voi
     );
 };
 
-// ... (ProviderPortal main logic)
-const ProviderPortal: React.FC<{ provider: AuthenticatedUser; onLogout: () => void; onUpdateUser: (updates: Partial<AuthenticatedUser>) => void; onNavTo?: (target: string) => void }> = ({ provider, onLogout, onUpdateUser, onNavTo }) => {
+export const ProviderPortal: React.FC<{ provider: AuthenticatedUser; onLogout: () => void; onUpdateUser: (updates: Partial<AuthenticatedUser>) => void; onNavTo?: (target: string) => void }> = ({ provider, onLogout, onUpdateUser, onNavTo }) => {
     const { t } = useLocalization();
     const [view, setView] = useState<'scan' | 'notifications' | 'history' | 'ads' | 'offers' | 'urgent' | 'ai_config' | 'welcome_ad' | null>(null);
     const [editMode, setEditMode] = useState(false);
@@ -677,7 +768,6 @@ const ProviderPortal: React.FC<{ provider: AuthenticatedUser; onLogout: () => vo
             const { count: followersCount } = await supabase.from('follows').select('id', { count: 'exact' }).eq('provider_id', provider.id);
             setStats({ followers: followersCount || 0, posts: offersCount || 0, visits: provider.visits_count || 0 });
             
-            // Calculate Subscription Days Left
             if (provider.subscriptionEndDate) {
                 const now = new Date();
                 const end = new Date(provider.subscriptionEndDate);
@@ -710,7 +800,6 @@ const ProviderPortal: React.FC<{ provider: AuthenticatedUser; onLogout: () => vo
                     <div className="flex-1 flex justify-around text-center dark:text-white"><div><div className="font-bold text-lg">{stats.posts}</div><div className="text-xs text-gray-500 dark:text-gray-400">{t('posts')}</div></div><div><div className="font-bold text-lg">{stats.followers}</div><div className="text-xs text-gray-500 dark:text-gray-400">{t('followers')}</div></div><div><div className="font-bold text-lg">{stats.visits}</div><div className="text-xs text-gray-500 dark:text-gray-400">{t('visits')}</div></div></div>
                 </div>
                 
-                {/* SUBSCRIPTION COUNTDOWN BADGE */}
                 {daysLeft < 365 && (
                     <div className={`mb-4 p-3 rounded-lg flex items-center justify-between shadow-sm border ${daysLeft <= 5 ? 'bg-red-50 border-red-200 text-red-700' : 'bg-green-50 border-green-200 text-green-700'}`}>
                         <div className="flex items-center gap-2">
@@ -725,14 +814,9 @@ const ProviderPortal: React.FC<{ provider: AuthenticatedUser; onLogout: () => vo
                 <div className="flex gap-2 mt-4 mb-6"><button onClick={() => setEditMode(true)} className="flex-1 bg-gray-100 dark:bg-gray-800 dark:text-white py-1.5 rounded-lg font-bold text-sm">{t('editProfile')}</button><button onClick={handleShare} className="flex-1 bg-gray-100 dark:bg-gray-800 dark:text-white py-1.5 rounded-lg font-bold text-sm">{t('share')}</button></div>
                 <div className="flex border-t border-b dark:border-gray-700"><button className="flex-1 py-3 flex justify-center border-b-2 border-black dark:border-white dark:text-white"><Grid size={24}/></button><button className="flex-1 py-3 flex justify-center text-gray-400"><Tag size={24}/></button></div>
                 
-                {/* GRID ITEMS */}
                 <div className="grid grid-cols-3 gap-0.5 mt-0.5">
-                    {/* FIXED: Using solid dark purple background to ensure text-white works correctly */}
                     <GridItem icon={BrainCircuit} label="إعدادات الذكاء" onClick={() => setView('ai_config')} color="bg-purple-600 hover:bg-purple-700 text-white"/>
-                    
-                    {/* NEW WELCOME AD TILE */}
                     <GridItem icon={MessageSquare} label="إعلانات المحادثة" onClick={() => setView('welcome_ad')} color="bg-pink-600 hover:bg-pink-700 text-white"/>
-
                     {isAdmin && <GridItem icon={ShieldAlert} label="الإدارة (Admin)" onClick={handleAdminClick} badge={0} color="bg-red-600 hover:bg-red-700 text-white" />}
                     <GridItem icon={QrCode} label={t('qrScannerTitle')} onClick={() => setView('scan')}/>
                     <GridItem icon={Megaphone} label={t('requestBoost')} onClick={() => setView('ads')}/>

@@ -11,7 +11,7 @@ import { JobBoard } from './components/JobBoard';
 import { AdminDashboard } from './components/AdminDashboard'; // Import New Component
 import { useLocalization, LocalizationProvider } from './hooks/useLocalization';
 import { supabase } from './services/supabaseClient';
-import { LogIn, User, MapPin, ShoppingBag, Home, Briefcase, Settings, X, Phone, Globe, LayoutGrid, Heart, List, LogOut, CheckCircle, Edit, Share2, Grid, Bookmark, Menu, Users, Database, Instagram, Facebook, Tag, Sparkles, MessageCircle, Calendar, Bell, Eye, EyeOff, Camera, Loader2, UserPlus, UserCheck, Megaphone, Clock, ArrowLeft, Moon, Sun, AlertCircle, Zap, Scan, BrainCircuit, ShieldCheck, Gem, RefreshCw, Copy, Terminal, Star, CheckSquare } from 'lucide-react';
+import { LogIn, User, MapPin, ShoppingBag, Home, Briefcase, Settings, X, Phone, Globe, LayoutGrid, Heart, List, LogOut, CheckCircle, Edit, Share2, Grid, Bookmark, Menu, Users, Database, Instagram, Facebook, Tag, Sparkles, MessageCircle, Calendar, Bell, Eye, EyeOff, Camera, Loader2, UserPlus, UserCheck, Megaphone, Clock, ArrowLeft, Moon, Sun, AlertCircle, Zap, Scan, BrainCircuit, ShieldCheck, Gem, RefreshCw, Copy, Terminal, Star, CheckSquare, Search } from 'lucide-react';
 
 // --- CUSTOM TOAST NOTIFICATION ---
 const ToastNotification: React.FC<{ message: string; type: 'success' | 'error'; onClose: () => void }> = ({ message, type, onClose }) => {
@@ -414,8 +414,7 @@ const AuthModal: React.FC<{ isOpen: boolean; onClose: () => void; onLogin: (user
     );
 };
 
-// ... (Rest of App.tsx remains the same)
-// ... (ClientNotificationsModal, ProviderDirectory, ServicesHub, EditClientProfileModal, SuggestedProviders, ProfileTab, SplashScreen remain unchanged)
+// ... (ClientNotificationsModal)
 const ClientNotificationsModal: React.FC<{ isOpen: boolean; onClose: () => void; userId: number }> = ({ isOpen, onClose, userId }) => {
     // ... same code ...
     const { t } = useLocalization();
@@ -426,12 +425,81 @@ const ClientNotificationsModal: React.FC<{ isOpen: boolean; onClose: () => void;
     if(!isOpen) return null;
     return (<div className="fixed inset-0 bg-black/60 z-[70] flex justify-end animate-fade-in"><div className="w-full max-w-sm bg-white h-full animate-slide-up flex flex-col shadow-2xl"><div className="p-4 border-b flex justify-between items-center bg-gray-50"><h3 className="font-bold text-lg flex items-center gap-2"><Bell className="text-red-500"/> {t('notifications')}</h3><button onClick={onClose}><X/></button></div><div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">{loading ? <div className="flex justify-center p-10"><Loader2 className="animate-spin"/></div> : (ads.length === 0 ? <p className="text-center text-gray-400 py-10">{t('noNotifications')}</p> : (ads.map(ad => (<div key={ad.id} className="bg-white p-4 rounded-xl shadow-sm border border-l-4 border-l-red-500"><div className="flex items-center gap-3 mb-2"><div className="w-8 h-8 rounded-full bg-gray-200 overflow-hidden"><img src={(ad as any).providers?.profile_image_url || `https://ui-avatars.com/api/?name=${(ad as any).providers?.name}`} className="w-full h-full object-cover"/></div><div><h4 className="font-bold text-sm">{(ad as any).providers?.name}</h4><p className="text-xs text-gray-400 flex items-center gap-1"><Clock size={10}/> {new Date(ad.created_at).toLocaleDateString()}</p></div></div><p className="text-sm text-gray-800 font-medium">{ad.message}</p></div>))))}</div></div></div>)
 }
+
+// --- UPDATED PROVIDER DIRECTORY (WITH SEARCH) ---
 const ProviderDirectory: React.FC<{ isOpen: boolean; onClose: () => void; currentUser: AuthenticatedUser | null }> = ({ isOpen, onClose, currentUser }) => {
-    // ... same code ...
-    const { t } = useLocalization(); const [providers, setProviders] = useState<any[]>([]); const [loading, setLoading] = useState(false); const [selectedProvider, setSelectedProvider] = useState<any | null>(null);
-    useEffect(() => { if(isOpen) fetchProviders(); }, [isOpen]); const fetchProviders = async () => { setLoading(true); const { data } = await supabase.from('providers').select('*').eq('is_active', true); setProviders(data || []); setLoading(false); }
-    if(!isOpen) return null; return (<div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-0 md:p-4"><div className="bg-gray-100 dark:bg-gray-900 w-full h-full md:h-[90vh] md:max-w-4xl md:rounded-3xl flex flex-col overflow-hidden animate-slide-up relative"><div className="bg-white dark:bg-gray-800 p-4 flex justify-between items-center shadow-sm border-b dark:border-gray-700"><h2 className="text-xl font-bold dark:text-white flex items-center gap-2 text-blue-600"><Users/> {t('providerDirectory')}</h2><button onClick={onClose}><X className="dark:text-white"/></button></div><div className="flex-1 overflow-y-auto p-4 bg-gray-50">{loading ? <div className="flex justify-center p-10"><Loader2 className="animate-spin text-blue-500"/></div> : (<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">{providers.map(p => (<div key={p.id} onClick={() => setSelectedProvider(p)} className="bg-white p-4 rounded-2xl shadow-sm border hover:shadow-md transition-all cursor-pointer flex flex-col items-center text-center h-full"><div className="w-16 h-16 rounded-full bg-gray-200 mb-3 overflow-hidden border shrink-0"><img src={p.profile_image_url || `https://ui-avatars.com/api/?name=${p.name}`} className="w-full h-full object-cover"/></div><h3 className="font-bold text-sm truncate w-full">{p.name}</h3><span className="text-xs text-blue-500 font-medium mb-1 truncate w-full block">{p.service_type}</span><p className="text-[10px] text-gray-400 line-clamp-2 mb-2 flex-1 w-full text-center">{p.bio || "No bio available."}</p><button className="mt-auto w-full py-1.5 bg-gray-100 rounded-lg text-xs font-bold text-gray-600 hover:bg-black hover:text-white transition-colors">{t('viewQRCode')}</button></div>))}</div>)}</div>{selectedProvider && (<ChatProfileModal provider={selectedProvider} onClose={() => setSelectedProvider(null)} currentUser={currentUser} />)}</div></div>)
+    const { t } = useLocalization(); 
+    const [providers, setProviders] = useState<any[]>([]); 
+    const [loading, setLoading] = useState(false); 
+    const [selectedProvider, setSelectedProvider] = useState<any | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
+
+    useEffect(() => { 
+        if(isOpen) fetchProviders(); 
+    }, [isOpen]); 
+    
+    const fetchProviders = async () => { 
+        setLoading(true); 
+        const { data } = await supabase.from('providers').select('*').eq('is_active', true); 
+        setProviders(data || []); 
+        setLoading(false); 
+    }
+
+    const filteredProviders = providers.filter(p => 
+        p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        p.service_type?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        p.category?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    if(!isOpen) return null; 
+    
+    return (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-0 md:p-4">
+            <div className="bg-gray-100 dark:bg-gray-900 w-full h-full md:h-[90vh] md:max-w-4xl md:rounded-3xl flex flex-col overflow-hidden animate-slide-up relative">
+                <div className="bg-white dark:bg-gray-800 p-4 flex flex-col gap-3 shadow-sm border-b dark:border-gray-700">
+                    <div className="flex justify-between items-center">
+                        <h2 className="text-xl font-bold dark:text-white flex items-center gap-2 text-blue-600"><Users/> {t('providerDirectory')}</h2>
+                        <button onClick={onClose}><X className="dark:text-white"/></button>
+                    </div>
+                    {/* SEARCH BAR */}
+                    <div className="relative">
+                        <Search className="absolute left-3 top-3 text-gray-400" size={18}/>
+                        <input 
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder={t('search')} 
+                            className="w-full bg-gray-50 dark:bg-gray-700 dark:text-white pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm"
+                        />
+                    </div>
+                </div>
+                <div className="flex-1 overflow-y-auto p-4 bg-gray-50 dark:bg-gray-900">
+                    {loading ? (
+                        <div className="flex justify-center p-10"><Loader2 className="animate-spin text-blue-500"/></div>
+                    ) : (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                            {filteredProviders.map(p => (
+                                <div key={p.id} onClick={() => setSelectedProvider(p)} className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border dark:border-gray-700 hover:shadow-md transition-all cursor-pointer flex flex-col items-center text-center h-full">
+                                    <div className="w-16 h-16 rounded-full bg-gray-200 mb-3 overflow-hidden border shrink-0">
+                                        <img src={p.profile_image_url || `https://ui-avatars.com/api/?name=${p.name}`} className="w-full h-full object-cover"/>
+                                    </div>
+                                    <h3 className="font-bold text-sm truncate w-full dark:text-white">{p.name}</h3>
+                                    <span className="text-xs text-blue-500 font-medium mb-1 truncate w-full block">{p.service_type}</span>
+                                    <p className="text-[10px] text-gray-400 line-clamp-2 mb-2 flex-1 w-full text-center">{p.bio || "No bio available."}</p>
+                                    <button className="mt-auto w-full py-1.5 bg-gray-100 dark:bg-gray-700 rounded-lg text-xs font-bold text-gray-600 dark:text-gray-300 hover:bg-black hover:text-white transition-colors">{t('viewQRCode')}</button>
+                                </div>
+                            ))}
+                            {filteredProviders.length === 0 && (
+                                <p className="col-span-full text-center text-gray-400 py-10">No providers found.</p>
+                            )}
+                        </div>
+                    )}
+                </div>
+                {selectedProvider && (<ChatProfileModal provider={selectedProvider} onClose={() => setSelectedProvider(null)} currentUser={currentUser} />)}
+            </div>
+        </div>
+    )
 }
+
 const ServicesHub: React.FC<{ onNav: (target: string) => void; isAdmin: boolean }> = ({ onNav, isAdmin }) => {
     // ... same code ...
     const { t } = useLocalization(); const ServiceCard = ({ icon: Icon, title, color, bg, onClick }: any) => (<button onClick={onClick} className={`${bg} border border-transparent hover:border-${color.split('-')[1]}-200 p-6 rounded-2xl flex flex-col items-center justify-center gap-3 shadow-sm active:scale-95 transition-all`}><div className={`w-14 h-14 rounded-full ${color} text-white flex items-center justify-center shadow-md`}><Icon size={28}/></div><span className="font-bold text-gray-800 text-sm">{title}</span></button>);
@@ -673,10 +741,10 @@ const AppContent: React.FC = () => {
     }
 
     return (
-        <div className={`flex flex-col h-screen bg-gray-50 dark:bg-gray-900 ${language === 'ar' ? 'font-arabic' : 'font-sans'}`} dir={language === 'ar' ? 'rtl' : 'ltr'}>
+        <div className={`flex flex-col h-full min-h-screen bg-gray-50 dark:bg-gray-900 ${language === 'ar' ? 'font-arabic' : 'font-sans'}`} dir={language === 'ar' ? 'rtl' : 'ltr'}>
             
-            {/* WRAPPER FOR LARGE SCREENS - RESPONSIVENESS */}
-            <div className="mx-auto w-full max-w-lg md:max-w-2xl lg:max-w-4xl xl:max-w-5xl h-full flex flex-col bg-white dark:bg-black shadow-2xl overflow-hidden relative border-x border-gray-100 dark:border-gray-800">
+            {/* WRAPPER FOR LARGE SCREENS - RESPONSIVENESS - FIXED HEIGHT FOR DARK MODE */}
+            <div className="mx-auto w-full max-w-lg md:max-w-2xl lg:max-w-4xl xl:max-w-5xl flex-1 flex flex-col bg-white dark:bg-black shadow-2xl overflow-hidden relative border-x border-gray-100 dark:border-gray-800">
 
                 {/* NEW CLEAN HEADER - CONDITIONAL RENDERING */}
                 {activeTab !== 'CHAT' && (

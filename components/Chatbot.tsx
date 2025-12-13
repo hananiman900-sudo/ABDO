@@ -196,9 +196,27 @@ export const BookingModal: React.FC<{ provider: any; onClose: () => void; curren
         setLoading(true);
         const appointmentId = Date.now();
         const clientName = currentUser ? currentUser.name : guestName; 
+        
         if (currentUser) { await supabase.from('appointments').insert({ client_id: currentUser.id, provider_id: provider.id, created_at: new Date().toISOString() }); }
-        await supabase.from('provider_notifications').insert({ provider_id: provider.id, message: `New Booking: ${clientName} for ${selectedOffer?.title || 'General Visit'} on ${date} at ${time}`, type: 'BOOKING', status: 'pending' });
-        const bookingDetails = { appointmentId, clientName: clientName, providerId: provider.id, provider: provider.name, service: provider.service_type, date: date, time: time, offerTitle: selectedOffer?.title, price: selectedOffer?.discount_price, message: `${t('bookingSuccessMessage')} ${t('keepQR')}` };
+        
+        const offerText = selectedOffer ? `with Offer: ${selectedOffer.title}` : '';
+        await supabase.from('provider_notifications').insert({ provider_id: provider.id, message: `New Booking: ${clientName} on ${date} at ${time} ${offerText}`, type: 'BOOKING', status: 'pending' });
+        
+        // Ensure bookingDetails contains everything needed for the QR and security checks
+        const bookingDetails = { 
+            appointmentId, 
+            clientName: clientName, // Explicitly set clientName for Guest support in QR
+            name: clientName, // For backwards compatibility
+            providerId: provider.id, // CRITICAL FOR SECURITY CHECK
+            provider: provider.name, 
+            service: provider.service_type, 
+            date: date, 
+            time: time, 
+            offerTitle: selectedOffer?.title, 
+            price: selectedOffer?.discount_price, 
+            message: `${t('bookingSuccessMessage')} ${t('keepQR')}` 
+        };
+        
         onBooked(bookingDetails);
         setLoading(false);
     }
@@ -397,11 +415,35 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
 
                 const { data } = await query;
                 if (data) {
-                    const formatted: Message[] = data.map((msg: any) => ({
-                        role: msg.role === 'USER' ? Role.USER : Role.BOT,
-                        text: msg.text || '',
-                        imageUrl: msg.image_url,
-                    }));
+                    const formatted: Message[] = data.map((msg: any) => {
+                        let bookingDetails = undefined;
+                        let isComponent = false;
+
+                        // Try to parse booking details from text if it's a JSON string
+                        // This allows the QR code to persist across reloads
+                        if (msg.role === 'BOT' && msg.text && msg.text.startsWith('{"appointmentId"')) {
+                             try {
+                                 bookingDetails = JSON.parse(msg.text);
+                                 isComponent = true;
+                                 // Override the raw text with the user-friendly message for display
+                                 // But we still pass bookingDetails to the renderer
+                                 return {
+                                     role: Role.BOT,
+                                     text: bookingDetails.message || "Booking Details",
+                                     bookingDetails: bookingDetails,
+                                     isComponent: true
+                                 };
+                             } catch (e) {
+                                 // If parsing fails, just treat as text
+                             }
+                        }
+
+                        return {
+                            role: msg.role === 'USER' ? Role.USER : Role.BOT,
+                            text: msg.text || '',
+                            imageUrl: msg.image_url,
+                        }
+                    });
                     setMessages(formatted);
                 } else {
                     setMessages([]);
@@ -735,16 +777,20 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
         }
     }
 
-    const handleBookingConfirmed = (details: any) => {
+    const handleBookingConfirmed = async (details: any) => {
         setShowBooking(false);
         const msg = { role: Role.BOT, text: details.message, bookingDetails: details, isComponent: true };
         setMessages(prev => [...prev, msg]);
+        
         if(currentUser) {
-            supabase.from('chat_history').insert({
+            // Save as JSON string to persist the component details including appointmentId
+            const persistedData = JSON.stringify(details);
+            
+            await supabase.from('chat_history').insert({
                 user_id: currentUser.id,
                 provider_id: selectedChat ? selectedChat.id : null,
                 role: 'BOT',
-                text: details.message
+                text: persistedData // Save structured data
             });
         }
     }

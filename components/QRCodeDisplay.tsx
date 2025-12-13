@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import QRCode from 'qrcode';
 import { useLocalization } from '../hooks/useLocalization';
-import { Download, Loader2, Share2 } from 'lucide-react';
+import { Download, Loader2, Share2, AlertTriangle } from 'lucide-react';
 
 interface QRCodeDisplayProps {
   appointmentId: number;
@@ -19,10 +19,12 @@ const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({ appointmentId, bookingDat
       setIsLoading(true);
       if (!appointmentId) return;
       try {
-        // Construct Payload with Client Name if available
+        // Construct Payload with Client Name, Provider ID and Offer
         const payload = {
             appointmentId: appointmentId,
-            clientName: bookingData?.clientName || 'Guest',
+            clientName: bookingData?.name || bookingData?.clientName || 'Guest',
+            providerId: bookingData?.providerId, // CRITICAL for security check
+            offerTitle: bookingData?.offerTitle, // CRITICAL for display
             date: bookingData?.date,
             time: bookingData?.time
         };
@@ -69,19 +71,23 @@ const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({ appointmentId, bookingDat
             }
         }
 
-        // Fallback: Direct Download (Best for Desktop)
+        // Fallback: Direct Download
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
         link.download = `appointment-${appointmentId}.png`;
         document.body.appendChild(link);
         link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
+        
+        // Use timeout to safely remove link
+        setTimeout(() => {
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        }, 100);
 
     } catch (e) {
         console.error("Action failed", e);
-        alert(t('keepQR')); // Fallback alert asking user to save it manually
+        // Do not alert error to prevent crash/confusion, rely on the visual instruction below
     }
   };
 
@@ -100,10 +106,19 @@ const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({ appointmentId, bookingDat
       </div>
       
       {/* Visual Instruction for Mobile App Users */}
-      <p className="text-[10px] text-gray-500 mt-2 text-center dark:text-gray-400">
-        اضغط مطولاً على الصورة لحفظها <br/>
-        (Long press to save)
-      </p>
+      <div className="mt-2 text-center">
+          <p className="text-[10px] text-gray-500 dark:text-gray-400">
+            اضغط مطولاً على الصورة لحفظها <br/>
+            (Long press to save)
+          </p>
+          
+          <div className="mt-2 bg-yellow-50 dark:bg-yellow-900/20 p-2 rounded-lg border border-yellow-100 dark:border-yellow-800">
+              <p className="text-[9px] text-yellow-700 dark:text-yellow-400 flex items-center justify-center gap-1">
+                  <AlertTriangle size={10}/>
+                  <span>إذا واجهت مشكلة في التحميل، ستجد هذا الكود في خانة "مواعيدي" في قسم الخدمات.</span>
+              </p>
+          </div>
+      </div>
 
       <button
         onClick={handleAction}

@@ -45,7 +45,20 @@ export interface ProviderAd {
     is_active: boolean;
 }
 
-export interface BookingDetails { name: string; phone: string; service: string; provider: string; location: string; discount: string; appointmentId: number; offerTitle?: string; price?: number; }
+export interface BookingDetails { 
+    appointmentId: number; 
+    name: string; 
+    phone: string; 
+    service: string; 
+    provider: string; 
+    providerId: number; // Added for security check
+    location: string; 
+    discount: string; 
+    offerTitle?: string; 
+    price?: number;
+    message?: string;
+}
+
 export interface ProviderRegistrationDetails { name: string; service: string; location: string; username: string; phone: string; }
 export interface FollowUp { id: number; client_id: number; provider_id: number; next_appointment_date: string; notes: string; medication_image_url?: string; clients: { full_name: string; phone: string; }; }
 export interface Announcement { id: number; provider_id: number; message: string; created_at: string; providers: { name: string }; }
