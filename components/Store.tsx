@@ -14,53 +14,111 @@ interface StoreProps {
     notify: (msg: string, type: 'success' | 'error') => void;
 }
 
-// --- NEW BANNER COMPONENT (RESIZED) ---
-const StoreBanner = () => {
+// --- NEW IMMERSIVE BANNER HEADER ---
+const StoreHeaderBanner = ({ 
+    onClose, 
+    cartCount, 
+    onOpenCart, 
+    onOpenOrders, 
+    onOpenAdmin,
+    onProfile, 
+    currentUser, 
+    isAdmin 
+}: any) => {
+    // New curated images for a "Shopping Store" vibe
     const bannerImages = [
-        "https://images.unsplash.com/photo-1483985988355-763728e1935b?q=80&w=800&auto=format&fit=crop", // Shopping
-        "https://images.unsplash.com/photo-1555529669-e69e7aa0ba9a?q=80&w=800&auto=format&fit=crop", // Shopping Bags
-        "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?q=80&w=800&auto=format&fit=crop"  // Sale
+        "https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=800&auto=format&fit=crop", // Clothing Store Interior
+        "https://images.unsplash.com/photo-1472851294608-415522f96319?q=80&w=800&auto=format&fit=crop", // Classy Watch/Accessories
+        "https://images.unsplash.com/photo-1511556820780-d912e42b4980?q=80&w=800&auto=format&fit=crop"  // Product Packaging/Bags
     ];
     const [current, setCurrent] = useState(0);
 
     useEffect(() => {
         const timer = setInterval(() => {
             setCurrent(prev => (prev + 1) % bannerImages.length);
-        }, 4000);
+        }, 5000);
         return () => clearInterval(timer);
     }, []);
 
     return (
-        <div className="w-full h-28 bg-gray-200 relative overflow-hidden shrink-0">
+        <div className="w-full h-36 relative overflow-hidden shrink-0 shadow-md">
+            {/* Background Slider */}
             {bannerImages.map((img, idx) => (
                 <div 
                     key={idx} 
                     className={`absolute inset-0 transition-opacity duration-1000 ${idx === current ? 'opacity-100' : 'opacity-0'}`}
                 >
-                    <img src={img} className="w-full h-full object-cover opacity-80"/>
-                    <div className="absolute inset-0 bg-gradient-to-r from-black/70 to-transparent"></div>
+                    <img src={img} className="w-full h-full object-cover"/>
+                    {/* Dark Gradient Overlay for Icon Visibility */}
+                    <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/20 to-transparent"></div>
                 </div>
             ))}
             
-            {/* Content Overlay */}
-            <div className="absolute inset-0 flex items-center px-6 py-2 text-white">
-                <div>
-                    <div className="flex items-center gap-2 mb-1 animate-fade-in">
-                        <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg border border-white/20">
-                            <Globe size={12} className="text-white"/>
-                        </div>
-                        <span className="font-black text-[10px] tracking-widest uppercase text-cyan-300">Tanger IA Store</span>
+            {/* --- FLOATING HEADER ICONS (OVERLAY) --- */}
+            <div className="absolute inset-0 flex flex-col justify-between p-4 z-20">
+                
+                {/* Top Row: Back Button & Title & Actions */}
+                <div className="flex justify-between items-start">
+                    <button 
+                        onClick={onClose} 
+                        className="w-8 h-8 bg-white/20 backdrop-blur-md border border-white/30 rounded-full flex items-center justify-center text-white hover:bg-white/40 transition-colors"
+                    >
+                        <ArrowLeft size={18}/>
+                    </button>
+
+                    <div className="flex items-center gap-2">
+                        {/* My Orders Button */}
+                        {currentUser && (
+                            <button 
+                                onClick={onOpenOrders} 
+                                className="w-8 h-8 bg-white/20 backdrop-blur-md border border-white/30 rounded-full flex items-center justify-center text-white hover:bg-white/40"
+                            >
+                                <ListChecks size={16}/>
+                            </button>
+                        )}
+                        
+                        {/* Admin Button */}
+                        {isAdmin && (
+                            <button onClick={onOpenAdmin} className="w-8 h-8 bg-black/50 text-white rounded-full flex items-center justify-center">
+                                <Settings size={16}/>
+                            </button>
+                        )}
+
+                        {/* Cart Button */}
+                        <button 
+                            onClick={onOpenCart} 
+                            className="w-8 h-8 bg-orange-500 text-white rounded-full flex items-center justify-center relative shadow-lg border border-white/20"
+                        >
+                            <ShoppingBag size={16}/>
+                            {cartCount > 0 && (
+                                <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[9px] w-3.5 h-3.5 rounded-full flex items-center justify-center border border-white font-bold">
+                                    {cartCount}
+                                </span>
+                            )}
+                        </button>
+
+                        {/* Profile Pic */}
+                        {currentUser && (
+                            <button onClick={onProfile} className="w-8 h-8 rounded-full overflow-hidden border-2 border-white/50 shadow-sm">
+                                <img src={currentUser.profile_image_url || `https://ui-avatars.com/api/?name=${currentUser.name}`} className="w-full h-full object-cover"/>
+                            </button>
+                        )}
                     </div>
-                    <h2 className="text-lg font-black leading-tight max-w-[200px] drop-shadow-md">
-                        تسوق بذكاء في طنجة
-                    </h2>
+                </div>
+
+                {/* Bottom Row: Minimal Branding */}
+                <div className="flex items-center gap-2 animate-fade-in pb-1">
+                    <div className="w-5 h-5 rounded-full bg-white flex items-center justify-center shadow-sm">
+                        <ShoppingBag size={12} className="text-orange-600"/>
+                    </div>
+                    <span className="font-black text-sm text-white tracking-wide uppercase drop-shadow-md">Tanger Store</span>
                 </div>
             </div>
 
-            {/* Dots */}
-            <div className="absolute bottom-2 right-4 flex gap-1">
+            {/* Dots Indicator */}
+            <div className="absolute bottom-2 right-4 flex gap-1 z-20">
                 {bannerImages.map((_, idx) => (
-                    <div key={idx} className={`w-1 h-1 rounded-full transition-all ${idx === current ? 'bg-white w-2' : 'bg-white/40'}`}></div>
+                    <div key={idx} className={`h-1 rounded-full transition-all shadow-sm ${idx === current ? 'bg-white w-4' : 'bg-white/40 w-1.5'}`}></div>
                 ))}
             </div>
         </div>
@@ -259,39 +317,32 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-0 md:p-4">
             <div className="bg-gray-100 w-full h-full md:rounded-3xl flex flex-col overflow-hidden relative">
                 
-                <div className="bg-white p-3 flex justify-between items-center shadow-sm z-10 border-b relative">
-                    <button onClick={onClose} className="p-2"><ArrowLeft/></button>
-                    <h2 className="font-bold text-lg text-orange-600">{view === 'admin' ? t('adminPanel') : (view === 'my_orders' ? t('myOrders') : t('shop'))}</h2>
-                    <div className="flex items-center gap-2">
-                        {currentUser && (
-                            <button 
-                                onClick={() => { setView('my_orders'); fetchMyOrders(); }} 
-                                className="p-2 bg-gray-100 rounded-full text-gray-700 relative hover:bg-gray-200"
-                            >
-                                <ListChecks size={20}/>
-                            </button>
-                        )}
-                        {isAdmin && <button onClick={() => { setView('admin'); fetchAdRequests(); }} className="p-2"><Settings/></button>}
-                        <button onClick={() => setView('cart')} className="p-2 bg-black text-white rounded-full relative">
-                            <ShoppingBag size={20}/> 
-                            {cart.length > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center border border-white font-bold">{cart.length}</span>}
-                        </button>
-                        {currentUser && (
-                            <button onClick={onGoToProfile} className="w-8 h-8 rounded-full overflow-hidden border border-gray-200 ml-1">
-                                <img src={currentUser.profile_image_url || `https://ui-avatars.com/api/?name=${currentUser.name}`} className="w-full h-full object-cover"/>
-                            </button>
-                        )}
+                {/* --- HEADER IS NOW THE BANNER ITSELF --- */}
+                {view === 'catalog' ? (
+                    <StoreHeaderBanner 
+                        onClose={onClose}
+                        cartCount={cart.length}
+                        onOpenCart={() => setView('cart')}
+                        onOpenOrders={() => { setView('my_orders'); fetchMyOrders(); }}
+                        onOpenAdmin={() => { setView('admin'); fetchAdRequests(); }}
+                        onProfile={onGoToProfile}
+                        currentUser={currentUser}
+                        isAdmin={isAdmin}
+                    />
+                ) : (
+                    /* Simple Header for other views */
+                    <div className="bg-white p-3 flex justify-between items-center shadow-sm z-10 border-b relative">
+                        <button onClick={() => setView('catalog')} className="p-2"><ArrowLeft/></button>
+                        <h2 className="font-bold text-lg text-orange-600">{view === 'admin' ? t('adminPanel') : (view === 'my_orders' ? t('myOrders') : t('shop'))}</h2>
+                        <div className="w-8"></div>
                     </div>
-                </div>
+                )}
 
                 {view === 'catalog' && (
                     <>
-                        {/* --- SMALLER BANNER STRIP --- */}
-                        <StoreBanner />
-
                         {/* --- SEARCH BAR --- */}
                         <div className="bg-white p-3 border-b border-gray-100">
-                            <div className="bg-gray-50 border border-gray-200 rounded-xl flex items-center px-3 py-2">
+                            <div className="bg-gray-50 border border-gray-200 rounded-xl flex items-center px-3 py-2 shadow-sm focus-within:ring-2 focus-within:ring-orange-100 transition-all">
                                 <Search size={18} className="text-gray-400"/>
                                 <input 
                                     value={searchTerm}
@@ -308,7 +359,7 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                                  <button 
                                     key={c} 
                                     onClick={() => setActiveCategory(c)}
-                                    className={`px-4 py-1.5 rounded-full text-xs font-bold transition-colors ${activeCategory === c ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-600'}`}
+                                    className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${activeCategory === c ? 'bg-black text-white shadow-md' : 'bg-gray-100 text-gray-600 border border-gray-200'}`}
                                 >
                                     {t(c)}
                                  </button>
@@ -365,10 +416,6 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                         </div>
                     ) : view === 'my_orders' ? (
                         <div className="p-4 space-y-3">
-                            <div className="flex justify-between items-center mb-2">
-                                <h3 className="font-bold flex items-center gap-2"><ListChecks className="text-orange-600"/> {t('myOrders')}</h3>
-                                <button onClick={() => setView('catalog')}><X/></button>
-                            </div>
                             {loading && <div className="text-center py-10"><Loader2 className="animate-spin mx-auto"/></div>}
                             {myOrders.length === 0 && !loading && <p className="text-center text-gray-500">{t('noNotifications')}</p>}
                             {myOrders.map(o => (
@@ -405,7 +452,7 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                                      </div>
                                      <button 
                                         onClick={(e) => { e.stopPropagation(); openProduct(p); }} 
-                                        className="w-full mt-1 bg-green-500 text-white text-[10px] rounded-full py-1 font-bold shadow-sm"
+                                        className="w-full mt-1 bg-green-500 text-white text-[10px] rounded-full py-1 font-bold shadow-sm active:scale-95 transition-transform"
                                      >
                                          {t('addToCart')}
                                      </button>
