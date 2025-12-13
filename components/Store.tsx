@@ -562,7 +562,7 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                                             <div className="flex-1">
                                                 <div className="flex justify-between items-center mb-1">
                                                     <span className="font-bold text-xs text-gray-900">{rev.user_name}</span>
-                                                    <span className="text-[10px] text-gray-400">{new Date(rev.created_at).toLocaleDateString()}</p>
+                                                    <span className="text-[10px] text-gray-400">{new Date(rev.created_at).toLocaleDateString()}</span>
                                                 </div>
                                                 <p className="text-sm text-gray-700 bg-gray-50 p-2 rounded-lg rounded-tl-none">{rev.comment}</p>
                                             </div>
