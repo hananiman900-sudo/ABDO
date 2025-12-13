@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLocalization } from '../hooks/useLocalization';
 import { Product, CartItem, AuthenticatedUser, AdRequest, Order, ProductReview } from '../types';
 import { supabase } from '../services/supabaseClient';
-import { ShoppingBag, ShoppingCart, X, Check, Loader2, ArrowLeft, Truck, Star, Heart, Send, Settings, Image as ImageIcon, Plus, List, ChevronLeft, ChevronRight, MessageSquare, ListChecks, Hash, User, Globe } from 'lucide-react';
+import { ShoppingBag, ShoppingCart, X, Check, Loader2, ArrowLeft, Truck, Star, Heart, Send, Settings, Image as ImageIcon, Plus, List, ChevronLeft, ChevronRight, MessageSquare, ListChecks, Hash, User, Globe, Search } from 'lucide-react';
 
 interface StoreProps {
     isOpen: boolean;
@@ -14,7 +14,7 @@ interface StoreProps {
     notify: (msg: string, type: 'success' | 'error') => void;
 }
 
-// --- NEW BANNER COMPONENT ---
+// --- NEW BANNER COMPONENT (RESIZED) ---
 const StoreBanner = () => {
     const bannerImages = [
         "https://images.unsplash.com/photo-1483985988355-763728e1935b?q=80&w=800&auto=format&fit=crop", // Shopping
@@ -31,37 +31,36 @@ const StoreBanner = () => {
     }, []);
 
     return (
-        <div className="w-full h-40 bg-gray-200 relative overflow-hidden shrink-0">
+        <div className="w-full h-28 bg-gray-200 relative overflow-hidden shrink-0">
             {bannerImages.map((img, idx) => (
                 <div 
                     key={idx} 
                     className={`absolute inset-0 transition-opacity duration-1000 ${idx === current ? 'opacity-100' : 'opacity-0'}`}
                 >
                     <img src={img} className="w-full h-full object-cover opacity-80"/>
-                    <div className="absolute inset-0 bg-gradient-to-r from-black/60 to-transparent"></div>
+                    <div className="absolute inset-0 bg-gradient-to-r from-black/70 to-transparent"></div>
                 </div>
             ))}
             
             {/* Content Overlay */}
-            <div className="absolute inset-0 flex items-center p-6 text-white">
+            <div className="absolute inset-0 flex items-center px-6 py-2 text-white">
                 <div>
-                    <div className="flex items-center gap-2 mb-2 animate-fade-in">
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg border border-white/20">
-                            <Globe size={16} className="text-white"/>
+                    <div className="flex items-center gap-2 mb-1 animate-fade-in">
+                        <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg border border-white/20">
+                            <Globe size={12} className="text-white"/>
                         </div>
-                        <span className="font-black text-sm tracking-widest uppercase text-cyan-300">Tanger IA Store</span>
+                        <span className="font-black text-[10px] tracking-widest uppercase text-cyan-300">Tanger IA Store</span>
                     </div>
-                    <h2 className="text-2xl font-black leading-tight max-w-[200px] drop-shadow-md">
-                        تسوق بذكاء<br/>في طنجة
+                    <h2 className="text-lg font-black leading-tight max-w-[200px] drop-shadow-md">
+                        تسوق بذكاء في طنجة
                     </h2>
-                    <p className="text-xs text-gray-200 mt-2 font-medium">أفضل العروض • توصيل سريع</p>
                 </div>
             </div>
 
             {/* Dots */}
-            <div className="absolute bottom-3 right-4 flex gap-1.5">
+            <div className="absolute bottom-2 right-4 flex gap-1">
                 {bannerImages.map((_, idx) => (
-                    <div key={idx} className={`w-1.5 h-1.5 rounded-full transition-all ${idx === current ? 'bg-white w-3' : 'bg-white/40'}`}></div>
+                    <div key={idx} className={`w-1 h-1 rounded-full transition-all ${idx === current ? 'bg-white w-2' : 'bg-white/40'}`}></div>
                 ))}
             </div>
         </div>
@@ -81,6 +80,7 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
     
     // Filtering State
     const [activeCategory, setActiveCategory] = useState<string>('category_all');
+    const [searchTerm, setSearchTerm] = useState('');
 
     // Reviews State
     const [reviews, setReviews] = useState<ProductReview[]>([]);
@@ -224,9 +224,12 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
         setReviewLoading(false);
     }
     
-    const filteredProducts = activeCategory === 'category_all' 
-        ? products 
-        : products.filter(p => p.category === activeCategory);
+    // --- UPDATED FILTER LOGIC WITH SEARCH ---
+    const filteredProducts = products.filter(p => {
+        const matchesCategory = activeCategory === 'category_all' || p.category === activeCategory;
+        const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
+        return matchesCategory && matchesSearch;
+    });
 
     const getImages = (p: Product) => {
         if(p.images && p.images.length > 0) return [p.image_url, ...p.images].filter(Boolean);
@@ -283,9 +286,23 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
 
                 {view === 'catalog' && (
                     <>
-                        {/* --- NEW BANNER SECTION --- */}
+                        {/* --- SMALLER BANNER STRIP --- */}
                         <StoreBanner />
 
+                        {/* --- SEARCH BAR --- */}
+                        <div className="bg-white p-3 border-b border-gray-100">
+                            <div className="bg-gray-50 border border-gray-200 rounded-xl flex items-center px-3 py-2">
+                                <Search size={18} className="text-gray-400"/>
+                                <input 
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    placeholder={t('search')} 
+                                    className="bg-transparent border-none outline-none flex-1 mx-2 text-sm text-gray-800 placeholder-gray-400 h-full"
+                                />
+                            </div>
+                        </div>
+
+                        {/* --- CATEGORIES --- */}
                         <div className="bg-white border-b overflow-x-auto whitespace-nowrap p-2 flex gap-2 no-scrollbar shadow-sm z-10 sticky top-0">
                              {categories.map(c => (
                                  <button 
