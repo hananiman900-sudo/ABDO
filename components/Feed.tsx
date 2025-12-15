@@ -88,13 +88,56 @@ export const Feed: React.FC<FeedProps> = ({ currentUser, onOpenAuth, onOpenNotif
     };
 
     const fetchSuggestions = async () => {
-        // Fetch top 10 active providers
-        const { data: providers } = await supabase.from('providers').select('*').eq('is_active', true).order('visits_count', { ascending: false }).limit(10);
-        setSuggestedProviders(providers || []);
+        try {
+            // 1. Get Followed IDs to exclude
+            let followedIds: number[] = [];
+            if (currentUser) {
+                const { data: follows } = await supabase.from('follows').select('provider_id').eq('client_id', currentUser.id);
+                if (follows) followedIds = follows.map(f => f.provider_id);
+            }
 
-        // Fetch random products for suggestions
-        const { data: products } = await supabase.from('products').select('*').limit(10);
-        setSuggestedProducts(products || []);
+            // 2. Fetch Suggested Providers (Priority: Same Neighborhood)
+            let providerQuery = supabase.from('providers')
+                .select('*')
+                .eq('is_active', true)
+                .limit(15); // Fetch more to filter locally if needed
+
+            if (currentUser && currentUser.neighborhood) {
+                // Try to get providers in same neighborhood first
+                const { data: hoodProviders } = await supabase.from('providers')
+                    .select('*')
+                    .eq('is_active', true)
+                    .eq('neighborhood', currentUser.neighborhood)
+                    .limit(10);
+                
+                if (hoodProviders && hoodProviders.length > 0) {
+                    // Filter out already followed
+                    const newInHood = hoodProviders.filter(p => !followedIds.includes(p.id));
+                    if (newInHood.length > 0) {
+                        setSuggestedProviders(newInHood);
+                    } else {
+                        // Fallback to general popular if all in hood are followed
+                        const { data: popular } = await providerQuery.order('visits_count', { ascending: false });
+                        setSuggestedProviders((popular || []).filter(p => !followedIds.includes(p.id)).slice(0, 10));
+                    }
+                } else {
+                    // No providers in hood, get general popular
+                    const { data: popular } = await providerQuery.order('visits_count', { ascending: false });
+                    setSuggestedProviders((popular || []).filter(p => !followedIds.includes(p.id)).slice(0, 10));
+                }
+            } else {
+                // No user or no neighborhood, just get popular
+                const { data: popular } = await providerQuery.order('visits_count', { ascending: false });
+                setSuggestedProviders((popular || []).filter(p => !followedIds.includes(p.id)).slice(0, 10));
+            }
+
+            // 3. Fetch Products for Store suggestions
+            const { data: products } = await supabase.from('products').select('*').limit(10);
+            setSuggestedProducts(products || []);
+
+        } catch (e) {
+            console.error("Suggestion Error", e);
+        }
     };
 
     const handleLike = async (adId: number) => {
@@ -157,47 +200,57 @@ export const Feed: React.FC<FeedProps> = ({ currentUser, onOpenAuth, onOpenNotif
     // --- RENDER HELPERS ---
     
     // Render Suggested Providers Block
-    const renderProviderSuggestions = () => (
-        <div className="py-4 bg-white dark:bg-gray-800 border-y dark:border-gray-700 mb-3 animate-fade-in">
-            <div className="flex justify-between px-4 mb-3">
-                <h4 className="font-bold text-sm dark:text-white">اقتراحات لك (Providers)</h4>
-                <button className="text-blue-600 text-xs font-bold">See all</button>
-            </div>
-            <div className="flex gap-3 overflow-x-auto no-scrollbar px-4 pb-2">
-                {suggestedProviders.map(p => (
-                    <div key={p.id} className="w-32 bg-gray-50 dark:bg-gray-700 border dark:border-gray-600 p-3 rounded-xl flex flex-col items-center shrink-0 relative">
-                        <div onClick={() => setViewingProvider(p)} className="w-14 h-14 rounded-full bg-gray-200 mb-2 overflow-hidden border cursor-pointer">
-                            <img src={p.profile_image_url || `https://ui-avatars.com/api/?name=${p.name}`} className="w-full h-full object-cover"/>
+    const renderProviderSuggestions = () => {
+        if (suggestedProviders.length === 0) return null;
+        
+        return (
+            <div className="py-4 bg-white dark:bg-gray-800 border-y dark:border-gray-700 mb-3 animate-fade-in">
+                <div className="flex justify-between px-4 mb-3">
+                    <h4 className="font-bold text-sm dark:text-white">
+                        {currentUser?.neighborhood ? `اقتراحات في ${currentUser.neighborhood}` : t('suggestedProviders')}
+                    </h4>
+                    <button className="text-blue-600 text-xs font-bold">See all</button>
+                </div>
+                <div className="flex gap-3 overflow-x-auto no-scrollbar px-4 pb-2">
+                    {suggestedProviders.map(p => (
+                        <div key={p.id} className="w-32 bg-gray-50 dark:bg-gray-700 border dark:border-gray-600 p-3 rounded-xl flex flex-col items-center shrink-0 relative">
+                            <div onClick={() => setViewingProvider(p)} className="w-14 h-14 rounded-full bg-gray-200 mb-2 overflow-hidden border cursor-pointer">
+                                <img src={p.profile_image_url || `https://ui-avatars.com/api/?name=${p.name}`} className="w-full h-full object-cover"/>
+                            </div>
+                            <h5 className="font-bold text-xs truncate w-full text-center dark:text-white">{p.name}</h5>
+                            <p className="text-[10px] text-gray-500 dark:text-gray-400 mb-2 truncate w-full text-center">{p.service_type}</p>
+                            <button onClick={() => onChatWithProvider(p)} className="w-full bg-blue-600 text-white text-[10px] py-1.5 rounded-lg font-bold">Follow</button>
                         </div>
-                        <h5 className="font-bold text-xs truncate w-full text-center dark:text-white">{p.name}</h5>
-                        <p className="text-[10px] text-gray-500 dark:text-gray-400 mb-2">{p.service_type}</p>
-                        <button onClick={() => onChatWithProvider(p)} className="w-full bg-blue-600 text-white text-[10px] py-1.5 rounded-lg font-bold">Follow</button>
-                    </div>
-                ))}
+                    ))}
+                </div>
             </div>
-        </div>
-    );
+        );
+    };
 
     // Render Store Product Suggestions Block
-    const renderProductSuggestions = () => (
-        <div className="py-4 bg-white dark:bg-gray-800 border-y dark:border-gray-700 mb-3 animate-fade-in">
-            <div className="flex justify-between px-4 mb-3">
-                <h4 className="font-bold text-sm dark:text-white flex items-center gap-2"><ShoppingBag size={14} className="text-orange-500"/> من المتجر</h4>
-                <button className="text-orange-600 text-xs font-bold">Shop Now</button>
-            </div>
-            <div className="flex gap-3 overflow-x-auto no-scrollbar px-4 pb-2">
-                {suggestedProducts.map(p => (
-                    <div key={p.id} onClick={() => onViewProduct(p)} className="w-32 cursor-pointer shrink-0 group">
-                        <div className="aspect-square bg-gray-100 rounded-xl mb-2 overflow-hidden relative">
-                            <img src={p.image_url} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"/>
-                            <div className="absolute bottom-1 right-1 bg-white/90 px-1.5 py-0.5 rounded text-[10px] font-bold shadow-sm">{p.price} DH</div>
+    const renderProductSuggestions = () => {
+        if (suggestedProducts.length === 0) return null;
+
+        return (
+            <div className="py-4 bg-white dark:bg-gray-800 border-y dark:border-gray-700 mb-3 animate-fade-in">
+                <div className="flex justify-between px-4 mb-3">
+                    <h4 className="font-bold text-sm dark:text-white flex items-center gap-2"><ShoppingBag size={14} className="text-orange-500"/> من المتجر</h4>
+                    <button className="text-orange-600 text-xs font-bold">Shop Now</button>
+                </div>
+                <div className="flex gap-3 overflow-x-auto no-scrollbar px-4 pb-2">
+                    {suggestedProducts.map(p => (
+                        <div key={p.id} onClick={() => onViewProduct(p)} className="w-32 cursor-pointer shrink-0 group">
+                            <div className="aspect-square bg-gray-100 rounded-xl mb-2 overflow-hidden relative">
+                                <img src={p.image_url} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"/>
+                                <div className="absolute bottom-1 right-1 bg-white/90 px-1.5 py-0.5 rounded text-[10px] font-bold shadow-sm">{p.price} DH</div>
+                            </div>
+                            <h5 className="font-bold text-xs truncate w-full dark:text-white">{p.name}</h5>
                         </div>
-                        <h5 className="font-bold text-xs truncate w-full dark:text-white">{p.name}</h5>
-                    </div>
-                ))}
+                    ))}
+                </div>
             </div>
-        </div>
-    );
+        );
+    };
 
     return (
         <div className="flex flex-col h-full bg-gray-100 dark:bg-gray-900 relative" onClick={() => setActiveMenuId(null)}>

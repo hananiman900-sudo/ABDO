@@ -64,14 +64,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
             const { data } = await supabase.from('provider_ad_requests').select('*, providers(name, phone)').order('created_at', { ascending: false });
             setAdRequests(data as any || []);
         } else if (activeTab === 'STATS') {
+            // FIX: Removed date filter to show TOTAL stats for all time
             const { data: providers } = await supabase.from('providers').select('id, name, service_type, visits_count, profile_image_url').order('visits_count', { ascending: false });
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const { data: todayScans } = await supabase.from('scan_history').select('provider_id').gte('created_at', today.toISOString());
-            const todayCounts: Record<number, number> = {};
-            todayScans?.forEach((scan: any) => { todayCounts[scan.provider_id] = (todayCounts[scan.provider_id] || 0) + 1; });
-            const mergedStats = providers?.map((p: any) => ({ ...p, today_visits: todayCounts[p.id] || 0 })) || [];
+            
+            // Fetch ALL lifetime scan history
+            const { data: allScans } = await supabase.from('scan_history').select('provider_id');
+            
+            const scanCounts: Record<number, number> = {};
+            allScans?.forEach((scan: any) => { scanCounts[scan.provider_id] = (scanCounts[scan.provider_id] || 0) + 1; });
+            
+            const mergedStats = providers?.map((p: any) => ({ ...p, total_scans_calculated: scanCounts[p.id] || 0 })) || [];
+            
+            // Sort by calculated scans desc
+            mergedStats.sort((a, b) => b.total_scans_calculated - a.total_scans_calculated);
             setProviderStats(mergedStats);
+
         } else if (activeTab === 'ORDERS') {
             const { data } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
             setOrders(data as any || []);
@@ -90,44 +97,65 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
         setLoading(false);
     };
 
-    // --- BOOST LOGIC (FIXED) ---
+    // --- BOOST LOGIC (FIXED WITH DEBUGGING) ---
     const handleApproveBoost = async (req: any) => {
         if(!confirm('هل استلمت الدفع (50 درهم)؟ سيتم تفعيل الإعلان لمدة أسبوع.')) return;
         
         setLoading(true);
-        const endDate = new Date();
-        endDate.setDate(endDate.getDate() + 7);
+        try {
+            const endDate = new Date();
+            endDate.setDate(endDate.getDate() + 7);
+            const isoEndDate = endDate.toISOString();
 
-        // 1. Update Request Status
-        const { error: reqError } = await supabase.from('sponsored_requests').update({ status: 'approved' }).eq('id', req.id);
-        
-        if (reqError) {
-            alert("خطأ في تحديث الطلب: " + reqError.message);
-            setLoading(false);
-            return;
-        }
+            console.log("Starting approval for req:", req.id, "Ad ID:", req.ad_id);
 
-        // 2. Update Ad (Set Sponsored)
-        const { error: adError } = await supabase.from('provider_ads')
-            .update({ 
-                is_sponsored: true, 
-                sponsored_end_date: endDate.toISOString() 
-            })
-            .eq('id', req.ad_id);
-        
-        if (adError) {
-            alert("خطأ في تفعيل الإعلان: " + adError.message);
-        } else {
-            alert("تم التفعيل بنجاح! (الدفع اليدوي مقبول)");
+            // 1. Update Ad (Set Sponsored)
+            const { error: adError } = await supabase.from('provider_ads')
+                .update({ 
+                    is_sponsored: true, 
+                    sponsored_end_date: isoEndDate
+                })
+                .eq('id', req.ad_id);
+            
+            if (adError) {
+                console.error("Ad update failed:", adError);
+                alert("فشل تحديث جدول الإعلانات (provider_ads): " + adError.message + "\nCode: " + adError.code);
+                setLoading(false);
+                return;
+            }
+
+            // 2. Update Request Status
+            const { error: reqError } = await supabase.from('sponsored_requests').update({ status: 'approved' }).eq('id', req.id);
+            
+            if (reqError) {
+                console.error("Request update failed:", reqError);
+                alert("فشل تحديث حالة الطلب (sponsored_requests): " + reqError.message + "\nCode: " + reqError.code);
+                // Try to rollback ad update manually if possible, or just alert admin
+                setLoading(false);
+                return;
+            }
+
+            alert("تم التفعيل بنجاح! الإعلان نشط الآن لمدة أسبوع.");
             fetchData();
+
+        } catch (e: any) {
+            console.error("Critical Error:", e);
+            alert("خطأ غير متوقع: " + e.message);
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
     const handleRejectBoost = async (id: number) => {
         if(!confirm('رفض الطلب؟')) return;
-        await supabase.from('sponsored_requests').update({ status: 'rejected' }).eq('id', id);
-        fetchData();
+        setLoading(true);
+        const { error } = await supabase.from('sponsored_requests').update({ status: 'rejected' }).eq('id', id);
+        if (error) {
+            alert("خطأ في الرفض: " + error.message);
+        } else {
+            fetchData();
+        }
+        setLoading(false);
     };
 
     // (KEEP all existing helper functions for product, cats, etc.)
@@ -256,7 +284,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                         </div>
                     </div>
                 )}
-                {/* ... (Rest of tabs remain same) */}
+                
+                {/* STATS TAB (UPDATED) */}
+                {activeTab === 'STATS' && (
+                    <div className="space-y-4">
+                        <div className="bg-green-50 p-4 rounded-xl border border-green-200 mb-4"><h3 className="font-bold text-green-800 flex items-center gap-2"><BarChart3 size={20}/> {t('globalStats')}</h3><p className="text-xs text-green-600">Total lifetime scans per provider.</p></div>
+                        <div className="bg-white rounded-xl shadow-sm border overflow-hidden"><table className="w-full text-sm"><thead className="bg-gray-100 text-gray-600 font-bold"><tr><th className="p-3 text-right">#</th><th className="p-3 text-right">{t('provider')}</th><th className="p-3 text-right">{t('service')}</th><th className="p-3 text-center">{t('totalVisits')}</th></tr></thead><tbody>{providerStats.length === 0 && (<tr><td colSpan={4} className="text-center p-6 text-gray-400">No data available</td></tr>)}{providerStats.map((p, index) => (<tr key={p.id} className="border-t hover:bg-gray-50"><td className="p-3 font-bold text-gray-400">{index + 1}</td><td className="p-3 font-bold flex items-center gap-2"><img src={p.profile_image_url || `https://ui-avatars.com/api/?name=${p.name}`} className="w-8 h-8 rounded-full bg-gray-200 object-cover"/><span className="truncate max-w-[100px]">{p.name}</span></td><td className="p-3 text-gray-600 text-xs">{p.service_type}</td><td className="p-3 text-center font-black text-blue-600">{p.total_scans_calculated || 0}</td></tr>))}</tbody></table></div>
+                    </div>
+                )}
             </div>
         </div>
     );
