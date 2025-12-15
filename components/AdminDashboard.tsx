@@ -14,6 +14,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
     const { t } = useLocalization();
     const [activeTab, setActiveTab] = useState<'PRODUCTS' | 'PROVIDERS' | 'ADS' | 'STATS' | 'ORDERS' | 'SUBS' | 'SETTINGS' | 'BOOSTS'>('PRODUCTS');
     const [loading, setLoading] = useState(false);
+    const [actionLoading, setActionLoading] = useState<number | null>(null); // Track specific button loading
 
     // Products State
     const [products, setProducts] = useState<Product[]>([]);
@@ -97,65 +98,78 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
         setLoading(false);
     };
 
-    // --- BOOST LOGIC (FIXED WITH DEBUGGING) ---
+    // --- BOOST LOGIC (DEBUGGED WITH TIMEOUT) ---
     const handleApproveBoost = async (req: any) => {
-        if(!confirm('هل استلمت الدفع (50 درهم)؟ سيتم تفعيل الإعلان لمدة أسبوع.')) return;
+        // 1. Immediate visual feedback via Window Alert
+        alert(`جاري بدء العملية للطلب رقم: ${req.id}\nالمرجو الانتظار...`);
         
-        setLoading(true);
+        setActionLoading(req.id); // Show spinner on specific button
+        
         try {
             const endDate = new Date();
             endDate.setDate(endDate.getDate() + 7);
             const isoEndDate = endDate.toISOString();
 
-            console.log("Starting approval for req:", req.id, "Ad ID:", req.ad_id);
+            // 2. TIMEOUT PROMISE: If Supabase hangs > 5s, throw error
+            const timeout = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error("انتهت مهلة الاتصال (Timeout). السيرفر لا يستجيب.")), 5000)
+            );
 
-            // 1. Update Ad (Set Sponsored)
-            const { error: adError } = await supabase.from('provider_ads')
-                .update({ 
-                    is_sponsored: true, 
-                    sponsored_end_date: isoEndDate
-                })
-                .eq('id', req.ad_id);
-            
-            if (adError) {
-                console.error("Ad update failed:", adError);
-                alert("فشل تحديث جدول الإعلانات (provider_ads): " + adError.message + "\nCode: " + adError.code);
-                setLoading(false);
-                return;
-            }
+            // 3. EXECUTE REQUESTS
+            const dbPromise = (async () => {
+                // A. Update Request Status (No .select)
+                const { error: reqError } = await supabase
+                    .from('sponsored_requests')
+                    .update({ status: 'approved' })
+                    .eq('id', req.id);
+                
+                if (reqError) throw new Error("فشل تحديث الطلب: " + reqError.message);
 
-            // 2. Update Request Status
-            const { error: reqError } = await supabase.from('sponsored_requests').update({ status: 'approved' }).eq('id', req.id);
-            
-            if (reqError) {
-                console.error("Request update failed:", reqError);
-                alert("فشل تحديث حالة الطلب (sponsored_requests): " + reqError.message + "\nCode: " + reqError.code);
-                // Try to rollback ad update manually if possible, or just alert admin
-                setLoading(false);
-                return;
-            }
+                // B. Update Ad Status (No .select)
+                const { error: adError } = await supabase
+                    .from('provider_ads')
+                    .update({ 
+                        is_sponsored: true, 
+                        sponsored_end_date: isoEndDate
+                    })
+                    .eq('id', req.ad_id);
+                
+                if (adError) {
+                    // Try to catch "Column not found" specifically
+                    if (adError.message?.includes("is_sponsored")) {
+                        throw new Error("العمود 'is_sponsored' غير موجود. شغل كود V31 في الإعدادات.");
+                    }
+                    throw new Error("فشل تحديث الإعلان: " + adError.message);
+                }
 
-            alert("تم التفعيل بنجاح! الإعلان نشط الآن لمدة أسبوع.");
+                return "SUCCESS";
+            })();
+
+            // 4. RACE: Database vs Timeout
+            await Promise.race([dbPromise, timeout]);
+
+            // 5. Success
+            alert("✅ تمت العملية بنجاح!\nالإعلان نشط الآن لمدة 7 أيام.");
             fetchData();
 
         } catch (e: any) {
-            console.error("Critical Error:", e);
-            alert("خطأ غير متوقع: " + e.message);
+            console.error("Boost Error:", e);
+            alert(`⛔ فشلت العملية:\n${e.message}\n\nنصيحة: تأكد من تشغيل كود V31 في إعدادات قاعدة البيانات.`);
         } finally {
-            setLoading(false);
+            setActionLoading(null);
         }
     };
 
     const handleRejectBoost = async (id: number) => {
         if(!confirm('رفض الطلب؟')) return;
-        setLoading(true);
+        setActionLoading(id);
         const { error } = await supabase.from('sponsored_requests').update({ status: 'rejected' }).eq('id', id);
         if (error) {
             alert("خطأ في الرفض: " + error.message);
         } else {
             fetchData();
         }
-        setLoading(false);
+        setActionLoading(null);
     };
 
     // (KEEP all existing helper functions for product, cats, etc.)
@@ -230,8 +244,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
 
                                 {r.status === 'pending' && (
                                     <div className="flex gap-2">
-                                        <button onClick={() => handleRejectBoost(r.id)} className="flex-1 bg-red-100 text-red-600 py-2 rounded-lg font-bold text-xs hover:bg-red-200">Reject</button>
-                                        <button onClick={() => handleApproveBoost(r)} className="flex-1 bg-green-600 text-white py-2 rounded-lg font-bold text-xs hover:bg-green-700">Approve (7 Days)</button>
+                                        <button onClick={() => handleRejectBoost(r.id)} disabled={actionLoading === r.id} className="flex-1 bg-red-100 text-red-600 py-2 rounded-lg font-bold text-xs hover:bg-red-200">
+                                            {actionLoading === r.id ? <Loader2 size={16} className="animate-spin mx-auto"/> : 'Reject'}
+                                        </button>
+                                        <button onClick={() => handleApproveBoost(r)} disabled={actionLoading === r.id} className="flex-1 bg-green-600 text-white py-2 rounded-lg font-bold text-xs hover:bg-green-700 flex items-center justify-center gap-2">
+                                            {actionLoading === r.id ? <Loader2 size={16} className="animate-spin"/> : 'Approve (7 Days)'}
+                                        </button>
                                     </div>
                                 )}
                             </div>
