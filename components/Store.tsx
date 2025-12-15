@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLocalization } from '../hooks/useLocalization';
 import { Product, CartItem, AuthenticatedUser, AdRequest, Order, ProductReview } from '../types';
 import { supabase } from '../services/supabaseClient';
-import { ShoppingBag, ShoppingCart, X, Check, Loader2, ArrowLeft, Truck, Star, Heart, Send, Settings, Image as ImageIcon, Plus, List, ChevronLeft, ChevronRight, MessageSquare, ListChecks, Hash, User, Globe, Search } from 'lucide-react';
+import { ShoppingBag, ShoppingCart, X, Check, Loader2, ArrowLeft, Truck, Star, Heart, Send, Settings, Image as ImageIcon, Plus, List, ChevronLeft, ChevronRight, MessageSquare, ListChecks, Hash, User, Globe, Search, Tag, CheckCircle } from 'lucide-react';
 
 interface StoreProps {
     isOpen: boolean;
@@ -12,11 +12,10 @@ interface StoreProps {
     onOpenAuth: () => void;
     onGoToProfile: () => void;
     notify: (msg: string, type: 'success' | 'error') => void;
-    initialProduct?: Product | null; // NEW PROP
+    initialProduct?: Product | null; 
 }
 
-// ... (StoreHeaderBanner remains the same)
-// --- NEW IMMERSIVE BANNER HEADER ---
+// ... (StoreHeaderBanner remains unchanged)
 const StoreHeaderBanner = ({ 
     onClose, 
     cartCount, 
@@ -44,85 +43,28 @@ const StoreHeaderBanner = ({
 
     return (
         <div className="w-full h-36 relative overflow-hidden shrink-0 shadow-md">
-            {/* Background Slider */}
             {bannerImages.map((img, idx) => (
                 <div 
                     key={idx} 
                     className={`absolute inset-0 transition-opacity duration-1000 ${idx === current ? 'opacity-100' : 'opacity-0'}`}
                 >
                     <img src={img} className="w-full h-full object-cover"/>
-                    {/* Dark Gradient Overlay for Icon Visibility */}
                     <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/20 to-transparent"></div>
                 </div>
             ))}
-            
-            {/* --- FLOATING HEADER ICONS (OVERLAY) --- */}
             <div className="absolute inset-0 flex flex-col justify-between p-4 z-20">
-                
-                {/* Top Row: Back Button & Title & Actions */}
                 <div className="flex justify-between items-start">
-                    <button 
-                        onClick={onClose} 
-                        className="w-8 h-8 bg-white/20 backdrop-blur-md border border-white/30 rounded-full flex items-center justify-center text-white hover:bg-white/40 transition-colors"
-                    >
-                        <ArrowLeft size={18}/>
-                    </button>
-
+                    <button onClick={onClose} className="w-8 h-8 bg-white/20 backdrop-blur-md border border-white/30 rounded-full flex items-center justify-center text-white hover:bg-white/40 transition-colors"><ArrowLeft size={18}/></button>
                     <div className="flex items-center gap-2">
-                        {/* My Orders Button */}
-                        {currentUser && (
-                            <button 
-                                onClick={onOpenOrders} 
-                                className="w-8 h-8 bg-white/20 backdrop-blur-md border border-white/30 rounded-full flex items-center justify-center text-white hover:bg-white/40"
-                            >
-                                <ListChecks size={16}/>
-                            </button>
-                        )}
-                        
-                        {/* Admin Button */}
-                        {isAdmin && (
-                            <button onClick={onOpenAdmin} className="w-8 h-8 bg-black/50 text-white rounded-full flex items-center justify-center">
-                                <Settings size={16}/>
-                            </button>
-                        )}
-
-                        {/* Cart Button */}
-                        <button 
-                            onClick={onOpenCart} 
-                            className="w-8 h-8 bg-orange-500 text-white rounded-full flex items-center justify-center relative shadow-lg border border-white/20"
-                        >
-                            <ShoppingBag size={16}/>
-                            {cartCount > 0 && (
-                                <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[9px] w-3.5 h-3.5 rounded-full flex items-center justify-center border border-white font-bold">
-                                    {cartCount}
-                                </span>
-                            )}
-                        </button>
-
-                        {/* Profile Pic */}
-                        {currentUser && (
-                            <button onClick={onProfile} className="w-8 h-8 rounded-full overflow-hidden border-2 border-white/50 shadow-sm">
-                                <img src={currentUser.profile_image_url || `https://ui-avatars.com/api/?name=${currentUser.name}`} className="w-full h-full object-cover"/>
-                            </button>
-                        )}
+                        {currentUser && (<button onClick={onOpenOrders} className="w-8 h-8 bg-white/20 backdrop-blur-md border border-white/30 rounded-full flex items-center justify-center text-white hover:bg-white/40"><ListChecks size={16}/></button>)}
+                        {isAdmin && (<button onClick={onOpenAdmin} className="w-8 h-8 bg-black/50 text-white rounded-full flex items-center justify-center"><Settings size={16}/></button>)}
+                        <button onClick={onOpenCart} className="w-8 h-8 bg-orange-500 text-white rounded-full flex items-center justify-center relative shadow-lg border border-white/20"><ShoppingBag size={16}/>{cartCount > 0 && (<span className="absolute -top-1 -right-1 bg-red-600 text-white text-[9px] w-3.5 h-3.5 rounded-full flex items-center justify-center border border-white font-bold">{cartCount}</span>)}</button>
+                        {currentUser && (<button onClick={onProfile} className="w-8 h-8 rounded-full overflow-hidden border-2 border-white/50 shadow-sm"><img src={currentUser.profile_image_url || `https://ui-avatars.com/api/?name=${currentUser.name}`} className="w-full h-full object-cover"/></button>)}
                     </div>
                 </div>
-
-                {/* Bottom Row: Minimal Branding */}
-                <div className="flex items-center gap-2 animate-fade-in pb-1">
-                    <div className="w-5 h-5 rounded-full bg-white flex items-center justify-center shadow-sm">
-                        <ShoppingBag size={12} className="text-orange-600"/>
-                    </div>
-                    <span className="font-black text-sm text-white tracking-wide uppercase drop-shadow-md">Tanger Store</span>
-                </div>
+                <div className="flex items-center gap-2 animate-fade-in pb-1"><div className="w-5 h-5 rounded-full bg-white flex items-center justify-center shadow-sm"><ShoppingBag size={12} className="text-orange-600"/></div><span className="font-black text-sm text-white tracking-wide uppercase drop-shadow-md">Tanger Store</span></div>
             </div>
-
-            {/* Dots Indicator */}
-            <div className="absolute bottom-2 right-4 flex gap-1 z-20">
-                {bannerImages.map((_, idx) => (
-                    <div key={idx} className={`h-1 rounded-full transition-all shadow-sm ${idx === current ? 'bg-white w-4' : 'bg-white/40 w-1.5'}`}></div>
-                ))}
-            </div>
+            <div className="absolute bottom-2 right-4 flex gap-1 z-20">{bannerImages.map((_, idx) => (<div key={idx} className={`h-1 rounded-full transition-all shadow-sm ${idx === current ? 'bg-white w-4' : 'bg-white/40 w-1.5'}`}></div>))}</div>
         </div>
     );
 };
@@ -132,8 +74,8 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
     const [products, setProducts] = useState<Product[]>([]);
     const [cart, setCart] = useState<CartItem[]>([]);
     const [view, setView] = useState<'catalog' | 'cart' | 'admin' | 'my_orders'>('catalog');
-    const [selectedProduct, setSelectedProduct] = useState<Product | null>(initialProduct || null); // INIT FROM PROP
-    const [showWelcome, setShowWelcome] = useState(!initialProduct); // HIDE WELCOME IF DEEP LINKED
+    const [selectedProduct, setSelectedProduct] = useState<Product | null>(initialProduct || null); 
+    const [showWelcome, setShowWelcome] = useState(!initialProduct); 
     const [adRequests, setAdRequests] = useState<AdRequest[]>([]);
     const [myOrders, setMyOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(false);
@@ -152,6 +94,11 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
     
     // Size Selection State
     const [selectedSize, setSelectedSize] = useState<string>('');
+
+    // --- PROMO CODE STATE ---
+    const [promoCode, setPromoCode] = useState('');
+    const [appliedDiscount, setAppliedDiscount] = useState<{code: string, rate: number, partnerId: number} | null>(null);
+    const [promoLoading, setPromoLoading] = useState(false);
 
     // Categories
     const categories = ['category_all', 'category_clothes', 'category_electronics', 'category_accessories', 'category_home', 'category_beauty'];
@@ -227,25 +174,77 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
         fetchAdRequests();
     }
 
+    const validatePromo = async () => {
+        if (!promoCode.trim()) return;
+        setPromoLoading(true);
+        // Ensure user doesn't use their own code
+        const { data } = await supabase.from('affiliate_partners').select('*').eq('promo_code', promoCode.toUpperCase()).single();
+        
+        if (data) {
+            if (currentUser && data.user_id === currentUser.id) {
+                notify("You cannot use your own promo code!", 'error');
+            } else if (data.status !== 'approved') {
+                notify("هذا الكود غير مفعل بعد.", 'error');
+            } else {
+                setAppliedDiscount({ code: data.promo_code, rate: data.discount_rate || 0.10, partnerId: data.id });
+                notify(t('codeApplied'), 'success');
+            }
+        } else {
+            notify(t('invalidCode'), 'error');
+            setAppliedDiscount(null);
+        }
+        setPromoLoading(false);
+    };
+
     const handleCheckout = async () => {
         if(!currentUser) { onOpenAuth(); return; }
         setLoading(true);
         
-        const { error } = await supabase.from('orders').insert({
+        const subtotal = cart.reduce((a,b) => a + b.price * b.quantity, 0);
+        let finalAmount = subtotal;
+        let discountAmount = 0;
+
+        if (appliedDiscount) {
+            discountAmount = Math.round(subtotal * appliedDiscount.rate);
+            finalAmount = subtotal - discountAmount;
+        }
+
+        const { data: orderData, error } = await supabase.from('orders').insert({
             user_id: currentUser.id,
             user_type: currentUser.accountType,
-            total_amount: cart.reduce((a,b) => a + b.price * b.quantity, 0),
+            total_amount: finalAmount,
             items: cart,
             status: 'pending',
             customer_details: { 
                 name: currentUser.name, 
                 phone: currentUser.phone 
-            }
-        });
+            },
+            promo_code: appliedDiscount?.code,
+            discount_amount: discountAmount
+        }).select().single();
 
-        if (!error) {
+        if (!error && orderData) {
+            // --- UPDATE AFFILIATE SALES (IF APPLICABLE) ---
+            if (appliedDiscount) {
+                const commission = Math.round(finalAmount * 0.05); // 5% Commission based on final amount
+                await supabase.from('affiliate_sales').insert({
+                    partner_id: appliedDiscount.partnerId,
+                    order_id: orderData.id,
+                    amount: finalAmount,
+                    commission: commission
+                });
+                
+                // Increment Partner Earnings (RPC would be better, but doing Client Side for simplicity)
+                const { data: partner } = await supabase.from('affiliate_partners').select('total_earnings').eq('id', appliedDiscount.partnerId).single();
+                if (partner) {
+                    await supabase.from('affiliate_partners').update({ total_earnings: (partner.total_earnings || 0) + commission }).eq('id', appliedDiscount.partnerId);
+                }
+            }
+
             setCart([]);
             localStorage.removeItem(getCartKey()); 
+            setAppliedDiscount(null);
+            setPromoCode('');
             notify(t('orderPlaced'), 'success');
             setView('catalog');
         } else {
@@ -260,10 +259,13 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
             return;
         }
 
+        // Use DISCOUNTED PRICE if active
+        const priceToUse = appliedDiscount ? Math.round(p.price * (1 - appliedDiscount.rate)) : p.price;
+
         setCart(prev => {
             const ex = prev.find(i => i.id === p.id && i.selectedSize === selectedSize);
             if(ex) return prev.map(i => (i.id === p.id && i.selectedSize === selectedSize) ? {...i, quantity: i.quantity + 1} : i);
-            return [...prev, {...p, quantity: 1, selectedSize: selectedSize || undefined}];
+            return [...prev, {...p, price: priceToUse, quantity: 1, selectedSize: selectedSize || undefined}];
         });
         notify(t('addToCart'), 'success');
     }
@@ -291,7 +293,7 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
         setReviewLoading(false);
     }
     
-    // --- UPDATED FILTER LOGIC WITH SEARCH ---
+    // --- FILTER LOGIC ---
     const filteredProducts = products.filter(p => {
         const matchesCategory = activeCategory === 'category_all' || p.category === activeCategory;
         const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -320,6 +322,11 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
         fetchReviews(p.id);
     }
 
+    // Calculations for Cart View
+    const subtotal = cart.reduce((a,b)=>a+b.price*b.quantity,0);
+    // Since we add to cart with discounted price already if active, display logic simplifies here
+    const total = subtotal;
+
     if(!isOpen) return null;
 
     return (
@@ -347,12 +354,12 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                     </div>
                 )}
 
-                {/* ... (Rest of Store UI - Keeping Existing Code) */}
+                {/* ... (Rest of Store UI) */}
                 {view === 'catalog' && (
                     <>
-                        {/* --- SEARCH BAR --- */}
-                        <div className="bg-white p-3 border-b border-gray-100">
-                            <div className="bg-gray-50 border border-gray-200 rounded-xl flex items-center px-3 py-2 shadow-sm focus-within:ring-2 focus-within:ring-orange-100 transition-all">
+                        {/* --- SEARCH BAR & PROMO CODE INPUT --- */}
+                        <div className="bg-white p-3 border-b border-gray-100 flex gap-2">
+                            <div className="bg-gray-50 border border-gray-200 rounded-xl flex items-center px-3 py-2 shadow-sm focus-within:ring-2 focus-within:ring-orange-100 transition-all flex-1">
                                 <Search size={18} className="text-gray-400"/>
                                 <input 
                                     value={searchTerm}
@@ -360,6 +367,27 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                                     placeholder={t('search')} 
                                     className="bg-transparent border-none outline-none flex-1 mx-2 text-sm text-gray-800 placeholder-gray-400 h-full"
                                 />
+                            </div>
+                            
+                            {/* NEW PROMO CODE TRIGGER */}
+                            <div className="relative group">
+                                <div className={`flex items-center bg-gray-50 border ${appliedDiscount ? 'border-green-500 bg-green-50' : 'border-gray-200'} rounded-xl px-2 py-1 h-full shadow-sm`}>
+                                    <Tag size={16} className={appliedDiscount ? "text-green-600" : "text-gray-400"}/>
+                                    <input 
+                                        value={promoCode}
+                                        onChange={e => setPromoCode(e.target.value)}
+                                        placeholder="CODE"
+                                        className="bg-transparent border-none outline-none w-16 text-center text-sm font-bold uppercase mx-1"
+                                        disabled={!!appliedDiscount}
+                                    />
+                                    {appliedDiscount ? (
+                                        <button onClick={() => { setAppliedDiscount(null); setPromoCode(''); }} className="bg-red-500 text-white rounded-full p-0.5"><X size={12}/></button>
+                                    ) : (
+                                        <button onClick={validatePromo} disabled={!promoCode.trim() || promoLoading} className="text-orange-600 font-bold text-xs px-1">
+                                            {promoLoading ? <Loader2 size={12} className="animate-spin"/> : 'OK'}
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         </div>
 
@@ -414,10 +442,20 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                                             <span className="font-bold">{i.price * i.quantity} DH</span>
                                         </div>
                                     ))}
-                                    <div className="py-4 font-black text-xl flex justify-between">
-                                        <span>{t('total')}</span>
-                                        <span>{cart.reduce((a,b)=>a+b.price*b.quantity,0)} DH</span>
+                                    
+                                    <div className="py-4">
+                                        {appliedDiscount && (
+                                            <div className="flex justify-between text-sm mb-1 text-green-600 font-bold">
+                                                <span>Discount Applied</span>
+                                                <span>{(appliedDiscount.rate * 100)}% OFF</span>
+                                            </div>
+                                        )}
+                                        <div className="flex justify-between font-black text-xl mt-2">
+                                            <span>{t('total')}</span>
+                                            <span className="text-orange-600">{total} DH</span>
+                                        </div>
                                     </div>
+
                                     <div className="p-3 bg-yellow-50 text-xs text-yellow-700 rounded-lg mb-4">
                                         ℹ️ {t('storeWelcomeMsg')}
                                     </div>
@@ -438,7 +476,17 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                                         </span>
                                     </div>
                                     <p className="text-sm text-gray-600">{new Date(o.created_at).toLocaleDateString()}</p>
-                                    <p className="font-bold text-orange-600 mt-1">{o.total_amount} DH</p>
+                                    
+                                    {o.discount_amount && o.discount_amount > 0 ? (
+                                        <div className="mt-1">
+                                            <span className="line-through text-xs text-gray-400 mr-2">{o.total_amount + o.discount_amount} DH</span>
+                                            <span className="font-bold text-orange-600">{o.total_amount} DH</span>
+                                            <span className="text-[10px] bg-green-100 text-green-700 px-1 rounded ml-2">Promo Applied</span>
+                                        </div>
+                                    ) : (
+                                        <p className="font-bold text-orange-600 mt-1">{o.total_amount} DH</p>
+                                    )}
+
                                     <div className="mt-2 text-xs text-gray-500">
                                         {o.items.map((i: any) => `${i.name} ${i.selectedSize ? `(${i.selectedSize})` : ''} (x${i.quantity})`).join(', ')}
                                     </div>
@@ -447,28 +495,42 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                         </div>
                     ) : (
                         <div className="grid grid-cols-2 gap-1 p-1 pb-20">
-                             {filteredProducts.map(p => (
-                                 <div key={p.id} onClick={() => openProduct(p)} className="bg-white p-2 flex flex-col gap-1 cursor-pointer hover:shadow-md transition-shadow">
-                                     <div className="aspect-[4/5] bg-gray-100 relative mb-1 overflow-hidden rounded-sm">
-                                         <img src={p.image_url} className="w-full h-full object-cover"/>
+                             {filteredProducts.map(p => {
+                                 // CALCULATE DISPLAY PRICE
+                                 const originalPrice = p.price;
+                                 const displayPrice = appliedDiscount ? Math.round(originalPrice * (1 - appliedDiscount.rate)) : originalPrice;
+
+                                 return (
+                                     <div key={p.id} onClick={() => openProduct(p)} className="bg-white p-2 flex flex-col gap-1 cursor-pointer hover:shadow-md transition-shadow relative">
+                                         {appliedDiscount && (
+                                             <div className="absolute top-2 right-2 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded z-10 shadow-sm animate-pulse">
+                                                 SALE
+                                             </div>
+                                         )}
+                                         <div className="aspect-[4/5] bg-gray-100 relative mb-1 overflow-hidden rounded-sm">
+                                             <img src={p.image_url} className="w-full h-full object-cover"/>
+                                         </div>
+                                         <h3 className="text-xs line-clamp-1 text-gray-700">{p.name}</h3>
+                                         <div className="flex items-baseline gap-1 flex-wrap">
+                                             <span className="text-orange-600 font-black text-lg">{displayPrice}<span className="text-xs">DH</span></span>
+                                             {/* SHOW ORIGINAL CROSSED OUT IF DISCOUNTED OR FAKE DISCOUNT */}
+                                             <span className="text-gray-400 text-[10px] line-through">
+                                                 {appliedDiscount ? originalPrice : (p.price * 1.5).toFixed(0)}
+                                             </span>
+                                         </div>
+                                         <div className="flex items-center gap-1">
+                                             <Star size={8} className="fill-yellow-400 text-yellow-400"/>
+                                             <span className="text-[10px] text-gray-400">4.9</span>
+                                         </div>
+                                         <button 
+                                            onClick={(e) => { e.stopPropagation(); addToCart(p); }} 
+                                            className="w-full mt-1 bg-green-500 text-white text-[10px] rounded-full py-1 font-bold shadow-sm active:scale-95 transition-transform"
+                                         >
+                                             {t('addToCart')}
+                                         </button>
                                      </div>
-                                     <h3 className="text-xs line-clamp-1 text-gray-700">{p.name}</h3>
-                                     <div className="flex items-baseline gap-1">
-                                         <span className="text-orange-600 font-black text-lg">{p.price}<span className="text-xs">DH</span></span>
-                                         <span className="text-gray-400 text-[10px] line-through">{(p.price * 1.5).toFixed(0)}</span>
-                                     </div>
-                                     <div className="flex items-center gap-1">
-                                         <Star size={8} className="fill-yellow-400 text-yellow-400"/>
-                                         <span className="text-[10px] text-gray-400">4.9</span>
-                                     </div>
-                                     <button 
-                                        onClick={(e) => { e.stopPropagation(); openProduct(p); }} 
-                                        className="w-full mt-1 bg-green-500 text-white text-[10px] rounded-full py-1 font-bold shadow-sm active:scale-95 transition-transform"
-                                     >
-                                         {t('addToCart')}
-                                     </button>
-                                 </div>
-                             ))}
+                                 );
+                             })}
                              {filteredProducts.length === 0 && <p className="col-span-2 text-center py-10 text-gray-400">{t('loading')}</p>}
                         </div>
                     )}
@@ -513,7 +575,17 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
 
                             <div className="p-4 bg-white mb-2 shadow-sm">
                                 <div className="flex justify-between items-start mb-2">
-                                    <div className="text-3xl font-black text-orange-600">{selectedProduct.price} <span className="text-sm text-gray-500 font-normal">DH</span></div>
+                                    <div>
+                                        <div className="text-3xl font-black text-orange-600">
+                                            {appliedDiscount ? Math.round(selectedProduct.price * (1 - appliedDiscount.rate)) : selectedProduct.price} 
+                                            <span className="text-sm text-gray-500 font-normal">DH</span>
+                                        </div>
+                                        {appliedDiscount && (
+                                            <div className="text-sm text-gray-400 line-through">
+                                                {selectedProduct.price} DH
+                                            </div>
+                                        )}
+                                    </div>
                                     <button className="p-2 bg-gray-50 rounded-full text-gray-400 hover:text-red-500"><Heart/></button>
                                 </div>
                                 <h1 className="text-lg font-bold text-gray-900 leading-tight mb-4">{selectedProduct.name}</h1>

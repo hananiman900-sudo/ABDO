@@ -138,6 +138,19 @@ export const translations: Translations = {
   reviews: { ar: 'التعليقات', en: 'Reviews', fr: 'Avis' },
   addReview: { ar: 'أضف تعليق', en: 'Add Review', fr: 'Ajouter avis' },
   
+  // --- AFFILIATE SYSTEM ---
+  affiliateProgram: { ar: 'برنامج الشركاء (Affiliate)', en: 'Affiliate Program', fr: 'Programme Affiliation' },
+  affiliateDesc: { ar: 'اربح المال معنا! شارك كود الخصم الخاص بك واربح عمولة على كل مبيعة.', en: 'Earn money! Share your promo code and earn commission.', fr: 'Gagnez de l\'argent ! Partagez votre code promo et gagnez une commission.' },
+  joinAffiliate: { ar: 'انضم كشريك', en: 'Join as Partner', fr: 'Devenir Partenaire' },
+  yourCode: { ar: 'كود الخصم الخاص بك', en: 'Your Promo Code', fr: 'Votre Code Promo' },
+  totalEarnings: { ar: 'مجموع الأرباح', en: 'Total Earnings', fr: 'Total Gains' },
+  salesCount: { ar: 'عدد المبيعات', en: 'Sales Count', fr: 'Ventes' },
+  commissionRate: { ar: 'نسبة العمولة', en: 'Commission', fr: 'Commission' },
+  promoCodeLabel: { ar: 'هل لديك كود تخفيض؟', en: 'Have a promo code?', fr: 'Code Promo ?' },
+  apply: { ar: 'تطبيق', en: 'Apply', fr: 'Appliquer' },
+  codeApplied: { ar: 'تم تفعيل التخفيض!', en: 'Discount Applied!', fr: 'Réduction Active !' },
+  invalidCode: { ar: 'كود غير صالح', en: 'Invalid Code', fr: 'Code Invalide' },
+  
   // --- CHATBOT ---
   inputPlaceholder: { ar: 'كتب رسالة...', en: 'Type a message...', fr: 'Écrivez un message...' },
   recording: { ar: 'جاري التسجيل...', en: 'Recording...', fr: 'Enregistrement...' },
@@ -231,8 +244,6 @@ export const translations: Translations = {
   databaseSetupDesc: { ar: 'شغل هاد الأكواد ف Supabase', en: 'Run in Supabase', fr: 'Exécuter dans Supabase' },
   createAdminUser: { ar: 'إنشاء أدمن', en: 'Create Admin', fr: 'Créer Admin' },
   completeSQLScript: { ar: 'الكل', en: 'All', fr: 'Tout' },
-  v12UpdateTitle: { ar: 'تحديث V12', en: 'V12', fr: 'V12' },
-  v13UpdateTitle: { ar: 'تحديث V13', en: 'V13', fr: 'V13' },
   
   // --- NEIGHBORHOODS ---
   neighborhoods: {

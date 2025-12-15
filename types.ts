@@ -139,7 +139,7 @@ export interface AppSpecialty {
 
 export interface Category { id: number; name: string; created_at: string; }
 export interface CartItem extends Product { quantity: number; selectedSize?: string; note?: string; }
-export interface Order { id: number; user_id: number; user_type: string; total_amount: number; status: 'pending' | 'delivered' | 'cancelled'; items: CartItem[]; customer_details?: { name: string; phone: string; }; created_at: string; }
+export interface Order { id: number; user_id: number; user_type: string; total_amount: number; status: 'pending' | 'delivered' | 'cancelled'; items: CartItem[]; customer_details?: { name: string; phone: string; }; created_at: string; promo_code?: string; discount_amount?: number; }
 export interface AdRequest { id: number; provider_id: number; message: string; image_url: string; status: 'pending' | 'approved' | 'rejected'; created_at: string; providers?: { name: string; phone: string; }; }
 
 export interface Offer {
@@ -198,4 +198,26 @@ export interface JobComment {
   job_id: number;
   user_name: string;
   comment: string;
+}
+
+// NEW AFFILIATE TYPES
+export interface AffiliatePartner {
+    id: number;
+    user_id: number;
+    promo_code: string;
+    commission_rate: number; // e.g. 0.05 for 5%
+    discount_rate: number; // e.g. 0.10 for 10%
+    total_earnings: number;
+    status: 'pending' | 'approved' | 'rejected'; // Added Status
+    created_at: string;
+    clients?: { full_name: string; phone: string }; // For join query
+}
+
+export interface AffiliateSale {
+    id: number;
+    partner_id: number;
+    order_id: number;
+    amount: number;
+    commission: number;
+    created_at: string;
 }

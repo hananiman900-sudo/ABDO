@@ -10,9 +10,10 @@ import { RealEstate } from './components/RealEstate';
 import { JobBoard } from './components/JobBoard';
 import { AdminDashboard } from './components/AdminDashboard';
 import { Feed } from './components/Feed'; // Import Feed
+import { AffiliateDashboard } from './components/AffiliateDashboard'; // IMPORT NEW DASHBOARD
 import { useLocalization, LocalizationProvider } from './hooks/useLocalization';
 import { supabase } from './services/supabaseClient';
-import { LogIn, User, MapPin, ShoppingBag, Home, Briefcase, Settings, X, Phone, Globe, LayoutGrid, Heart, List, LogOut, CheckCircle, Edit, Share2, Grid, Bookmark, Menu, Users, Database, Instagram, Facebook, Tag, Sparkles, MessageCircle, Calendar, Bell, Eye, EyeOff, Camera, Loader2, UserPlus, UserCheck, Megaphone, Clock, ArrowLeft, Moon, Sun, AlertCircle, Zap, Scan, BrainCircuit, ShieldCheck, Gem, RefreshCw, Copy, Terminal, Star, CheckSquare, Search } from 'lucide-react';
+import { LogIn, User, MapPin, ShoppingBag, Home, Briefcase, Settings, X, Phone, Globe, LayoutGrid, Heart, List, LogOut, CheckCircle, Edit, Share2, Grid, Bookmark, Menu, Users, Database, Instagram, Facebook, Tag, Sparkles, MessageCircle, Calendar, Bell, Eye, EyeOff, Camera, Loader2, UserPlus, UserCheck, Megaphone, Clock, ArrowLeft, Moon, Sun, AlertCircle, Zap, Scan, BrainCircuit, ShieldCheck, Gem, RefreshCw, Copy, Terminal, Star, CheckSquare, Search, Handshake } from 'lucide-react';
 
 // ... (ToastNotification, ProviderPendingView, SettingsModal, AuthModal, ClientNotificationsModal, ProviderDirectory, ServicesHub, EditClientProfileModal, SuggestedProviders - KEEP ALL AS IS)
 
@@ -112,6 +113,7 @@ const ProviderPendingView: React.FC<{ user: AuthenticatedUser; onLogout: () => v
 }
 
 const SettingsModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ isOpen, onClose }) => {
+    // ... existing implementation
     const { t, language, setLanguage } = useLocalization();
     const [isDark, setIsDark] = useState(document.documentElement.classList.contains('dark'));
 
@@ -176,7 +178,7 @@ const SettingsModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ is
 }
 
 const AuthModal: React.FC<{ isOpen: boolean; onClose: () => void; onLogin: (user: AuthenticatedUser) => void; notify: (msg: string, type: 'success'|'error') => void }> = ({ isOpen, onClose, onLogin, notify }) => {
-    // ... (Existing code for AuthModal)
+    // ... (Existing implementation, kept for brevity)
     const { t, language } = useLocalization();
     const [isRegister, setIsRegister] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -392,7 +394,7 @@ const AuthModal: React.FC<{ isOpen: boolean; onClose: () => void; onLogin: (user
     );
 };
 
-// ... (ClientNotificationsModal, ProviderDirectory, ServicesHub, EditClientProfileModal, SuggestedProviders, ProfileTab, SplashScreen - KEEP AS IS)
+// ... (ClientNotificationsModal, ProviderDirectory, ServicesHub, EditClientProfileModal, SuggestedProviders - KEEP AS IS)
 
 // --- REUSED COMPONENTS TO AVOID REDECLARATION ERRORS (Minimal versions for context) ---
 // (In a real scenario, these are already defined in the file)
@@ -444,12 +446,54 @@ const SuggestedProviders: React.FC<{ currentUser: AuthenticatedUser; onOpenProfi
 }
 
 const ProfileTab: React.FC<{ user: AuthenticatedUser | null; onLogin: () => void; onLogout: () => void; isAdmin: boolean; onNav: (target: string) => void; onUpdateUser: (u: Partial<AuthenticatedUser>) => void; notify: (msg: string, type: 'success' | 'error') => void; onOpenSettings: () => void; }> = ({ user, onLogin, onLogout, isAdmin, onNav, onUpdateUser, notify, onOpenSettings }) => {
-    // ... existing implementation
-    const { t } = useLocalization(); const [showEdit, setShowEdit] = useState(false); const [viewingProvider, setViewingProvider] = useState<any | null>(null);
+    const { t } = useLocalization(); 
+    const [showEdit, setShowEdit] = useState(false); 
+    const [viewingProvider, setViewingProvider] = useState<any | null>(null);
+    const [showAffiliate, setShowAffiliate] = useState(false); // New state
+
     if (!user) { return (<div className="flex-1 flex flex-col items-center justify-center p-6 bg-gray-50 pb-20"><div className="w-24 h-24 bg-gray-200 rounded-full flex items-center justify-center mb-4 shadow-inner"><User size={48} className="text-gray-400"/></div><h2 className="text-xl font-bold mb-2">{t('guest')}</h2><p className="text-gray-500 text-center mb-6 max-w-xs">{t('appDesc')}</p><button onClick={onLogin} className="px-8 py-3 bg-black text-white rounded-full font-bold shadow-lg active:scale-95 transition-transform">{t('loginRegister')}</button></div>); }
-    return (<div className="flex-1 overflow-y-auto bg-gray-50 pb-20"><div className="bg-white p-6 border-b shadow-sm mb-4"><div className="flex items-center gap-4"><div className="w-20 h-20 rounded-full bg-gray-200 overflow-hidden border-2 border-white shadow-lg"><img src={user.profile_image_url || `https://ui-avatars.com/api/?name=${user.name}`} className="w-full h-full object-cover"/></div><div><h2 className="font-bold text-xl">{user.name}</h2><p className="text-sm text-gray-500">{user.accountType === 'PROVIDER' ? t('provider') : t('client')}</p><p className="text-xs text-gray-400 mt-1">{user.phone}</p></div></div><div className="flex gap-2 mt-6"><button onClick={() => setShowEdit(true)} className="flex-1 py-2 bg-gray-100 rounded-lg font-bold text-xs">{t('editProfile')}</button><button onClick={onLogout} className="flex-1 py-2 bg-red-50 text-red-500 rounded-lg font-bold text-xs flex items-center justify-center gap-1"><LogOut size={14}/> {t('logout')}</button></div></div><div className="p-4">{user.accountType === 'CLIENT' && (<SuggestedProviders currentUser={user} onOpenProfile={setViewingProvider}/>)}<h3 className="font-bold text-gray-400 text-xs uppercase mb-3">{t('menu')}</h3><div className="bg-white rounded-xl shadow-sm border overflow-hidden">{user.accountType === 'PROVIDER' && (<div className="p-4 border-b flex items-center justify-between cursor-pointer hover:bg-gray-50" onClick={() => onNav('ROOM')}><div className="flex items-center gap-3"><div className="p-2 bg-black text-white rounded-lg"><LayoutGrid size={18}/></div><span className="font-bold">{t('controlRoom')}</span></div><div className="w-2 h-2 bg-red-500 rounded-full"></div></div>)}{isAdmin && (<div className="p-4 border-b flex items-center justify-between cursor-pointer hover:bg-gray-50" onClick={() => onNav('DB')}><div className="flex items-center gap-3"><div className="p-2 bg-red-100 text-red-600 rounded-lg"><Database size={18}/></div><span className="font-bold">{t('databaseSetupTitle')}</span></div></div>)}<div className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50" onClick={onOpenSettings}><div className="flex items-center gap-3"><div className="p-2 bg-gray-100 text-gray-600 rounded-lg"><Settings size={18}/></div><span className="font-bold">App Settings</span></div></div></div></div>{showEdit && <EditClientProfileModal user={user} onClose={() => setShowEdit(false)} onUpdateUser={onUpdateUser} notify={notify}/>}{viewingProvider && <ChatProfileModal provider={viewingProvider} onClose={() => setViewingProvider(null)} currentUser={user} />}</div>);
+    
+    return (
+        <div className="flex-1 overflow-y-auto bg-gray-50 pb-20">
+            <div className="bg-white p-6 border-b shadow-sm mb-4">
+                <div className="flex items-center gap-4">
+                    <div className="w-20 h-20 rounded-full bg-gray-200 overflow-hidden border-2 border-white shadow-lg"><img src={user.profile_image_url || `https://ui-avatars.com/api/?name=${user.name}`} className="w-full h-full object-cover"/></div>
+                    <div><h2 className="font-bold text-xl">{user.name}</h2><p className="text-sm text-gray-500">{user.accountType === 'PROVIDER' ? t('provider') : t('client')}</p><p className="text-xs text-gray-400 mt-1">{user.phone}</p></div>
+                </div>
+                <div className="flex gap-2 mt-6">
+                    <button onClick={() => setShowEdit(true)} className="flex-1 py-2 bg-gray-100 rounded-lg font-bold text-xs">{t('editProfile')}</button>
+                    <button onClick={onLogout} className="flex-1 py-2 bg-red-50 text-red-500 rounded-lg font-bold text-xs flex items-center justify-center gap-1"><LogOut size={14}/> {t('logout')}</button>
+                </div>
+            </div>
+            <div className="p-4">
+                {user.accountType === 'CLIENT' && (<SuggestedProviders currentUser={user} onOpenProfile={setViewingProvider}/>)}
+                
+                {/* --- AFFILIATE BANNER (NEW) --- */}
+                {user.accountType === 'CLIENT' && (
+                    <div onClick={() => setShowAffiliate(true)} className="mb-6 p-4 bg-gradient-to-r from-yellow-500 to-orange-600 rounded-2xl shadow-lg cursor-pointer text-white flex justify-between items-center transform transition-transform hover:scale-[1.02]">
+                        <div>
+                            <h3 className="font-black text-lg flex items-center gap-2"><Handshake className="text-white"/> {t('affiliateProgram')}</h3>
+                            <p className="text-xs text-white/80 mt-1">{t('affiliateDesc')}</p>
+                        </div>
+                        <div className="bg-white/20 p-2 rounded-full"><Star size={24} className="fill-white text-white"/></div>
+                    </div>
+                )}
+
+                <h3 className="font-bold text-gray-400 text-xs uppercase mb-3">{t('menu')}</h3>
+                <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+                    {user.accountType === 'PROVIDER' && (<div className="p-4 border-b flex items-center justify-between cursor-pointer hover:bg-gray-50" onClick={() => onNav('ROOM')}><div className="flex items-center gap-3"><div className="p-2 bg-black text-white rounded-lg"><LayoutGrid size={18}/></div><span className="font-bold">{t('controlRoom')}</span></div><div className="w-2 h-2 bg-red-500 rounded-full"></div></div>)}
+                    {isAdmin && (<div className="p-4 border-b flex items-center justify-between cursor-pointer hover:bg-gray-50" onClick={() => onNav('DB')}><div className="flex items-center gap-3"><div className="p-2 bg-red-100 text-red-600 rounded-lg"><Database size={18}/></div><span className="font-bold">{t('databaseSetupTitle')}</span></div></div>)}
+                    <div className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50" onClick={onOpenSettings}><div className="flex items-center gap-3"><div className="p-2 bg-gray-100 text-gray-600 rounded-lg"><Settings size={18}/></div><span className="font-bold">App Settings</span></div></div>
+                </div>
+            </div>
+            {showEdit && <EditClientProfileModal user={user} onClose={() => setShowEdit(false)} onUpdateUser={onUpdateUser} notify={notify}/>}
+            {viewingProvider && <ChatProfileModal provider={viewingProvider} onClose={() => setViewingProvider(null)} currentUser={user} />}
+            {showAffiliate && <AffiliateDashboard isOpen={showAffiliate} onClose={() => setShowAffiliate(false)} currentUser={user} />}
+        </div>
+    );
 }
 
+// ... (SplashScreen - KEEP AS IS)
 const SplashScreen: React.FC = () => {
     return (<div className="fixed inset-0 bg-white z-[100] flex flex-col items-center justify-center animate-fade-in"><div className="w-24 h-24 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white shadow-xl mb-6 animate-slide-up"><Globe size={48} className="animate-spin-slow"/></div><h1 className="text-2xl font-black text-gray-900 tracking-tight animate-pulse">Tanger IA</h1><p className="text-gray-400 text-sm mt-2">Connect. Smart. Easy.</p></div>);
 }
