@@ -12,8 +12,10 @@ interface StoreProps {
     onOpenAuth: () => void;
     onGoToProfile: () => void;
     notify: (msg: string, type: 'success' | 'error') => void;
+    initialProduct?: Product | null; // NEW PROP
 }
 
+// ... (StoreHeaderBanner remains the same)
 // --- NEW IMMERSIVE BANNER HEADER ---
 const StoreHeaderBanner = ({ 
     onClose, 
@@ -125,13 +127,13 @@ const StoreHeaderBanner = ({
     );
 };
 
-const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth, onGoToProfile, notify }) => {
+const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth, onGoToProfile, notify, initialProduct }) => {
     const { t } = useLocalization();
     const [products, setProducts] = useState<Product[]>([]);
     const [cart, setCart] = useState<CartItem[]>([]);
     const [view, setView] = useState<'catalog' | 'cart' | 'admin' | 'my_orders'>('catalog');
-    const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-    const [showWelcome, setShowWelcome] = useState(true);
+    const [selectedProduct, setSelectedProduct] = useState<Product | null>(initialProduct || null); // INIT FROM PROP
+    const [showWelcome, setShowWelcome] = useState(!initialProduct); // HIDE WELCOME IF DEEP LINKED
     const [adRequests, setAdRequests] = useState<AdRequest[]>([]);
     const [myOrders, setMyOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(false);
@@ -156,7 +158,6 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
 
     const isAdmin = currentUser?.phone === '0617774846' && currentUser?.accountType === 'PROVIDER';
 
-    // --- FIX 1: DYNAMIC CART KEY BASED ON USER ID ---
     const getCartKey = () => {
         if (currentUser) return `tanger_cart_${currentUser.id}`;
         return 'tanger_cart_guest';
@@ -165,6 +166,15 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
     useEffect(() => {
         if(isOpen) fetchProducts();
     }, [isOpen]);
+
+    // Handle Deep Link updates
+    useEffect(() => {
+        if(initialProduct) {
+            setSelectedProduct(initialProduct);
+            setShowWelcome(false);
+            fetchReviews(initialProduct.id);
+        }
+    }, [initialProduct]);
 
     // LOAD CART
     useEffect(() => {
@@ -178,10 +188,9 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                 setCart([]);
             }
         } else {
-            // Important: If switching users, and new user has no cart, clear the state
             setCart([]);
         }
-    }, [currentUser]); // Re-run when currentUser changes
+    }, [currentUser]);
 
     // SAVE CART
     useEffect(() => {
@@ -236,7 +245,7 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
 
         if (!error) {
             setCart([]);
-            localStorage.removeItem(getCartKey()); // Clear correct key
+            localStorage.removeItem(getCartKey()); 
             notify(t('orderPlaced'), 'success');
             setView('catalog');
         } else {
@@ -338,6 +347,7 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                     </div>
                 )}
 
+                {/* ... (Rest of Store UI - Keeping Existing Code) */}
                 {view === 'catalog' && (
                     <>
                         {/* --- SEARCH BAR --- */}
@@ -369,6 +379,7 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                 )}
 
                 <div className="flex-1 overflow-y-auto bg-gray-50">
+                    {/* ... (Existing Views: Admin, Cart, Orders) ... */}
                     {view === 'admin' ? (
                         <div className="p-4 space-y-4">
                             <h3 className="font-bold">{t('adRequests')}</h3>
@@ -562,7 +573,7 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                                             <div className="flex-1">
                                                 <div className="flex justify-between items-center mb-1">
                                                     <span className="font-bold text-xs text-gray-900">{rev.user_name}</span>
-                                                    <span className="text-[10px] text-gray-400">{new Date(rev.created_at).toLocaleDateString()}</span>
+                                                    <span className="text-[10px] text-gray-400">{new Date(rev.created_at).toLocaleDateString()}</p>
                                                 </div>
                                                 <p className="text-sm text-gray-700 bg-gray-50 p-2 rounded-lg rounded-tl-none">{rev.comment}</p>
                                             </div>

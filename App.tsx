@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { UserView, Language, AuthenticatedUser, AccountType, Role, Offer, UrgentAd, AppCategory, AppSpecialty } from './types';
-import Chatbot, { ChatProfileModal } from './components/Chatbot';
+import { UserView, Language, AuthenticatedUser, AccountType, Role, Offer, UrgentAd, AppCategory, AppSpecialty, Product } from './types';
+import Chatbot, { ChatProfileModal, BookingModal } from './components/Chatbot';
 import ProviderPortal from './components/QRScanner';
 import AppointmentsDrawer from './components/AppointmentsDrawer';
 import DatabaseSetup from './components/DatabaseSetup';
@@ -461,10 +461,15 @@ const AppContent: React.FC = () => {
     const [userView, setUserView] = useState<UserView>(UserView.CLIENT);
     const [showSplash, setShowSplash] = useState(true);
     
-    // TAB STATE: 'HOME' is Default (Index 0)
+    // TAB STATE
     const [activeTab, setActiveTab] = useState<'HOME' | 'CHAT' | 'STORE' | 'SERVICES' | 'PROFILE'>('HOME');
     const [hideBottomNav, setHideBottomNav] = useState(false);
     
+    // Deep Linking State
+    const [chatInitialProvider, setChatInitialProvider] = useState<any | null>(null);
+    const [chatInitialMessage, setChatInitialMessage] = useState<string | undefined>(undefined);
+    const [storeInitialProduct, setStoreInitialProduct] = useState<Product | null>(null);
+
     // Notifications State
     const [unreadNotifs, setUnreadNotifs] = useState(0);
     const [showClientNotifs, setShowClientNotifs] = useState(false);
@@ -481,6 +486,11 @@ const AppContent: React.FC = () => {
     
     // Internal Navigation for Feed to Profile
     const [feedViewingProvider, setFeedViewingProvider] = useState<any | null>(null);
+
+    // BOOKING FROM FEED PROFILE STATE
+    const [showBookingModal, setShowBookingModal] = useState(false);
+    const [bookingTargetProvider, setBookingTargetProvider] = useState<any>(null);
+    const [bookingTargetOffer, setBookingTargetOffer] = useState<Offer | null>(null);
 
     // Custom Toast State
     const [toast, setToast] = useState<{message: string, type: 'success' | 'error'} | null>(null);
@@ -612,6 +622,30 @@ const AppContent: React.FC = () => {
             case 'ROOM': toggleProviderView(); break;
         }
     }
+
+    // --- DEEP LINK HANDLERS FROM FEED ---
+    const handleChatFromFeed = (provider: any, message?: string) => {
+        setChatInitialProvider(provider);
+        setChatInitialMessage(message);
+        setActiveTab('CHAT');
+    };
+
+    const handleProductFromFeed = (product: Product) => {
+        setStoreInitialProduct(product);
+        setActiveTab('STORE');
+    }
+
+    // --- BOOKING HANDLERS ---
+    const handleOpenBooking = (provider: any, offer: Offer) => {
+        setBookingTargetProvider(provider);
+        setBookingTargetOffer(offer);
+        setShowBookingModal(true);
+    };
+
+    const handleBookingCompleted = (details: any) => {
+        setShowBookingModal(false);
+        showToast(t('bookingSuccessMessage'), 'success');
+    };
     
     const isAdmin = user?.phone === '0617774846';
 
@@ -676,6 +710,8 @@ const AppContent: React.FC = () => {
                             onOpenAuth={() => setShowAuth(true)} 
                             onOpenNotifications={() => setShowClientNotifs(true)}
                             onOpenProfile={(p) => setFeedViewingProvider(p)}
+                            onChatWithProvider={handleChatFromFeed}
+                            onViewProduct={handleProductFromFeed}
                         />
                     )}
                     
@@ -687,43 +723,51 @@ const AppContent: React.FC = () => {
                             onDiscover={() => setActiveTab('SERVICES')} 
                             onToggleNav={(hidden) => setHideBottomNav(hidden)} 
                             onOpenNotifications={() => setShowClientNotifs(true)} 
+                            initialProvider={chatInitialProvider} // Pass deep link data
+                            initialMessage={chatInitialMessage}
                         />
                     )}
                     
-                    {activeTab === 'STORE' && <Store isOpen={true} onClose={() => setActiveTab('HOME')} currentUser={user} onOpenAuth={() => setShowAuth(true)} onGoToProfile={() => setActiveTab('PROFILE')} notify={showToast} />}
+                    {activeTab === 'STORE' && (
+                        <Store 
+                            isOpen={true} 
+                            onClose={() => setActiveTab('HOME')} 
+                            currentUser={user} 
+                            onOpenAuth={() => setShowAuth(true)} 
+                            onGoToProfile={() => setActiveTab('PROFILE')} 
+                            notify={showToast} 
+                            initialProduct={storeInitialProduct} // Pass deep link data
+                        />
+                    )}
+                    
                     {activeTab === 'SERVICES' && <ServicesHub onNav={handleNav} isAdmin={isAdmin}/>}
                     {activeTab === 'PROFILE' && <ProfileTab user={user} onLogin={() => setShowAuth(true)} onLogout={handleLogout} isAdmin={isAdmin} onNav={handleNav} onUpdateUser={handleUpdateUser} notify={showToast} onOpenSettings={() => setShowSettings(true)}/>}
                 </div>
 
-                {/* BOTTOM NAVIGATION (Updated) */}
+                {/* BOTTOM NAVIGATION (Fixed Grid Layout) */}
                 {!hideBottomNav && (
-                    <div className="bg-white dark:bg-gray-800 border-t dark:border-gray-700 flex justify-around items-center pb-safe pt-2 px-2 shadow-[0_-5px_20px_-5px_rgba(0,0,0,0.05)] z-40">
-                        {/* 1. HOME (FEED) */}
-                        <button onClick={() => setActiveTab('HOME')} className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${activeTab === 'HOME' ? 'text-black dark:text-white font-bold scale-105' : 'text-gray-400 dark:text-gray-500'}`}>
+                    <div className="bg-white dark:bg-gray-800 border-t dark:border-gray-700 grid grid-cols-5 items-center pb-safe pt-2 px-2 shadow-[0_-5px_20px_-5px_rgba(0,0,0,0.05)] z-40 w-full h-16">
+                        <button onClick={() => setActiveTab('HOME')} className={`flex flex-col items-center justify-center gap-1 w-full h-full transition-all ${activeTab === 'HOME' ? 'text-black dark:text-white font-bold' : 'text-gray-400 dark:text-gray-500'}`}>
                             <Home size={24} className={activeTab === 'HOME' ? 'fill-black dark:fill-white' : ''}/>
                             <span className="text-[10px]">{t('navHome')}</span>
                         </button>
 
-                        {/* 2. CHAT/PROVIDERS */}
-                        <button onClick={() => setActiveTab('CHAT')} className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${activeTab === 'CHAT' ? 'text-blue-600 dark:text-blue-400 font-bold scale-105' : 'text-gray-400 dark:text-gray-500'}`}>
+                        <button onClick={() => setActiveTab('CHAT')} className={`flex flex-col items-center justify-center gap-1 w-full h-full transition-all ${activeTab === 'CHAT' ? 'text-blue-600 dark:text-blue-400 font-bold' : 'text-gray-400 dark:text-gray-500'}`}>
                             <Users size={24} className={activeTab === 'CHAT' ? 'fill-blue-100 dark:fill-blue-900' : ''}/>
                             <span className="text-[10px]">{t('navChat')}</span>
                         </button>
 
-                        {/* 3. STORE */}
-                        <button onClick={() => setActiveTab('STORE')} className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${activeTab === 'STORE' ? 'text-orange-600 dark:text-orange-400 font-bold scale-105' : 'text-gray-400 dark:text-gray-500'}`}>
+                        <button onClick={() => setActiveTab('STORE')} className={`flex flex-col items-center justify-center gap-1 w-full h-full transition-all ${activeTab === 'STORE' ? 'text-orange-600 dark:text-orange-400 font-bold' : 'text-gray-400 dark:text-gray-500'}`}>
                             <ShoppingBag size={24} className={activeTab === 'STORE' ? 'fill-orange-100 dark:fill-orange-900' : ''}/>
                             <span className="text-[10px]">{t('navStore')}</span>
                         </button>
 
-                        {/* 4. SERVICES */}
-                        <button onClick={() => setActiveTab('SERVICES')} className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${activeTab === 'SERVICES' ? 'text-purple-600 dark:text-purple-400 font-bold scale-105' : 'text-gray-400 dark:text-gray-500'}`}>
+                        <button onClick={() => setActiveTab('SERVICES')} className={`flex flex-col items-center justify-center gap-1 w-full h-full transition-all ${activeTab === 'SERVICES' ? 'text-purple-600 dark:text-purple-400 font-bold' : 'text-gray-400 dark:text-gray-500'}`}>
                             <LayoutGrid size={24} className={activeTab === 'SERVICES' ? 'fill-purple-100 dark:fill-purple-900' : ''}/>
                             <span className="text-[10px]">{t('navExplore')}</span>
                         </button>
 
-                        {/* 5. PROFILE */}
-                        <button onClick={() => setActiveTab('PROFILE')} className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${activeTab === 'PROFILE' ? 'text-green-600 dark:text-green-400 font-bold scale-105' : 'text-gray-400 dark:text-gray-500'}`}>
+                        <button onClick={() => setActiveTab('PROFILE')} className={`flex flex-col items-center justify-center gap-1 w-full h-full transition-all ${activeTab === 'PROFILE' ? 'text-green-600 dark:text-green-400 font-bold' : 'text-gray-400 dark:text-gray-500'}`}>
                             <User size={24} className={activeTab === 'PROFILE' ? 'fill-green-100 dark:fill-green-900' : ''}/>
                             <span className="text-[10px]">{t('navProfile')}</span>
                         </button>
@@ -742,7 +786,24 @@ const AppContent: React.FC = () => {
             <ProviderDirectory isOpen={showDirectory} onClose={() => setShowDirectory(false)} currentUser={user} />
             {user && <ClientNotificationsModal isOpen={showClientNotifs} onClose={() => setShowClientNotifs(false)} userId={user.id} />}
             
-            {feedViewingProvider && <ChatProfileModal provider={feedViewingProvider} onClose={() => setFeedViewingProvider(null)} currentUser={user} />}
+            {feedViewingProvider && (
+                <ChatProfileModal 
+                    provider={feedViewingProvider} 
+                    onClose={() => setFeedViewingProvider(null)} 
+                    currentUser={user} 
+                    onBookOffer={(offer) => handleOpenBooking(feedViewingProvider, offer)}
+                />
+            )}
+
+            {showBookingModal && bookingTargetProvider && (
+                <BookingModal
+                    provider={bookingTargetProvider}
+                    onClose={() => setShowBookingModal(false)}
+                    currentUser={user}
+                    onBooked={handleBookingCompleted}
+                    initialOffer={bookingTargetOffer}
+                />
+            )}
 
             {/* GLOBAL TOAST */}
             {toast && <ToastNotification message={toast.message} type={toast.type} onClose={() => setToast(null)} />}

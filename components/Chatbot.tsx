@@ -46,127 +46,58 @@ const ProviderAvatar = ({ provider }: { provider: any }) => {
     );
 };
 
-// --- UPDATED URGENT TICKER (WHITE BG + COLORED LABEL + PRO TRANSITION) ---
+// --- UPDATED URGENT TICKER ---
 export const UrgentTicker: React.FC<{ onClick: () => void; currentUser: AuthenticatedUser | null }> = ({ onClick, currentUser }) => {
+    // ... (Keeping UrgentTicker implementation as is)
     const { t } = useLocalization();
     const [ads, setAds] = useState<UrgentAd[]>([]);
     const [currentAdIndex, setCurrentAdIndex] = useState(0);
-    
-    // Modes: 'BRANDING' (Blue Label) or 'ADS' (Red Label)
     const [mode, setMode] = useState<'BRANDING' | 'ADS'>('BRANDING');
     const [animate, setAnimate] = useState(true); 
 
-    // 1. Fetch Ads
     useEffect(() => {
         const fetch = async () => {
             if (!currentUser) return; 
-            const { data } = await supabase.from('urgent_ads')
-                .select('*, providers(name)')
-                .eq('is_active', true)
-                .order('created_at', { ascending: false })
-                .limit(10);
+            const { data } = await supabase.from('urgent_ads').select('*, providers(name)').eq('is_active', true).order('created_at', { ascending: false }).limit(10);
             setAds(data as any || []);
         }
         fetch();
     }, [currentUser]);
 
-    // 2. Loop Logic with Professional Timing
     useEffect(() => {
         let timer: any;
-
         const loop = () => {
-            setAnimate(false); // Trigger exit animation
-
+            setAnimate(false);
             setTimeout(() => {
-                // Logic to switch content AFTER exit animation
-                if (ads.length === 0) {
-                    setMode('BRANDING');
-                } else {
-                    if (mode === 'BRANDING') {
-                        setMode('ADS'); 
-                    } else {
-                        if (currentAdIndex < ads.length - 1) {
-                            setCurrentAdIndex(prev => prev + 1);
-                        } else {
-                            setCurrentAdIndex(0);
-                            setMode('BRANDING');
-                        }
+                if (ads.length === 0) setMode('BRANDING');
+                else {
+                    if (mode === 'BRANDING') setMode('ADS'); 
+                    else {
+                        if (currentAdIndex < ads.length - 1) setCurrentAdIndex(prev => prev + 1);
+                        else { setCurrentAdIndex(0); setMode('BRANDING'); }
                     }
                 }
-                setAnimate(true); // Trigger entrance animation
-            }, 600); // Wait for exit transition to finish
+                setAnimate(true);
+            }, 600);
         };
-
-        // Duration: 6 Seconds for Branding, 8 Seconds for Ads
         const duration = mode === 'BRANDING' ? 6000 : 8000;
-        
-        if (ads.length === 0) {
-            setMode('BRANDING');
-            return; 
-        }
-
+        if (ads.length === 0) { setMode('BRANDING'); return; }
         timer = setInterval(loop, duration);
         return () => clearInterval(timer);
-
     }, [ads, mode, currentAdIndex]);
 
     return (
         <div onClick={onClick} className="bg-white border-b border-gray-100 shadow-sm z-10 flex items-stretch h-10 overflow-hidden relative cursor-pointer group">
-            
-            {/* 1. THE COLORED LABEL (Left/Right side) */}
             <div className={`${mode === 'BRANDING' ? 'bg-blue-600' : 'bg-red-600'} text-white px-3 flex items-center justify-center relative z-20 shrink-0 transition-colors duration-700 ease-in-out`}>
-                
-                {/* Icon & Text */}
                 <div className="relative z-10 flex items-center gap-1 font-black text-xs transition-all duration-500">
-                    {mode === 'BRANDING' ? (
-                        <div className="flex items-center gap-1 animate-fade-in">
-                            <Globe size={12} className="text-white"/>
-                            <span>Tanger IA</span>
-                        </div>
-                    ) : (
-                        <div className="flex items-center gap-1 animate-fade-in">
-                            <Zap size={12} className="fill-yellow-300 text-yellow-300 animate-pulse"/>
-                            <span>عاجل</span>
-                        </div>
-                    )}
+                    {mode === 'BRANDING' ? <div className="flex items-center gap-1 animate-fade-in"><Globe size={12} className="text-white"/><span>Tanger IA</span></div> : <div className="flex items-center gap-1 animate-fade-in"><Zap size={12} className="fill-yellow-300 text-yellow-300 animate-pulse"/><span>عاجل</span></div>}
                 </div>
-
-                {/* Slanted Edge (CSS Triangle) - Matches BG Color */}
                 <div className={`absolute top-0 -right-3 w-0 h-0 border-t-[40px] ${mode === 'BRANDING' ? 'border-t-blue-600' : 'border-t-red-600'} border-r-[15px] border-r-transparent pointer-events-none rtl:hidden transition-colors duration-700`}></div>
                 <div className={`absolute top-0 -left-3 w-0 h-0 border-t-[40px] ${mode === 'BRANDING' ? 'border-t-blue-600' : 'border-t-red-600'} border-l-[15px] border-l-transparent pointer-events-none ltr:hidden transition-colors duration-700`}></div>
             </div>
-
-            {/* 2. THE CONTENT AREA (White BG) */}
             <div className="flex-1 flex items-center px-4 overflow-hidden relative bg-white">
-                
-                {/* 3. PROFESSIONAL TRANSITION CONTAINER */}
-                <div 
-                    className={`w-full transition-all duration-700 ease-[cubic-bezier(0.34,1.56,0.64,1)] transform ${
-                        animate ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0'
-                    }`}
-                >
-                    {mode === 'BRANDING' ? (
-                        <div className="flex items-center gap-2 w-full">
-                            <span className="font-bold text-blue-600 text-xs">مساعدك الذكي:</span>
-                            {/* Scrolling Text for Description */}
-                            <div className="overflow-hidden relative w-full h-4">
-                                <span className="absolute animate-marquee whitespace-nowrap text-xs text-gray-500 font-medium">
-                                    مساعدك الذكي في طنجة • حجز مواعيد • صيدليات الحراسة • عقارات • وظائف • خدمات القرب • عروض حصرية
-                                </span>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="flex items-center gap-2 w-full">
-                            {/* Provider Name Tag */}
-                            <span className="font-black text-[10px] text-white bg-gray-800 px-2 py-0.5 rounded shadow-sm whitespace-nowrap">
-                                {ads[currentAdIndex]?.providers?.name || 'مجهول'}
-                            </span>
-                            {/* Ad Message */}
-                            <span className="text-xs font-bold text-gray-800 truncate flex-1">
-                                {ads[currentAdIndex]?.message}
-                            </span>
-                        </div>
-                    )}
+                <div className={`w-full transition-all duration-700 ease-[cubic-bezier(0.34,1.56,0.64,1)] transform ${animate ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0'}`}>
+                    {mode === 'BRANDING' ? <div className="flex items-center gap-2 w-full"><span className="font-bold text-blue-600 text-xs">مساعدك الذكي:</span><div className="overflow-hidden relative w-full h-4"><span className="absolute animate-marquee whitespace-nowrap text-xs text-gray-500 font-medium">مساعدك الذكي في طنجة • حجز مواعيد • صيدليات الحراسة • عقارات • وظائف • خدمات القرب • عروض حصرية</span></div></div> : <div className="flex items-center gap-2 w-full"><span className="font-black text-[10px] text-white bg-gray-800 px-2 py-0.5 rounded shadow-sm whitespace-nowrap">{ads[currentAdIndex]?.providers?.name || 'مجهول'}</span><span className="text-xs font-bold text-gray-800 truncate flex-1">{ads[currentAdIndex]?.message}</span></div>}
                 </div>
             </div>
         </div>
@@ -174,7 +105,7 @@ export const UrgentTicker: React.FC<{ onClick: () => void; currentUser: Authenti
 }
 
 export const BookingModal: React.FC<{ provider: any; onClose: () => void; currentUser: AuthenticatedUser | null; onBooked: (details: any) => void; initialOffer?: Offer | null }> = ({ provider, onClose, currentUser, onBooked, initialOffer }) => {
-    // ... same code ...
+    // ... (Keep BookingModal as is)
     const { t } = useLocalization();
     const [offers, setOffers] = useState<Offer[]>([]);
     const [selectedOffer, setSelectedOffer] = useState<Offer | null>(null);
@@ -202,20 +133,7 @@ export const BookingModal: React.FC<{ provider: any; onClose: () => void; curren
         const offerText = selectedOffer ? `with Offer: ${selectedOffer.title}` : '';
         await supabase.from('provider_notifications').insert({ provider_id: provider.id, message: `New Booking: ${clientName} on ${date} at ${time} ${offerText}`, type: 'BOOKING', status: 'pending' });
         
-        // Ensure bookingDetails contains everything needed for the QR and security checks
-        const bookingDetails = { 
-            appointmentId, 
-            clientName: clientName, // Explicitly set clientName for Guest support in QR
-            name: clientName, // For backwards compatibility
-            providerId: provider.id, // CRITICAL FOR SECURITY CHECK
-            provider: provider.name, 
-            service: provider.service_type, 
-            date: date, 
-            time: time, 
-            offerTitle: selectedOffer?.title, 
-            price: selectedOffer?.discount_price, 
-            message: `${t('bookingSuccessMessage')} ${t('keepQR')}` 
-        };
+        const bookingDetails = { appointmentId, clientName: clientName, name: clientName, providerId: provider.id, provider: provider.name, service: provider.service_type, date: date, time: time, offerTitle: selectedOffer?.title, price: selectedOffer?.discount_price, message: `${t('bookingSuccessMessage')} ${t('keepQR')}` };
         
         onBooked(bookingDetails);
         setLoading(false);
@@ -236,7 +154,7 @@ export const BookingModal: React.FC<{ provider: any; onClose: () => void; curren
 }
 
 export const ChatProfileModal: React.FC<{ provider: any; onClose: () => void; currentUser: AuthenticatedUser | null; onBookOffer?: (offer: Offer) => void }> = ({ provider, onClose, currentUser, onBookOffer }) => {
-    // ... same code ...
+    // ... (Keep ChatProfileModal as is)
     const { t } = useLocalization();
     const [offers, setOffers] = useState<Offer[]>([]);
     const [isFollowing, setIsFollowing] = useState(false);
@@ -273,7 +191,7 @@ export const ChatProfileModal: React.FC<{ provider: any; onClose: () => void; cu
                  <div className="flex justify-center gap-8 mb-6 text-center"><div className="flex flex-col items-center"><div className="font-black text-xl">{stats.followers}</div><div className="text-xs text-gray-500 font-bold uppercase tracking-wide">{t('followers')}</div></div><div className="w-px bg-gray-200 h-10"></div><div className="flex flex-col items-center"><div className="font-black text-xl">{stats.posts}</div><div className="text-xs text-gray-500 font-bold uppercase tracking-wide">{t('offers')}</div></div></div>
                  <div className="space-y-4 mb-6"><h3 className="font-bold border-b pb-2">{t('bioLabel')}</h3><p className="text-sm text-gray-600 whitespace-pre-line">{provider.bio || "No bio available."}</p><h3 className="font-bold border-b pb-2">{t('socialLinks')}</h3><div className="flex gap-4 justify-center">{provider.social_links?.instagram && <a href={`https://instagram.com/${provider.social_links.instagram}`} className="text-pink-600 bg-pink-50 p-2 rounded-full"><Instagram/></a>}{provider.social_links?.facebook && <a href={`https://facebook.com/${provider.social_links.facebook}`} className="text-blue-600 bg-blue-50 p-2 rounded-full"><Facebook/></a>}{provider.social_links?.gps && <a href={`https://maps.google.com/?q=${provider.social_links.gps}`} className="text-green-600 bg-green-50 p-2 rounded-full"><MapPin/></a>}</div></div>
                  <h3 className="font-bold border-b pb-2 mb-4 flex items-center gap-2"><Tag size={18}/> {t('offers')}</h3>
-                 {offers.length === 0 ? (<div className="text-center py-8 text-gray-400 bg-gray-50 rounded-xl border border-dashed"><Tag className="mx-auto mb-2 opacity-50"/><p className="text-sm">No active offers currently.</p></div>) : (<div className="grid grid-cols-2 gap-3">{offers.map(o => (<div key={o.id} className="border rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">{o.image_url && <div className="h-24 bg-gray-100"><img src={o.image_url} className="w-full h-full object-cover"/></div>}<div className="p-3"><h4 className="font-bold text-sm truncate mb-1">{o.title}</h4><div className="flex gap-2 text-xs mb-3 items-center"><span className="line-through text-gray-400">{o.original_price}</span><span className="text-red-600 font-black text-sm">{o.discount_price} DH</span></div><button onClick={() => onBookOffer && onBookOffer(o)} className="w-full bg-black text-white py-2 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 active:scale-95 transition-transform"><Calendar size={12}/> Book Now</button></div></div>))}</div>)}
+                 {offers.length === 0 ? (<div className="text-center py-8 text-gray-400 bg-gray-50 rounded-xl border border-dashed"><Tag className="mx-auto mb-2 opacity-50"/><p className="text-sm">No active offers currently.</p></div>) : (<div className="grid grid-cols-2 gap-3">{offers.map(o => (<div key={o.id} className="border rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">{o.image_url && <div className="h-24 bg-gray-100"><img src={o.image_url} className="w-full h-full object-cover"/></div><div className="p-3"><h4 className="font-bold text-sm truncate mb-1">{o.title}</h4><div className="flex gap-2 text-xs mb-3 items-center"><span className="line-through text-gray-400">{o.original_price}</span><span className="text-red-600 font-black text-sm">{o.discount_price} DH</span></div><button onClick={() => onBookOffer && onBookOffer(o)} className="w-full bg-black text-white py-2 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 active:scale-95 transition-transform"><Calendar size={12}/> Book Now</button></div></div>))}</div>)}
              </div>
         </div>
     )
@@ -281,7 +199,7 @@ export const ChatProfileModal: React.FC<{ provider: any; onClose: () => void; cu
 
 // --- MAIN CHATBOT COMPONENT ---
 
-const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () => void; onDiscover: () => void; onToggleNav: (hidden: boolean) => void; onOpenNotifications: () => void }> = ({ currentUser, onOpenAuth, onDiscover, onToggleNav, onOpenNotifications }) => {
+const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () => void; onDiscover: () => void; onToggleNav: (hidden: boolean) => void; onOpenNotifications: () => void; initialProvider?: any; initialMessage?: string }> = ({ currentUser, onOpenAuth, onDiscover, onToggleNav, onOpenNotifications, initialProvider, initialMessage }) => {
     const { t, language } = useLocalization();
     const [view, setView] = useState<'LIST' | 'CHAT'>('LIST');
     const [selectedChat, setSelectedChat] = useState<any | null>(null); 
@@ -323,15 +241,12 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
             // 1. Fetch active providers
             const { data: pData } = await supabase.from('providers').select('*').eq('is_active', true);
             
-            // 2. Fetch latest ad timestamp for each provider (for sorting)
-            // Note: Since Supabase basic query doesn't do complex joins easily in one go without a view,
-            // we will fetch all active ads and map them.
+            // 2. Fetch latest ad timestamp
             const { data: adsData } = await supabase.from('provider_ads')
                 .select('provider_id, created_at')
                 .eq('is_active', true)
                 .order('created_at', { ascending: false });
 
-            // Create a map of provider_id -> latest_ad_date
             const lastAdMap: Record<number, string> = {};
             if (adsData) {
                 adsData.forEach(ad => {
@@ -341,40 +256,27 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
                 });
             }
 
-            // 3. Process Providers with sorting logic
             let processedProviders = pData || [];
             processedProviders = processedProviders.map(p => ({
                 ...p,
-                last_ad_at: lastAdMap[p.id] || null // Attach ad date or null
+                last_ad_at: lastAdMap[p.id] || null 
             }));
 
-            // SORT: 
-            // - Providers with ads first (sorted by ad date desc)
-            // - Providers without ads second (sorted by visits or name)
             processedProviders.sort((a, b) => {
-                // If both have ads, compare dates
-                if (a.last_ad_at && b.last_ad_at) {
-                    return new Date(b.last_ad_at).getTime() - new Date(a.last_ad_at).getTime();
-                }
-                // If A has ad, A comes first
+                if (a.last_ad_at && b.last_ad_at) return new Date(b.last_ad_at).getTime() - new Date(a.last_ad_at).getTime();
                 if (a.last_ad_at) return -1;
-                // If B has ad, B comes first
                 if (b.last_ad_at) return 1;
-                
-                // If neither has ad, sort by visits count (desc)
                 return (b.visits_count || 0) - (a.visits_count || 0);
             });
 
             setProviders(processedProviders);
 
-            // Categories & Specialties
             const { data: cData } = await supabase.from('app_categories').select('*').order('name');
             setFetchedCategories(cData || []);
 
             const { data: sData } = await supabase.from('app_specialties').select('*').order('name');
             setFetchedSpecialties(sData || []);
             
-            // Calculate Unread Badges (If User logged in)
             if (currentUser && processedProviders) {
                 calculateUnreadBadges(currentUser.id);
             }
@@ -382,16 +284,22 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
         init();
     }, [currentUser]);
 
+    // Handle Deep Linking from Feed
+    useEffect(() => {
+        if(initialProvider) {
+            openChat(initialProvider);
+            if(initialMessage) {
+                // Short delay to allow chat view to mount
+                setTimeout(() => handleSend(initialMessage), 800); 
+            }
+        }
+    }, [initialProvider, initialMessage]);
+
     const calculateUnreadBadges = async (userId: number) => {
-        // 1. Get ALL active ads
         const { data: allAds } = await supabase.from('provider_ads').select('id, provider_id').eq('is_active', true);
         if (!allAds) return;
-
-        // 2. Get views for this user
         const { data: myViews } = await supabase.from('ad_views').select('ad_id').eq('user_id', userId);
         const viewedAdIds = new Set(myViews?.map(v => v.ad_id) || []);
-
-        // 3. Count unread
         const counts: Record<number, number> = {};
         allAds.forEach(ad => {
             if (!viewedAdIds.has(ad.id)) {
@@ -418,26 +326,18 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
                     const formatted: Message[] = data.map((msg: any) => {
                         let bookingDetails = undefined;
                         let isComponent = false;
-
-                        // Try to parse booking details from text if it's a JSON string
-                        // This allows the QR code to persist across reloads
                         if (msg.role === 'BOT' && msg.text && msg.text.startsWith('{"appointmentId"')) {
                              try {
                                  bookingDetails = JSON.parse(msg.text);
                                  isComponent = true;
-                                 // Override the raw text with the user-friendly message for display
-                                 // But we still pass bookingDetails to the renderer
                                  return {
                                      role: Role.BOT,
                                      text: bookingDetails.message || "Booking Details",
                                      bookingDetails: bookingDetails,
                                      isComponent: true
                                  };
-                             } catch (e) {
-                                 // If parsing fails, just treat as text
-                             }
+                             } catch (e) {}
                         }
-
                         return {
                             role: msg.role === 'USER' ? Role.USER : Role.BOT,
                             text: msg.text || '',
@@ -464,9 +364,8 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
                 if (selectedChat.booking_info) dynamicSuggestions.push('📝 شروط الحجز');
                 setSuggestions(dynamicSuggestions);
 
-                // --- MODIFIED: FETCH & DISPLAY ALL ACTIVE ADS (STORIES) AT THE BOTTOM ---
+                // --- FETCH & DISPLAY ALL ACTIVE ADS (STORIES) ---
                 const fetchAndMarkAds = async () => {
-                    // Fetch ALL ACTIVE ads for this provider (ordered oldest to newest to appear in sequence)
                     const { data: ads } = await supabase.from('provider_ads')
                         .select('*')
                         .eq('provider_id', selectedChat.id)
@@ -474,8 +373,6 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
                         .order('created_at', { ascending: true }); 
 
                     if (ads && ads.length > 0 && currentUser) {
-                        
-                        // 1. Check for unread ones just to update the "Read" status in DB (clear badge)
                         const { data: views } = await supabase.from('ad_views')
                             .select('ad_id')
                             .eq('user_id', currentUser.id)
@@ -485,19 +382,13 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
                         const unreadAds = ads.filter(a => !viewedIds.has(a.id));
 
                         if (unreadAds.length > 0) {
-                            // Mark unread ads as read in DB
                             const inserts = unreadAds.map(ad => ({ user_id: currentUser.id, ad_id: ad.id }));
                             await supabase.from('ad_views').insert(inserts);
-                            
-                            // Update local badge state immediately
                             setUnreadCounts(prev => ({...prev, [selectedChat.id]: 0}));
                         }
 
-                        // 2. DISPLAY ALL ADS (Persist them in chat view)
-                        // We filter out any duplicate "WelcomeAd" that might already be in the state to avoid double rendering
                         setMessages(prev => {
                             const existingAdIds = new Set(prev.filter(m => m.isWelcomeAd && (m as any)._adId).map(m => (m as any)._adId));
-                            
                             const newAdMessages = ads
                                 .filter(ad => !existingAdIds.has(ad.id))
                                 .map(ad => ({
@@ -505,17 +396,13 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
                                     text: ad.message,
                                     imageUrl: ad.image_url,
                                     isWelcomeAd: true,
-                                    _adId: ad.id // Internal helper ID
+                                    _adId: ad.id
                                 }));
-                            
                             return [...prev, ...newAdMessages];
                         });
                     }
                 };
-                
-                // Add a small delay to ensure history loads first
                 setTimeout(fetchAndMarkAds, 500);
-
             } else {
                 setSuggestions(['🏥 أبحث عن طبيب', '🔧 أحتاج سباك', '🏠 سمسار عقارات']);
             }
@@ -530,115 +417,31 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
         setShowBooking(false);
     };
 
-    // --- FILTER HANDLERS ---
-    const handleCategorySelect = (catName: string) => {
-        setSelectedCategory(catName);
-        
-        // Find if this category has specialties
-        const catObj = fetchedCategories.find(c => c.name === catName);
-        const hasSpecs = catObj && fetchedSpecialties.some(s => s.category_id === catObj.id);
+    // ... (Filter Handlers & Render Chips - Keep existing code)
+    const handleCategorySelect = (catName: string) => { setSelectedCategory(catName); const catObj = fetchedCategories.find(c => c.name === catName); const hasSpecs = catObj && fetchedSpecialties.some(s => s.category_id === catObj.id); if (hasSpecs) setFilterLevel(1); else setFilterLevel(2); };
+    const handleSpecialtySelect = (spec: string) => { setSelectedSpecialty(spec); setFilterLevel(2); };
+    const handleNeighborhoodSelect = (hood: string) => { setSelectedNeighborhood(hood); };
+    const resetFilters = () => { setFilterLevel(0); setSelectedCategory(null); setSelectedSpecialty(null); setSelectedNeighborhood(null); };
 
-        if (hasSpecs) {
-            setFilterLevel(1); // Go to Specialties
-        } else {
-            setFilterLevel(2); // Go directly to Neighborhoods
-        }
-    };
-
-    const handleSpecialtySelect = (spec: string) => {
-        setSelectedSpecialty(spec);
-        setFilterLevel(2); // Go to Neighborhoods
-    };
-
-    const handleNeighborhoodSelect = (hood: string) => {
-        setSelectedNeighborhood(hood);
-        // Filter is complete, list updates automatically below
-    };
-
-    const resetFilters = () => {
-        setFilterLevel(0);
-        setSelectedCategory(null);
-        setSelectedSpecialty(null);
-        setSelectedNeighborhood(null);
-    };
-
-    // --- RENDER FILTER CHIPS ---
     const renderFilterChips = () => {
         if (filterLevel === 0) {
-            // Show Categories
-            return (
-                <div className="flex gap-2 overflow-x-auto no-scrollbar py-2 px-1">
-                    {fetchedCategories.length > 0 ? fetchedCategories.map(cat => (
-                        <button key={cat.id} onClick={() => handleCategorySelect(cat.name)} className="px-4 py-1.5 bg-gray-100 text-gray-700 rounded-full text-xs font-bold whitespace-nowrap border border-gray-200 hover:bg-blue-50 hover:text-blue-600 transition-colors">
-                            {cat.name}
-                        </button>
-                    )) : (
-                        <p className="text-xs text-gray-400 p-2">Loading categories...</p>
-                    )}
-                </div>
-            );
+            return (<div className="flex gap-2 overflow-x-auto no-scrollbar py-2 px-1">{fetchedCategories.length > 0 ? fetchedCategories.map(cat => (<button key={cat.id} onClick={() => handleCategorySelect(cat.name)} className="px-4 py-1.5 bg-gray-100 text-gray-700 rounded-full text-xs font-bold whitespace-nowrap border border-gray-200 hover:bg-blue-50 hover:text-blue-600 transition-colors">{cat.name}</button>)) : (<p className="text-xs text-gray-400 p-2">Loading categories...</p>)}</div>);
         } else if (filterLevel === 1) {
-            // Show Specialties based on Selected Category
-            const catObj = fetchedCategories.find(c => c.name === selectedCategory);
-            const currentSpecs = catObj ? fetchedSpecialties.filter(s => s.category_id === catObj.id) : [];
-
-            return (
-                <div className="flex gap-2 overflow-x-auto no-scrollbar py-2 px-1 items-center">
-                    <button onClick={() => setFilterLevel(0)} className="p-1.5 bg-gray-200 rounded-full mr-2 shrink-0"><ArrowLeft size={12}/></button>
-                    {currentSpecs.map(spec => (
-                        <button key={spec.id} onClick={() => handleSpecialtySelect(spec.name)} className="px-4 py-1.5 bg-blue-50 text-blue-700 rounded-full text-xs font-bold whitespace-nowrap border border-blue-200">
-                            {spec.name}
-                        </button>
-                    ))}
-                </div>
-            );
+            const catObj = fetchedCategories.find(c => c.name === selectedCategory); const currentSpecs = catObj ? fetchedSpecialties.filter(s => s.category_id === catObj.id) : [];
+            return (<div className="flex gap-2 overflow-x-auto no-scrollbar py-2 px-1 items-center"><button onClick={() => setFilterLevel(0)} className="p-1.5 bg-gray-200 rounded-full mr-2 shrink-0"><ArrowLeft size={12}/></button>{currentSpecs.map(spec => (<button key={spec.id} onClick={() => handleSpecialtySelect(spec.name)} className="px-4 py-1.5 bg-blue-50 text-blue-700 rounded-full text-xs font-bold whitespace-nowrap border border-blue-200">{spec.name}</button>))}</div>);
         } else if (filterLevel === 2) {
-            // Show Neighborhoods
-            // Determine Back Button Logic: Go back to specialties (1) if they exist, else categories (0)
-            const catObj = fetchedCategories.find(c => c.name === selectedCategory);
-            const hasSpecs = catObj && fetchedSpecialties.some(s => s.category_id === catObj.id);
-            const backLevel = hasSpecs ? 1 : 0;
-
-            return (
-                <div className="flex gap-2 overflow-x-auto no-scrollbar py-2 px-1 items-center">
-                    <button onClick={() => setFilterLevel(backLevel)} className="p-1.5 bg-gray-200 rounded-full mr-2 shrink-0"><ArrowLeft size={12}/></button>
-                    <button onClick={() => setSelectedNeighborhood(null)} className={`px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap border ${selectedNeighborhood === null ? 'bg-black text-white' : 'bg-gray-100 text-gray-500'}`}>الكل</button>
-                    {neighborhoods.map(hood => (
-                        <button key={hood} onClick={() => handleNeighborhoodSelect(hood)} className={`px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap border transition-colors ${selectedNeighborhood === hood ? 'bg-green-600 text-white border-green-600' : 'bg-gray-100 text-gray-700 hover:bg-green-50'}`}>
-                            {hood}
-                        </button>
-                    ))}
-                </div>
-            );
+            const catObj = fetchedCategories.find(c => c.name === selectedCategory); const hasSpecs = catObj && fetchedSpecialties.some(s => s.category_id === catObj.id); const backLevel = hasSpecs ? 1 : 0;
+            return (<div className="flex gap-2 overflow-x-auto no-scrollbar py-2 px-1 items-center"><button onClick={() => setFilterLevel(backLevel)} className="p-1.5 bg-gray-200 rounded-full mr-2 shrink-0"><ArrowLeft size={12}/></button><button onClick={() => setSelectedNeighborhood(null)} className={`px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap border ${selectedNeighborhood === null ? 'bg-black text-white' : 'bg-gray-100 text-gray-500'}`}>الكل</button>{neighborhoods.map(hood => (<button key={hood} onClick={() => handleNeighborhoodSelect(hood)} className={`px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap border transition-colors ${selectedNeighborhood === hood ? 'bg-green-600 text-white border-green-600' : 'bg-gray-100 text-gray-700 hover:bg-green-50'}`}>{hood}</button>))}</div>);
         }
     };
 
-    // Filter Logic Implementation
     const filteredProviders = providers.filter(p => {
-        // 1. Search Term
         const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.service_type.toLowerCase().includes(searchTerm.toLowerCase());
-        
-        // 2. Category Filter
-        let matchesCategory = true;
-        if (selectedCategory) {
-            matchesCategory = p.category === selectedCategory || (!p.category && p.service_type === selectedCategory); // Fallback for old data
-        }
-
-        // 3. Specialty Filter
-        let matchesSpecialty = true;
-        if (selectedSpecialty) {
-            matchesSpecialty = p.specialty === selectedSpecialty;
-        }
-
-        // 4. Neighborhood Filter
-        let matchesNeighborhood = true;
-        if (selectedNeighborhood) {
-            matchesNeighborhood = p.neighborhood === selectedNeighborhood || p.location.includes(selectedNeighborhood);
-        }
-
+        let matchesCategory = true; if (selectedCategory) matchesCategory = p.category === selectedCategory || (!p.category && p.service_type === selectedCategory);
+        let matchesSpecialty = true; if (selectedSpecialty) matchesSpecialty = p.specialty === selectedSpecialty;
+        let matchesNeighborhood = true; if (selectedNeighborhood) matchesNeighborhood = p.neighborhood === selectedNeighborhood || p.location.includes(selectedNeighborhood);
         return matchesSearch && matchesCategory && matchesSpecialty && matchesNeighborhood;
     });
-
 
     const handleChipClick = async (text: string) => {
         setInput(text);
@@ -783,14 +586,12 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
         setMessages(prev => [...prev, msg]);
         
         if(currentUser) {
-            // Save as JSON string to persist the component details including appointmentId
             const persistedData = JSON.stringify(details);
-            
             await supabase.from('chat_history').insert({
                 user_id: currentUser.id,
                 provider_id: selectedChat ? selectedChat.id : null,
                 role: 'BOT',
-                text: persistedData // Save structured data
+                text: persistedData 
             });
         }
     }
@@ -873,8 +674,6 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
     return (
         <div className="flex flex-col h-full bg-[#EFE7DD] relative">
             
-            {/* URGENT TICKER HIDDEN IN CHAT VIEW AS REQUESTED */}
-            
             <div className="bg-white py-3 px-2 border-b flex items-center gap-2 shadow-sm z-20">
                 <button onClick={() => setView('LIST')} className="p-2"><ArrowLeft size={20}/></button>
                 <div onClick={() => selectedChat && setShowProfile(true)} className="flex items-center gap-3 flex-1 cursor-pointer">
@@ -899,7 +698,6 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
                 {messages.map((m, i) => (
                     <div key={i} className={`flex mb-2 ${m.role === Role.USER ? 'justify-end' : 'justify-start'}`}>
                         {m.isWelcomeAd ? (
-                            // --- WELCOME AD STYLE (PERSISTENT STORY) ---
                             <div className="w-full max-w-[85%] bg-white rounded-xl overflow-hidden shadow-md border border-pink-200 mb-4 transform transition-all hover:scale-[1.01]">
                                 <div className="bg-pink-50 p-2 flex items-center gap-2 border-b border-pink-100">
                                     <MessageSquare size={14} className="text-pink-600"/>
@@ -928,7 +726,6 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
                 <div ref={messagesEndRef}/>
             </div>
             
-            {/* SMART SUGGESTION CHIPS */}
             {suggestions.length > 0 && !isLoading && (
                 <div className="p-2 bg-[#EFE7DD] flex gap-2 overflow-x-auto no-scrollbar">
                     {suggestions.map((chip, i) => (
