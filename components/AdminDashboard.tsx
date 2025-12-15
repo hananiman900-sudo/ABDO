@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { useLocalization } from '../hooks/useLocalization';
-import { ArrowLeft, Loader2, Plus, Trash2, Edit, CheckCircle, XCircle, ShoppingBag, Users, Megaphone, Image as ImageIcon, Settings, Save, BarChart3, X, FileText, Phone, CreditCard, RefreshCw, Power, Layers, ChevronDown, ChevronUp, Clock, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Loader2, Plus, Trash2, Edit, CheckCircle, XCircle, ShoppingBag, Users, Megaphone, Image as ImageIcon, Settings, Save, BarChart3, X, FileText, Phone, CreditCard, RefreshCw, Power, Layers, ChevronDown, ChevronUp, Clock, AlertTriangle, Rocket } from 'lucide-react';
 import { Product, AdRequest, Order, AppCategory, AppSpecialty } from '../types';
 
 interface AdminDashboardProps {
@@ -12,7 +12,7 @@ interface AdminDashboardProps {
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
     const { t } = useLocalization();
-    const [activeTab, setActiveTab] = useState<'PRODUCTS' | 'PROVIDERS' | 'ADS' | 'STATS' | 'ORDERS' | 'SUBS' | 'SETTINGS'>('PRODUCTS');
+    const [activeTab, setActiveTab] = useState<'PRODUCTS' | 'PROVIDERS' | 'ADS' | 'STATS' | 'ORDERS' | 'SUBS' | 'SETTINGS' | 'BOOSTS'>('PRODUCTS');
     const [loading, setLoading] = useState(false);
 
     // Products State
@@ -43,6 +43,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
     const [newSpecialtyName, setNewSpecialtyName] = useState('');
     const [expandedCategory, setExpandedCategory] = useState<number | null>(null);
 
+    // Boosts State
+    const [boostRequests, setBoostRequests] = useState<any[]>([]);
+
     useEffect(() => {
         if(isOpen) {
             fetchData();
@@ -55,7 +58,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
             const { data } = await supabase.from('products').select('*').order('created_at', { ascending: false });
             setProducts(data || []);
         } else if (activeTab === 'PROVIDERS') {
-            // Fetch ALL providers ordered by creation date
             const { data } = await supabase.from('providers').select('*').order('created_at', { ascending: false });
             setAllProviders(data || []);
         } else if (activeTab === 'ADS') {
@@ -81,77 +83,56 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
             const { data: specs } = await supabase.from('app_specialties').select('*').order('name');
             setAppCategories(cats || []);
             setAppSpecialties(specs || []);
+        } else if (activeTab === 'BOOSTS') {
+            const { data } = await supabase.from('sponsored_requests').select('*, providers(name, phone), provider_ads(message, image_url)').order('created_at', { ascending: false });
+            setBoostRequests(data || []);
         }
         setLoading(false);
     };
 
-    // --- PRODUCT LOGIC ---
-    const handleSaveProduct = async () => { /* ... existing code ... */ 
-        if (!newProduct.name || !newProduct.price) return alert(t('errorMessage')); setLoading(true); const sizesArray = newProduct.sizes ? newProduct.sizes.split(',').map(s => s.trim()).filter(s => s !== '') : []; const payload = { name: newProduct.name, price: parseFloat(newProduct.price), category: newProduct.category, description: newProduct.description, image_url: newProduct.image, images: newProduct.images, sizes: sizesArray }; let error; if (editingProductId) { const { error: err } = await supabase.from('products').update(payload).eq('id', editingProductId); error = err; } else { const { error: err } = await supabase.from('products').insert(payload); error = err; } if (!error) { alert(editingProductId ? t('success') : t('addProductSuccess')); handleCancelEdit(); fetchData(); } else { alert(t('errorMessage')); } setLoading(false);
+    // ... (Existing handlers for Products, Categories, Providers, Ads, Orders, Subscriptions - KEEP AS IS)
+    
+    // --- BOOST LOGIC ---
+    const handleApproveBoost = async (req: any) => {
+        if(!confirm('Activate this ad for 7 days?')) return;
+        setLoading(true);
+        const endDate = new Date();
+        endDate.setDate(endDate.getDate() + 7);
+
+        // 1. Update Request
+        await supabase.from('sponsored_requests').update({ status: 'approved' }).eq('id', req.id);
+        
+        // 2. Update Ad
+        await supabase.from('provider_ads').update({ is_sponsored: true, sponsored_end_date: endDate.toISOString() }).eq('id', req.ad_id);
+        
+        fetchData();
+        setLoading(false);
     };
+
+    const handleRejectBoost = async (id: number) => {
+        if(!confirm('Reject?')) return;
+        await supabase.from('sponsored_requests').update({ status: 'rejected' }).eq('id', id);
+        fetchData();
+    };
+
+    // (KEEP all existing helper functions for product, cats, etc.)
+    const handleSaveProduct = async () => { if (!newProduct.name || !newProduct.price) return alert(t('errorMessage')); setLoading(true); const sizesArray = newProduct.sizes ? newProduct.sizes.split(',').map(s => s.trim()).filter(s => s !== '') : []; const payload = { name: newProduct.name, price: parseFloat(newProduct.price), category: newProduct.category, description: newProduct.description, image_url: newProduct.image, images: newProduct.images, sizes: sizesArray }; let error; if (editingProductId) { const { error: err } = await supabase.from('products').update(payload).eq('id', editingProductId); error = err; } else { const { error: err } = await supabase.from('products').insert(payload); error = err; } if (!error) { alert(editingProductId ? t('success') : t('addProductSuccess')); handleCancelEdit(); fetchData(); } else { alert(t('errorMessage')); } setLoading(false); };
     const handleEditProduct = (p: Product) => { setNewProduct({ name: p.name, price: p.price.toString(), category: p.category, description: p.description || '', image: p.image_url || '', images: p.images || [], sizes: p.sizes ? p.sizes.join(', ') : '' }); setEditingProductId(p.id); document.querySelector('.overflow-y-auto')?.scrollTo({ top: 0, behavior: 'smooth' }); }
     const handleCancelEdit = () => { setNewProduct({ name: '', price: '', category: 'category_clothes', description: '', image: '', images: [], sizes: '' }); setEditingProductId(null); }
     const handleDeleteProduct = async (id: number) => { if(confirm(t('delete') + '?')) { await supabase.from('products').delete().eq('id', id); fetchData(); } };
     const handleProductImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => { const file = e.target.files?.[0]; if(!file) return; setLoading(true); try { const fileName = `prod_${Date.now()}`; await supabase.storage.from('product-images').upload(fileName, file); const { data } = supabase.storage.from('product-images').getPublicUrl(fileName); if (!newProduct.image) setNewProduct(prev => ({ ...prev, image: data.publicUrl })); else setNewProduct(prev => ({ ...prev, images: [...prev.images, data.publicUrl] })); } catch(e) {} finally { setLoading(false); } };
     const removeImage = (index: number) => { const newImages = [...newProduct.images]; newImages.splice(index, 1); setNewProduct(prev => ({ ...prev, images: newImages })); }
-
-    // --- CATEGORY MANAGEMENT ---
     const handleAddCategory = async () => { if(!newCategoryName.trim()) return; setLoading(true); const { error } = await supabase.from('app_categories').insert({ name: newCategoryName.trim() }); if(!error) { setNewCategoryName(''); fetchData(); } else alert('Error adding category'); setLoading(false); };
     const handleDeleteCategory = async (id: number) => { if(!confirm('Delete category?')) return; setLoading(true); await supabase.from('app_categories').delete().eq('id', id); fetchData(); };
     const handleAddSpecialty = async (categoryId: number) => { if(!newSpecialtyName.trim()) return; setLoading(true); const { error } = await supabase.from('app_specialties').insert({ category_id: categoryId, name: newSpecialtyName.trim() }); if(!error) { setNewSpecialtyName(''); fetchData(); } else alert('Error adding specialty'); setLoading(false); };
     const handleDeleteSpecialty = async (id: number) => { if(!confirm('Delete specialty?')) return; await supabase.from('app_specialties').delete().eq('id', id); fetchData(); };
-
-    // --- PROVIDER TOGGLE LOGIC ---
-    const toggleProviderActivation = async (provider: any) => {
-        setLoading(true);
-        const newStatus = !provider.is_active;
-        
-        let updateData: any = { is_active: newStatus };
-        // If activating, and subscription is invalid, give 30 days
-        if (newStatus && (!provider.subscription_end_date || new Date(provider.subscription_end_date) < new Date())) {
-             const endDate = new Date();
-             endDate.setDate(endDate.getDate() + 30);
-             updateData.subscription_end_date = endDate.toISOString();
-        }
-
-        const { error } = await supabase.from('providers').update(updateData).eq('id', provider.id);
-        
-        if(!error) {
-            // Update local list instantly
-            setAllProviders(prev => prev.map(p => p.id === provider.id ? {...p, is_active: newStatus} : p));
-        } else {
-            alert(t('errorMessage'));
-        }
-        setLoading(false);
-    };
-
-    const handleDeleteProvider = async (id: number) => {
-        if(confirm(t('delete') + ' Provider? This will remove all their data.')) {
-            await supabase.from('providers').delete().eq('id', id);
-            fetchData();
-        }
-    };
-
-    // --- AD LOGIC ---
+    const toggleProviderActivation = async (provider: any) => { setLoading(true); const newStatus = !provider.is_active; let updateData: any = { is_active: newStatus }; if (newStatus && (!provider.subscription_end_date || new Date(provider.subscription_end_date) < new Date())) { const endDate = new Date(); endDate.setDate(endDate.getDate() + 30); updateData.subscription_end_date = endDate.toISOString(); } const { error } = await supabase.from('providers').update(updateData).eq('id', provider.id); if(!error) { setAllProviders(prev => prev.map(p => p.id === provider.id ? {...p, is_active: newStatus} : p)); } else { alert(t('errorMessage')); } setLoading(false); };
+    const handleDeleteProvider = async (id: number) => { if(confirm(t('delete') + ' Provider? This will remove all their data.')) { await supabase.from('providers').delete().eq('id', id); fetchData(); } };
     const handleApproveAd = async (req: AdRequest) => { await supabase.from('system_announcements').insert({ title: req.providers?.name || 'Offer', message: req.message, image_url: req.image_url, is_active: true }); await supabase.from('provider_ad_requests').update({ status: 'approved' }).eq('id', req.id); fetchData(); };
     const handleRejectAd = async (id: number) => { await supabase.from('provider_ad_requests').update({ status: 'rejected' }).eq('id', id); fetchData(); };
     const handleDeleteAdRequest = async (id: number) => { if(confirm(t('delete') + '?')) { await supabase.from('provider_ad_requests').delete().eq('id', id); fetchData(); } };
-
-    // --- ORDERS LOGIC ---
     const handleUpdateOrderStatus = async (id: number, status: string) => { setLoading(true); await supabase.from('orders').update({ status: status }).eq('id', id); fetchData(); setLoading(false); }
-
-    // --- SUBSCRIPTION LOGIC ---
-    const handleRenewSubscription = async (provider: any) => {
-        setLoading(true);
-        let currentEnd = provider.subscription_end_date ? new Date(provider.subscription_end_date) : new Date();
-        const now = new Date();
-        if (currentEnd < now) currentEnd = now;
-        currentEnd.setDate(currentEnd.getDate() + 30);
-        await supabase.from('providers').update({ subscription_end_date: currentEnd.toISOString() }).eq('id', provider.id);
-        fetchData();
-        alert(`تم تجديد اشتراك ${provider.name} لمدة شهر بنجاح.`);
-        setLoading(false);
-    }
+    const handleRenewSubscription = async (provider: any) => { setLoading(true); let currentEnd = provider.subscription_end_date ? new Date(provider.subscription_end_date) : new Date(); const now = new Date(); if (currentEnd < now) currentEnd = now; currentEnd.setDate(currentEnd.getDate() + 30); await supabase.from('providers').update({ subscription_end_date: currentEnd.toISOString() }).eq('id', provider.id); fetchData(); alert(`تم تجديد اشتراك ${provider.name} لمدة شهر بنجاح.`); setLoading(false); }
     const calculateDaysLeft = (dateStr: string) => { if(!dateStr) return 0; const end = new Date(dateStr); const now = new Date(); const diff = end.getTime() - now.getTime(); return Math.ceil(diff / (1000 * 60 * 60 * 24)); }
 
     if(!isOpen) return null;
@@ -166,16 +147,55 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
 
             {/* TABS */}
             <div className="flex border-b bg-gray-100 overflow-x-auto no-scrollbar">
-                <button onClick={() => setActiveTab('PRODUCTS')} className={`flex-1 py-4 px-2 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'PRODUCTS' ? 'bg-white text-orange-600 border-b-2 border-orange-600' : 'text-gray-500'}`}><ShoppingBag size={18}/> المنتجات</button>
-                <button onClick={() => setActiveTab('ORDERS')} className={`flex-1 py-4 px-2 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'ORDERS' ? 'bg-white text-teal-600 border-b-2 border-teal-600' : 'text-gray-500'}`}><FileText size={18}/> الطلبات</button>
+                <button onClick={() => setActiveTab('PRODUCTS')} className={`flex-1 py-4 px-2 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'PRODUCTS' ? 'bg-white text-orange-600 border-b-2 border-orange-600' : 'text-gray-500'}`}><ShoppingBag size={18}/> {t('manageProducts')}</button>
+                <button onClick={() => setActiveTab('ORDERS')} className={`flex-1 py-4 px-2 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'ORDERS' ? 'bg-white text-teal-600 border-b-2 border-teal-600' : 'text-gray-500'}`}><FileText size={18}/> {t('storeOrders')}</button>
                 <button onClick={() => setActiveTab('PROVIDERS')} className={`flex-1 py-4 px-2 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'PROVIDERS' ? 'bg-white text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}><Users size={18}/> المهنيين (All)</button>
                 <button onClick={() => setActiveTab('SUBS')} className={`flex-1 py-4 px-2 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'SUBS' ? 'bg-white text-pink-600 border-b-2 border-pink-600' : 'text-gray-500'}`}><CreditCard size={18}/> الاشتراكات</button>
-                <button onClick={() => setActiveTab('ADS')} className={`flex-1 py-4 px-2 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'ADS' ? 'bg-white text-purple-600 border-b-2 border-purple-600' : 'text-gray-500'}`}><Megaphone size={18}/> الإشهار</button>
+                <button onClick={() => setActiveTab('ADS')} className={`flex-1 py-4 px-2 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'ADS' ? 'bg-white text-purple-600 border-b-2 border-purple-600' : 'text-gray-500'}`}><Megaphone size={18}/> {t('adRequests')}</button>
+                <button onClick={() => setActiveTab('BOOSTS')} className={`flex-1 py-4 px-2 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'BOOSTS' ? 'bg-white text-red-600 border-b-2 border-red-600' : 'text-gray-500'}`}><Rocket size={18}/> {t('sponsoredRequests')}</button>
+                <button onClick={() => setActiveTab('STATS')} className={`flex-1 py-4 px-2 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'STATS' ? 'bg-white text-green-600 border-b-2 border-green-600' : 'text-gray-500'}`}><BarChart3 size={18}/> {t('globalStats')}</button>
                 <button onClick={() => setActiveTab('SETTINGS')} className={`flex-1 py-4 px-2 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'SETTINGS' ? 'bg-white text-gray-800 border-b-2 border-gray-800' : 'text-gray-500'}`}><Layers size={18}/> الإعدادات</button>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
                 
+                {/* BOOSTS TAB (NEW) */}
+                {activeTab === 'BOOSTS' && (
+                    <div className="space-y-4">
+                        <div className="bg-red-50 p-4 rounded-xl border border-red-200 mb-2">
+                             <h3 className="font-bold text-red-800">{t('sponsoredRequests')}</h3>
+                             <p className="text-xs text-red-600">Approve ads for 50DH/Week.</p>
+                        </div>
+                        {boostRequests.length === 0 && <p className="text-center text-gray-400 py-10">No boost requests.</p>}
+                        
+                        {boostRequests.map(r => (
+                            <div key={r.id} className="bg-white p-4 rounded-xl border shadow-sm flex flex-col gap-3">
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <h4 className="font-bold text-lg">{r.providers?.name}</h4>
+                                        <p className="text-sm text-gray-600">{r.providers?.phone}</p>
+                                    </div>
+                                    <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${r.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : r.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                        {r.status}
+                                    </span>
+                                </div>
+                                
+                                <div className="flex gap-3 bg-gray-50 p-2 rounded-lg">
+                                    {r.provider_ads?.image_url && <img src={r.provider_ads.image_url} className="w-16 h-16 object-cover rounded bg-white"/>}
+                                    <p className="text-sm italic text-gray-700">{r.provider_ads?.message}</p>
+                                </div>
+
+                                {r.status === 'pending' && (
+                                    <div className="flex gap-2">
+                                        <button onClick={() => handleRejectBoost(r.id)} className="flex-1 bg-red-100 text-red-600 py-2 rounded-lg font-bold text-xs hover:bg-red-200">Reject</button>
+                                        <button onClick={() => handleApproveBoost(r)} className="flex-1 bg-green-600 text-white py-2 rounded-lg font-bold text-xs hover:bg-green-700">Approve (7 Days)</button>
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
+
                 {/* SETTINGS TAB */}
                 {activeTab === 'SETTINGS' && (
                     <div className="space-y-6">
@@ -240,64 +260,53 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                     </div>
                 )}
 
-                {/* PROVIDERS TAB (UPDATED FOR CLEARER ACTIVATION) */}
+                {/* ORDERS TAB */}
+                {activeTab === 'ORDERS' && (
+                    <div className="space-y-4">
+                        <div className="bg-teal-50 p-4 rounded-xl border border-teal-200"><h3 className="font-bold text-teal-800">{t('storeOrders')}</h3><p className="text-xs text-teal-600">Review requests and contact customers.</p></div>
+                        {orders.length === 0 && <p className="text-center text-gray-400 py-10">No orders yet.</p>}
+                        {orders.map(o => (<div key={o.id} className="bg-white p-4 rounded-xl border shadow-sm space-y-3"><div className="flex justify-between items-start"><div><h4 className="font-bold flex items-center gap-2">{o.customer_details?.name || 'Unknown User'} <span className={`text-[10px] px-2 py-0.5 rounded-full ${o.status === 'delivered' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{o.status}</span></h4><p className="text-sm text-gray-600 flex items-center gap-1 mt-1"><Phone size={12}/> <a href={`tel:${o.customer_details?.phone}`} className="hover:underline">{o.customer_details?.phone || 'No phone'}</a></p><p className="text-[10px] text-gray-400">{new Date(o.created_at).toLocaleString()}</p></div><div className="text-right"><span className="font-black text-lg text-orange-600">{o.total_amount} DH</span></div></div><div className="bg-gray-50 p-3 rounded-lg text-sm border"><ul className="space-y-1">{o.items.map((item: any, idx: number) => (<li key={idx} className="flex justify-between text-xs"><span>{item.name} <span className="text-gray-500">x{item.quantity}</span> {item.selectedSize && <span className="font-bold bg-white px-1 border rounded">{item.selectedSize}</span>}</span><span className="font-bold">{item.price * item.quantity} DH</span></li>))}</ul></div>{o.status === 'pending' && (<button onClick={() => handleUpdateOrderStatus(o.id, 'delivered')} className="w-full py-2 bg-green-600 text-white rounded-lg font-bold text-xs flex items-center justify-center gap-2 hover:bg-green-700 transition-colors"><CheckCircle size={14}/> {t('markDelivered')} (Connect)</button>)}</div>))}
+                    </div>
+                )}
+
+                {/* PROVIDERS TAB (FULL MANAGEMENT) */}
                 {activeTab === 'PROVIDERS' && (
                     <div className="space-y-4">
                         <div className="bg-blue-50 p-4 rounded-xl border border-blue-200">
                              <h3 className="font-bold text-blue-800">إدارة المهنيين (All Providers)</h3>
-                             <p className="text-xs text-blue-600">تفعيل وتعطيل الحسابات مع إظهار مدة الاشتراك.</p>
+                             <p className="text-xs text-blue-600">Activate or deactivate accounts directly.</p>
                         </div>
                         {allProviders.length === 0 && <p className="text-center text-gray-400 py-10">No providers found.</p>}
                         
-                        {allProviders.map(p => {
-                            const daysLeft = calculateDaysLeft(p.subscription_end_date);
-                            const isActive = p.is_active === true || p.is_active === 'true'; // Strict check
-
-                            return (
-                                <div key={p.id} className={`bg-white p-4 rounded-xl border shadow-sm ${!isActive ? 'border-red-200 bg-red-50/10' : 'border-green-200'}`}>
-                                    <div className="flex justify-between items-start mb-3">
-                                        <div>
-                                            <div className="flex items-center gap-2">
-                                                <h4 className="font-bold text-lg">{p.name}</h4>
-                                                {isActive ? <CheckCircle size={16} className="text-green-500"/> : <AlertTriangle size={16} className="text-red-500"/>}
-                                            </div>
-                                            <p className="text-sm text-gray-600 font-mono mt-1 flex items-center gap-1"><Phone size={12}/> {p.phone}</p>
-                                            <p className="text-xs text-blue-500 font-bold mt-1">{p.service_type} <span className="text-gray-400">|</span> {p.category || 'N/A'}</p>
-                                            
-                                            {/* Days Left Indicator */}
-                                            <div className="flex items-center gap-2 mt-2">
-                                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold border flex items-center gap-1 ${daysLeft > 0 ? 'bg-green-100 text-green-700 border-green-200' : 'bg-red-100 text-red-700 border-red-200'}`}>
-                                                    <Clock size={10}/> {daysLeft > 0 ? `بقي ${daysLeft} يوم` : 'منتهي الصلاحية'}
-                                                </span>
-                                            </div>
+                        {allProviders.map(p => (
+                            <div key={p.id} className={`bg-white p-4 rounded-xl border shadow-sm ${!p.is_active ? 'border-red-200 bg-red-50/30' : 'border-green-200'}`}>
+                                <div className="flex justify-between items-start mb-2">
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <h4 className="font-bold">{p.name}</h4>
+                                            {p.is_active ? <CheckCircle size={14} className="text-green-500"/> : <XCircle size={14} className="text-red-500"/>}
                                         </div>
+                                        <p className="text-sm text-gray-600 font-mono">{p.phone}</p>
+                                        <p className="text-xs text-blue-500 font-bold">{p.service_type} <span className="text-gray-400">|</span> {p.category || 'N/A'}</p>
+                                        <p className="text-[10px] text-gray-400">{new Date(p.created_at).toLocaleDateString()}</p>
                                     </div>
-                                    
-                                    <div className="flex gap-2 pt-3 border-t border-dashed">
-                                        <button onClick={() => handleDeleteProvider(p.id)} className="p-2 bg-gray-100 text-red-500 rounded-lg hover:bg-red-100 transition-colors"><Trash2 size={18}/></button>
-                                        
-                                        {/* Distinct Activation Buttons */}
-                                        <div className="flex-1 flex gap-2">
-                                            {isActive ? (
-                                                <button 
-                                                    onClick={() => toggleProviderActivation(p)} 
-                                                    className="flex-1 bg-red-100 text-red-600 font-bold py-2 rounded-lg text-xs hover:bg-red-200 border border-red-200 flex items-center justify-center gap-2"
-                                                >
-                                                    <XCircle size={14}/> تعطيل الحساب (Deactivate)
-                                                </button>
-                                            ) : (
-                                                <button 
-                                                    onClick={() => toggleProviderActivation(p)} 
-                                                    className="flex-1 bg-green-600 text-white font-bold py-2 rounded-lg text-xs hover:bg-green-700 shadow-md flex items-center justify-center gap-2"
-                                                >
-                                                    <CheckCircle size={14}/> تفعيل الحساب (Activate)
-                                                </button>
-                                            )}
-                                        </div>
+                                    <div className="flex flex-col gap-2">
+                                        <button 
+                                            onClick={() => toggleProviderActivation(p)} 
+                                            className={`w-10 h-6 rounded-full transition-colors flex items-center px-1 ${p.is_active ? 'bg-green-500 justify-end' : 'bg-gray-300 justify-start'}`}
+                                        >
+                                            <div className="w-4 h-4 bg-white rounded-full shadow-sm"></div>
+                                        </button>
                                     </div>
                                 </div>
-                            );
-                        })}
+                                <div className="flex gap-2 mt-3 pt-3 border-t border-dashed">
+                                    <button onClick={() => handleDeleteProvider(p.id)} className="text-red-500 text-xs font-bold flex items-center gap-1 hover:bg-red-50 px-2 py-1 rounded"><Trash2 size={12}/> Delete</button>
+                                    {!p.is_active && (
+                                        <button onClick={() => toggleProviderActivation(p)} className="ml-auto bg-green-600 text-white text-xs px-3 py-1 rounded-full font-bold shadow-sm">تفعيل الآن</button>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 )}
 
@@ -346,7 +355,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                     </div>
                 )}
 
-                {/* ADS & ORDERS & STATS (Unchanged) */}
+                {/* ADS TAB */}
                 {activeTab === 'ADS' && (
                     <div className="space-y-4">
                          <div className="bg-purple-50 p-4 rounded-xl border border-purple-200 mb-2"><h3 className="font-bold text-purple-800">{t('adRequests')}</h3><p className="text-xs text-purple-600">Archive of all requests.</p></div>
@@ -354,6 +363,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                          {adRequests.map(r => (<div key={r.id} className={`bg-white p-4 rounded-xl border shadow-sm ${r.status !== 'pending' ? 'opacity-75 bg-gray-50' : ''}`}><div className="flex justify-between items-start mb-3"><div className="flex gap-3"><img src={r.image_url} className="w-16 h-16 rounded bg-gray-100 object-cover"/><div><p className="font-bold text-sm">{r.providers?.name}</p><p className="text-sm text-gray-800">{r.message}</p><p className="text-xs text-gray-500 mt-1">{new Date(r.created_at).toLocaleDateString()}</p></div></div><span className={`text-[10px] px-2 py-1 rounded-full font-bold uppercase ${r.status === 'approved' ? 'bg-green-100 text-green-700' : r.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>{r.status}</span></div><div className="flex gap-2">{r.status === 'pending' ? (<><button onClick={() => handleRejectAd(r.id)} className="flex-1 py-2 bg-red-50 text-red-600 rounded-lg font-bold text-xs">{t('reject')}</button><button onClick={() => handleApproveAd(r)} className="flex-1 py-2 bg-green-600 text-white rounded-lg font-bold text-xs">{t('approve')}</button></>) : (<button onClick={() => handleDeleteAdRequest(r.id)} className="w-full py-2 bg-gray-200 text-gray-600 hover:bg-red-500 hover:text-white transition-colors rounded-lg font-bold text-xs flex items-center justify-center gap-2"><Trash2 size={14}/> Delete Request</button>)}</div></div>))}
                     </div>
                 )}
+
+                {/* STATS TAB */}
                 {activeTab === 'STATS' && (
                     <div className="space-y-4">
                         <div className="bg-green-50 p-4 rounded-xl border border-green-200 mb-4"><h3 className="font-bold text-green-800 flex items-center gap-2"><BarChart3 size={20}/> {t('globalStats')}</h3><p className="text-xs text-green-600">Top providers by QR scans.</p></div>

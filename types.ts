@@ -43,6 +43,32 @@ export interface ProviderAd {
     image_url?: string;
     created_at: string;
     is_active: boolean;
+    // New Feed Fields
+    is_sponsored?: boolean;
+    sponsored_end_date?: string;
+    likes_count?: number;
+    comments_count?: number;
+    providers?: { name: string; profile_image_url: string; location: string; phone: string; neighborhood?: string; service_type?: string; };
+    user_has_liked?: boolean;
+}
+
+export interface AdComment {
+    id: number;
+    ad_id: number;
+    user_id: number;
+    user_name: string;
+    comment: string;
+    created_at: string;
+}
+
+export interface SponsoredRequest {
+    id: number;
+    provider_id: number;
+    ad_id: number;
+    status: 'pending' | 'approved' | 'rejected';
+    created_at: string;
+    providers?: { name: string; phone: string };
+    provider_ads?: { message: string; image_url: string };
 }
 
 export interface BookingDetails { 

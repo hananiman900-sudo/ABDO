@@ -16,10 +16,24 @@ export const translations: Translations = {
   discoverServices: { ar: 'اكتشف المزيد من الخدمات', en: 'Discover More Services', fr: 'Découvrir plus de services' },
   
   // --- BOTTOM NAV ---
-  navChat: { ar: 'الرئيسية', en: 'Chat', fr: 'Chat' },
+  navHome: { ar: 'الرئيسية', en: 'Home', fr: 'Accueil' },
+  navChat: { ar: 'المهنيين', en: 'Providers', fr: 'Pros' },
   navStore: { ar: 'المتجر', en: 'Store', fr: 'Boutique' },
   navExplore: { ar: 'خدمات', en: 'Services', fr: 'Services' },
   navProfile: { ar: 'حسابي', en: 'Profile', fr: 'Profil' },
+
+  // --- FEED & SPONSORED ---
+  sponsored: { ar: 'إعلان ممول', en: 'Sponsored', fr: 'Sponsorisé' },
+  contactProvider: { ar: 'تواصل (WhatsApp)', en: 'Contact', fr: 'Contacter' },
+  boostPost: { ar: 'ترويج المنشور (Boost)', en: 'Boost Post', fr: 'Booster' },
+  boostDesc: { ar: 'احصل على المزيد من الزبناء! إعلانك سيظهر للجميع في الصفحة الرئيسية لمدة أسبوع.', en: 'Get more clients! Your ad will be shown to everyone for a week.', fr: 'Plus de clients ! Votre pub sera vue par tous pendant une semaine.' },
+  boostPrice: { ar: '50 درهم / أسبوع', en: '50 DH / Week', fr: '50 DH / Semaine' },
+  requestBoost: { ar: 'طلب ترويج', en: 'Request Boost', fr: 'Demander Boost' },
+  sponsoredRequests: { ar: 'طلبات الترويج', en: 'Sponsored Requests', fr: 'Demandes Sponsor' },
+  like: { ar: 'إعجاب', en: 'Like', fr: 'J\'aime' },
+  comment: { ar: 'تعليق', en: 'Comment', fr: 'Commenter' },
+  writeComment: { ar: 'أضف تعليقا...', en: 'Add a comment...', fr: 'Ajouter un commentaire...' },
+  viewProfile: { ar: 'زيارة الملف', en: 'View Profile', fr: 'Voir Profil' },
 
   // --- SERVICES HUB ---
   servicesHubTitle: { ar: 'جميع الخدمات', en: 'All Services', fr: 'Tous les Services' },
@@ -136,7 +150,6 @@ export const translations: Translations = {
   with: { ar: 'مع', en: 'With', fr: 'Avec' },
   discountApplied: { ar: 'تخفيض', en: 'Discount', fr: 'Réduction' },
   bookingConfirmedTitle: { ar: 'تأكيد الموعد', en: 'Booking Confirmed', fr: 'RDV Confirmé' },
-  sponsored: { ar: 'إشهار', en: 'Sponsored', fr: 'Sponsorisé' },
   
   // --- REAL ESTATE & JOBS ---
   realEstateTitle: { ar: 'السمسار', en: 'Real Estate', fr: 'Immobilier' },
@@ -159,7 +172,6 @@ export const translations: Translations = {
   iamLooking: { ar: 'كنقلب على خدمة', en: 'Looking', fr: 'Je cherche' },
   applyWhatsApp: { ar: 'تواصل', en: 'Contact', fr: 'Contact' },
   hireWhatsApp: { ar: 'تواصل', en: 'Contact', fr: 'Contact' },
-  writeComment: { ar: 'تعليق...', en: 'Comment...', fr: 'Commentaire...' },
   postedAgo: { ar: 'منذ', en: 'ago', fr: 'il y a' },
   noPosts: { ar: 'والو حاليا', en: 'No posts', fr: 'Aucun post' },
   imageRequired: { ar: 'ضروري ترفع صورة وحدة على الأقل', en: 'At least one image is required', fr: 'Une image est requise' },
@@ -171,7 +183,6 @@ export const translations: Translations = {
   qrScannerTitle: { ar: 'مسح الكود', en: 'Scan QR', fr: 'Scanner QR' },
   notifications: { ar: 'الإشعارات', en: 'Notifications', fr: 'Notifications' },
   scanHistory: { ar: 'سجل الزبناء', en: 'History', fr: 'Historique' },
-  requestBoost: { ar: 'طلب إشهار', en: 'Request Ad', fr: 'Demande Pub' },
   verificationSuccess: { ar: 'كود صحيح!', en: 'Valid!', fr: 'Valide !' },
   invalidQR: { ar: 'كود غير صالح', en: 'Invalid QR', fr: 'QR Invalide' },
   wrongProvider: { ar: 'خطأ: هذا الموعد ليس لك', en: 'Error: Appointment not for you', fr: 'Erreur: RDV pas pour vous' },
@@ -182,7 +193,7 @@ export const translations: Translations = {
   requestSent: { ar: 'تم استلام طلبك. سيقوم الأدمن بمراجعة الإعلان والاتصال بكم.', en: 'Request received. Admin will review and contact you.', fr: 'Reçu. L\'admin vous contactera.' },
   uploadError: { ar: 'خطأ', en: 'Error', fr: 'Erreur' },
   providerDirectory: { ar: 'دليل المهنيين', en: 'Provider Directory', fr: 'Annuaire Pro' },
-  paidAdDesc: { ar: 'خدمة مدفوعة (50 درهم/أسبوع). إعلانك سيظهر في قائمة المحادثات.', en: 'Paid Service (50DH/Week). Ad appears in chat list.', fr: 'Service Payant (50DH/Semaine). Pub dans la liste.' },
+  paidAdDesc: { ar: 'خدمة مدفوعة (50 درهم/أسبوع). إعلانك سيظهر للجميع في الصفحة الرئيسية.', en: 'Paid Service (50DH/Week). Ad appears for everyone on Home Feed.', fr: 'Service Payant (50DH/Semaine). Pub pour tout le monde.' },
   
   // --- OFFERS & URGENT ADS ---
   offers: { ar: 'العروض', en: 'Offers', fr: 'Offres' },
