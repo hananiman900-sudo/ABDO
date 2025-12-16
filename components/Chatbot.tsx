@@ -7,8 +7,6 @@ import { supabase } from '../services/supabaseClient';
 import QRCodeDisplay from './QRCodeDisplay';
 import { Send, Mic, Paperclip, Camera, Loader2, X, Globe, Search, ArrowLeft, MoreVertical, Calendar, Info, Phone, MapPin, Instagram, Facebook, Tag, UserPlus, UserCheck, Megaphone, Star, Check, ChevronDown, CheckCircle, StopCircle, Sparkles, Banknote, Clock, Zap, Bell, ChevronRight, RotateCcw, Stethoscope, Wrench, HardHat, Scissors, Utensils, Truck, GraduationCap, Gavel, Syringe, Home, Briefcase, Pill, MessageSquare } from 'lucide-react';
 
-// ... (Existing Sub-components: BookingModal, ChatProfileModal remain unchanged)
-
 // --- HELPER: GET CATEGORY ICON ---
 const getProviderIcon = (serviceType: string, category: string) => {
     const term = (category || serviceType || '').toLowerCase();
@@ -46,9 +44,8 @@ const ProviderAvatar = ({ provider }: { provider: any }) => {
     );
 };
 
-// --- UPDATED URGENT TICKER ---
+// --- URGENT TICKER ---
 export const UrgentTicker: React.FC<{ onClick: () => void; currentUser: AuthenticatedUser | null }> = ({ onClick, currentUser }) => {
-    // ... (Keeping UrgentTicker implementation as is)
     const { t } = useLocalization();
     const [ads, setAds] = useState<UrgentAd[]>([]);
     const [currentAdIndex, setCurrentAdIndex] = useState(0);
@@ -105,7 +102,6 @@ export const UrgentTicker: React.FC<{ onClick: () => void; currentUser: Authenti
 }
 
 export const BookingModal: React.FC<{ provider: any; onClose: () => void; currentUser: AuthenticatedUser | null; onBooked: (details: any) => void; initialOffer?: Offer | null }> = ({ provider, onClose, currentUser, onBooked, initialOffer }) => {
-    // ... (Keep BookingModal as is)
     const { t } = useLocalization();
     const [offers, setOffers] = useState<Offer[]>([]);
     const [selectedOffer, setSelectedOffer] = useState<Offer | null>(null);
@@ -154,11 +150,11 @@ export const BookingModal: React.FC<{ provider: any; onClose: () => void; curren
 }
 
 export const ChatProfileModal: React.FC<{ provider: any; onClose: () => void; currentUser: AuthenticatedUser | null; onBookOffer?: (offer: Offer) => void }> = ({ provider, onClose, currentUser, onBookOffer }) => {
-    // ... (Keep ChatProfileModal as is)
     const { t } = useLocalization();
     const [offers, setOffers] = useState<Offer[]>([]);
     const [isFollowing, setIsFollowing] = useState(false);
     const [stats, setStats] = useState({ followers: 0, posts: 0 });
+    
     useEffect(() => {
         const fetch = async () => {
             const { data } = await supabase.from('provider_offers').select('*').eq('provider_id', provider.id);
@@ -173,6 +169,7 @@ export const ChatProfileModal: React.FC<{ provider: any; onClose: () => void; cu
         }
         fetch();
     }, [provider, currentUser]);
+
     const handleFollow = async () => {
         if(!currentUser) return alert(t('loginRequired'));
         if(isFollowing) { await supabase.from('follows').delete().eq('client_id', currentUser.id).eq('provider_id', provider.id); setStats(prev => ({ ...prev, followers: prev.followers - 1 })); } 
@@ -193,7 +190,7 @@ export const ChatProfileModal: React.FC<{ provider: any; onClose: () => void; cu
                  <div className="space-y-4 mb-6"><h3 className="font-bold border-b pb-2">{t('bioLabel')}</h3><p className="text-sm text-gray-600 whitespace-pre-line">{provider.bio || "No bio available."}</p><h3 className="font-bold border-b pb-2">{t('socialLinks')}</h3><div className="flex gap-4 justify-center">{provider.social_links?.instagram && <a href={`https://instagram.com/${provider.social_links.instagram}`} className="text-pink-600 bg-pink-50 p-2 rounded-full"><Instagram/></a>}{provider.social_links?.facebook && <a href={`https://facebook.com/${provider.social_links.facebook}`} className="text-blue-600 bg-blue-50 p-2 rounded-full"><Facebook/></a>}{provider.social_links?.gps && <a href={`https://maps.google.com/?q=${provider.social_links.gps}`} className="text-green-600 bg-green-50 p-2 rounded-full"><MapPin/></a>}</div></div>
                  <h3 className="font-bold border-b pb-2 mb-4 flex items-center gap-2"><Tag size={18}/> {t('offers')}</h3>
                  
-                 {/* FIXED OFFERS RENDERING STRUCTURE */}
+                 {/* FIXED OFFERS RENDERING STRUCTURE - MULTILINE TO FIX PARSING ERRORS */}
                  {offers.length === 0 ? (
                     <div className="text-center py-8 text-gray-400 bg-gray-50 rounded-xl border border-dashed">
                         <Tag className="mx-auto mb-2 opacity-50"/>
