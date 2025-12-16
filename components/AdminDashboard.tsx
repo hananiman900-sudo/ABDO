@@ -2,8 +2,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { useLocalization } from '../hooks/useLocalization';
-import { ArrowLeft, Loader2, Plus, Trash2, Edit, CheckCircle, XCircle, ShoppingBag, Users, Megaphone, Image as ImageIcon, Settings, Save, BarChart3, X, FileText, Phone, CreditCard, RefreshCw, Power, Layers, ChevronDown, ChevronUp, Clock, AlertTriangle, Rocket, Handshake, Check } from 'lucide-react';
-import { Product, AdRequest, Order, AppCategory, AppSpecialty } from '../types';
+import { ArrowLeft, Loader2, Plus, Trash2, Edit, CheckCircle, XCircle, ShoppingBag, Users, Megaphone, Image as ImageIcon, Settings, Save, BarChart3, X, FileText, Phone, CreditCard, RefreshCw, Power, Layers, ChevronDown, ChevronUp, Clock, AlertTriangle, Rocket, Handshake, Check, Banknote, ArrowDownLeft, Wallet } from 'lucide-react';
+import { Product, AdRequest, Order, AppCategory, AppSpecialty, WithdrawalRequest } from '../types';
 
 interface AdminDashboardProps {
     isOpen: boolean;
@@ -12,13 +12,13 @@ interface AdminDashboardProps {
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
     const { t } = useLocalization();
-    const [activeTab, setActiveTab] = useState<'PRODUCTS' | 'PROVIDERS' | 'ADS' | 'STATS' | 'ORDERS' | 'SUBS' | 'SETTINGS' | 'BOOSTS' | 'AFFILIATES'>('PRODUCTS');
+    const [activeTab, setActiveTab] = useState<'PRODUCTS' | 'PROVIDERS' | 'ADS' | 'STATS' | 'ORDERS' | 'SUBS' | 'SETTINGS' | 'BOOSTS' | 'AFFILIATES' | 'WITHDRAWALS'>('PRODUCTS');
     const [loading, setLoading] = useState(false);
     const [actionLoading, setActionLoading] = useState<number | null>(null);
 
     // Products State
     const [products, setProducts] = useState<Product[]>([]);
-    const [newProduct, setNewProduct] = useState({ name: '', price: '', category: 'category_clothes', description: '', image: '', images: [] as string[], sizes: '' });
+    const [newProduct, setNewProduct] = useState({ name: '', price: '', discount_price: '', category: 'category_clothes', description: '', image: '', images: [] as string[], sizes: '', affiliate_commission: '', is_featured: false });
     const [editingProductId, setEditingProductId] = useState<number | null>(null);
     const fileRef = useRef<HTMLInputElement>(null);
 
@@ -49,6 +49,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
 
     // Affiliate State
     const [affiliates, setAffiliates] = useState<any[]>([]);
+    
+    // Withdrawals State
+    const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
 
     useEffect(() => {
         if(isOpen) {
@@ -92,9 +95,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
         } else if (activeTab === 'AFFILIATES') {
             const { data } = await supabase.from('affiliate_partners').select('*, clients(full_name, phone)').order('created_at', { ascending: false });
             setAffiliates(data || []);
+        } else if (activeTab === 'WITHDRAWALS') {
+            const { data } = await supabase.from('withdrawal_requests').select('*, affiliate_partners(clients(full_name, phone))').order('created_at', { ascending: false });
+            setWithdrawals(data as any || []);
         }
         setLoading(false);
     };
+
+    // --- WITHDRAWAL LOGIC ---
+    const handleWithdrawalAction = async (id: number, status: 'approved' | 'rejected') => {
+        if(!confirm(`Confirm ${status} withdrawal?`)) return;
+        setActionLoading(id);
+        const { error } = await supabase.from('withdrawal_requests').update({ status }).eq('id', id);
+        if(!error) fetchData();
+        else alert(error.message);
+        setActionLoading(null);
+    }
 
     // --- AFFILIATE LOGIC ---
     const handleAffiliateAction = async (id: number, status: 'approved' | 'rejected') => {
@@ -135,13 +151,110 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
         setActionLoading(null);
     };
 
-    // (Helper functions for products, cats etc.)
-    const handleSaveProduct = async () => { if (!newProduct.name || !newProduct.price) return alert(t('errorMessage')); setLoading(true); const sizesArray = newProduct.sizes ? newProduct.sizes.split(',').map(s => s.trim()).filter(s => s !== '') : []; const payload = { name: newProduct.name, price: parseFloat(newProduct.price), category: newProduct.category, description: newProduct.description, image_url: newProduct.image, images: newProduct.images, sizes: sizesArray }; let error; if (editingProductId) { const { error: err } = await supabase.from('products').update(payload).eq('id', editingProductId); error = err; } else { const { error: err } = await supabase.from('products').insert(payload); error = err; } if (!error) { alert(editingProductId ? t('success') : t('addProductSuccess')); handleCancelEdit(); fetchData(); } else { alert(t('errorMessage')); } setLoading(false); };
-    const handleEditProduct = (p: Product) => { setNewProduct({ name: p.name, price: p.price.toString(), category: p.category, description: p.description || '', image: p.image_url || '', images: p.images || [], sizes: p.sizes ? p.sizes.join(', ') : '' }); setEditingProductId(p.id); document.querySelector('.overflow-y-auto')?.scrollTo({ top: 0, behavior: 'smooth' }); }
-    const handleCancelEdit = () => { setNewProduct({ name: '', price: '', category: 'category_clothes', description: '', image: '', images: [], sizes: '' }); setEditingProductId(null); }
+    // --- PRODUCT LOGIC (UPDATED WITH DISCOUNT & COMMISSION) ---
+    const handleSaveProduct = async () => { 
+        if (!newProduct.name || !newProduct.price) return alert(t('errorMessage')); 
+        setLoading(true); 
+        const sizesArray = newProduct.sizes ? newProduct.sizes.split(',').map(s => s.trim()).filter(s => s !== '') : []; 
+        const payload = { 
+            name: newProduct.name, 
+            price: parseFloat(newProduct.price), 
+            category: newProduct.category, 
+            description: newProduct.description, 
+            image_url: newProduct.image, 
+            images: newProduct.images, 
+            sizes: sizesArray,
+            affiliate_commission: newProduct.affiliate_commission ? parseFloat(newProduct.affiliate_commission) : 0,
+            discount_price: newProduct.discount_price ? parseFloat(newProduct.discount_price) : 0,
+            is_featured: newProduct.is_featured
+        }; 
+        let error; 
+        if (editingProductId) { 
+            const { error: err } = await supabase.from('products').update(payload).eq('id', editingProductId); error = err; 
+        } else { 
+            const { error: err } = await supabase.from('products').insert(payload); error = err; 
+        } 
+        if (!error) { alert(editingProductId ? t('success') : t('addProductSuccess')); handleCancelEdit(); fetchData(); } else { alert(t('errorMessage')); } 
+        setLoading(false); 
+    };
+    
+    const handleEditProduct = (p: Product) => { 
+        setNewProduct({ 
+            name: p.name, 
+            price: p.price.toString(), 
+            category: p.category, 
+            description: p.description || '', 
+            image: p.image_url || '', 
+            images: p.images || [], 
+            sizes: p.sizes ? p.sizes.join(', ') : '',
+            affiliate_commission: p.affiliate_commission ? p.affiliate_commission.toString() : '',
+            discount_price: p.discount_price ? p.discount_price.toString() : '',
+            is_featured: p.is_featured || false
+        }); 
+        setEditingProductId(p.id); 
+        document.querySelector('.overflow-y-auto')?.scrollTo({ top: 0, behavior: 'smooth' }); 
+    }
+    
+    const handleCancelEdit = () => { setNewProduct({ name: '', price: '', discount_price: '', category: 'category_clothes', description: '', image: '', images: [], sizes: '', affiliate_commission: '', is_featured: false }); setEditingProductId(null); }
     const handleDeleteProduct = async (id: number) => { if(confirm(t('delete') + '?')) { await supabase.from('products').delete().eq('id', id); fetchData(); } };
     const handleProductImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => { const file = e.target.files?.[0]; if(!file) return; setLoading(true); try { const fileName = `prod_${Date.now()}`; await supabase.storage.from('product-images').upload(fileName, file); const { data } = supabase.storage.from('product-images').getPublicUrl(fileName); if (!newProduct.image) setNewProduct(prev => ({ ...prev, image: data.publicUrl })); else setNewProduct(prev => ({ ...prev, images: [...prev.images, data.publicUrl] })); } catch(e) {} finally { setLoading(false); } };
     const removeImage = (index: number) => { const newImages = [...newProduct.images]; newImages.splice(index, 1); setNewProduct(prev => ({ ...prev, images: newImages })); }
+    
+    // --- ORDER LOGIC (UPDATED FOR AFFILIATE REALIZED EARNINGS) ---
+    const handleUpdateOrderStatus = async (id: number, status: string) => { 
+        setLoading(true); 
+        // Update Order Status
+        const { error } = await supabase.from('orders').update({ status: status }).eq('id', id); 
+        
+        if (error) {
+            alert("خطأ في تحديث الطلب: " + error.message);
+            setLoading(false);
+            return;
+        }
+
+        if (status === 'delivered') {
+            // IF DELIVERED, UPDATE AFFILIATE SALES TO COMPLETED (REALIZED EARNINGS)
+            // AND UPDATE PARTNER TOTAL EARNINGS
+            const { data: sales } = await supabase.from('affiliate_sales').select('*').eq('order_id', id);
+            
+            if (sales && sales.length > 0) {
+                let successCount = 0;
+                for (const sale of sales) {
+                    if (sale.status !== 'completed') {
+                        // Mark sale as completed (Realized)
+                        const { error: saleError } = await supabase.from('affiliate_sales').update({ status: 'completed' }).eq('id', sale.id);
+                        
+                        if (saleError) {
+                            console.error("Sale update error:", saleError);
+                            alert("خطأ: تأكد من تشغيل كود V36 لتحديث أرباح المسوقين.");
+                            continue;
+                        }
+
+                        // Increment Partner Total Earnings (Available for withdrawal)
+                        const { data: partner } = await supabase.from('affiliate_partners').select('total_earnings').eq('id', sale.partner_id).single();
+                        if (partner) {
+                            const newTotal = (Number(partner.total_earnings) || 0) + Number(sale.commission);
+                            const { error: partnerError } = await supabase.from('affiliate_partners').update({ total_earnings: newTotal }).eq('id', sale.partner_id);
+                            
+                            if (partnerError) {
+                                console.error("Partner update error:", partnerError);
+                                alert("خطأ في تحديث رصيد الشريك. تأكد من V36.");
+                            } else {
+                                successCount++;
+                            }
+                        }
+                    }
+                }
+                if (successCount > 0) {
+                    alert(`تم تحديث رصيد المسوق لـ ${successCount} منتجات.`);
+                }
+            }
+        }
+
+        fetchData(); 
+        setLoading(false); 
+    }
+
     const handleAddCategory = async () => { if(!newCategoryName.trim()) return; setLoading(true); const { error } = await supabase.from('app_categories').insert({ name: newCategoryName.trim() }); if(!error) { setNewCategoryName(''); fetchData(); } else alert('Error adding category'); setLoading(false); };
     const handleDeleteCategory = async (id: number) => { if(!confirm('Delete category?')) return; setLoading(true); await supabase.from('app_categories').delete().eq('id', id); fetchData(); };
     const handleAddSpecialty = async (categoryId: number) => { if(!newSpecialtyName.trim()) return; setLoading(true); const { error } = await supabase.from('app_specialties').insert({ category_id: categoryId, name: newSpecialtyName.trim() }); if(!error) { setNewSpecialtyName(''); fetchData(); } else alert('Error adding specialty'); setLoading(false); };
@@ -151,7 +264,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
     const handleApproveAd = async (req: AdRequest) => { await supabase.from('system_announcements').insert({ title: req.providers?.name || 'Offer', message: req.message, image_url: req.image_url, is_active: true }); await supabase.from('provider_ad_requests').update({ status: 'approved' }).eq('id', req.id); fetchData(); };
     const handleRejectAd = async (id: number) => { await supabase.from('provider_ad_requests').update({ status: 'rejected' }).eq('id', id); fetchData(); };
     const handleDeleteAdRequest = async (id: number) => { if(confirm(t('delete') + '?')) { await supabase.from('provider_ad_requests').delete().eq('id', id); fetchData(); } };
-    const handleUpdateOrderStatus = async (id: number, status: string) => { setLoading(true); await supabase.from('orders').update({ status: status }).eq('id', id); fetchData(); setLoading(false); }
     const handleRenewSubscription = async (provider: any) => { setLoading(true); let currentEnd = provider.subscription_end_date ? new Date(provider.subscription_end_date) : new Date(); const now = new Date(); if (currentEnd < now) currentEnd = now; currentEnd.setDate(currentEnd.getDate() + 30); await supabase.from('providers').update({ subscription_end_date: currentEnd.toISOString() }).eq('id', provider.id); fetchData(); alert(`تم تجديد اشتراك ${provider.name} لمدة شهر بنجاح.`); setLoading(false); }
     const calculateDaysLeft = (dateStr: string) => { if(!dateStr) return 0; const end = new Date(dateStr); const now = new Date(); const diff = end.getTime() - now.getTime(); return Math.ceil(diff / (1000 * 60 * 60 * 24)); }
 
@@ -173,6 +285,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                 <button onClick={() => setActiveTab('SUBS')} className={`flex-1 py-4 px-2 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'SUBS' ? 'bg-white text-pink-600 border-b-2 border-pink-600' : 'text-gray-500'}`}><CreditCard size={18}/> الاشتراكات</button>
                 <button onClick={() => setActiveTab('ADS')} className={`flex-1 py-4 px-2 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'ADS' ? 'bg-white text-purple-600 border-b-2 border-purple-600' : 'text-gray-500'}`}><Megaphone size={18}/> {t('adRequests')}</button>
                 <button onClick={() => setActiveTab('AFFILIATES')} className={`flex-1 py-4 px-2 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'AFFILIATES' ? 'bg-white text-yellow-600 border-b-2 border-yellow-600' : 'text-gray-500'}`}><Handshake size={18}/> Partners</button>
+                <button onClick={() => setActiveTab('WITHDRAWALS')} className={`flex-1 py-4 px-2 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'WITHDRAWALS' ? 'bg-white text-cyan-600 border-b-2 border-cyan-600' : 'text-gray-500'}`}><ArrowDownLeft size={18}/> سحب</button>
                 <button onClick={() => setActiveTab('BOOSTS')} className={`flex-1 py-4 px-2 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'BOOSTS' ? 'bg-white text-red-600 border-b-2 border-red-600' : 'text-gray-500'}`}><Rocket size={18}/> {t('sponsoredRequests')}</button>
                 <button onClick={() => setActiveTab('STATS')} className={`flex-1 py-4 px-2 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'STATS' ? 'bg-white text-green-600 border-b-2 border-green-600' : 'text-gray-500'}`}><BarChart3 size={18}/> {t('globalStats')}</button>
                 <button onClick={() => setActiveTab('SETTINGS')} className={`flex-1 py-4 px-2 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'SETTINGS' ? 'bg-white text-gray-800 border-b-2 border-gray-800' : 'text-gray-500'}`}><Layers size={18}/> الإعدادات</button>
@@ -189,13 +302,31 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                                 <input value={newProduct.name} onChange={e => setNewProduct({...newProduct, name: e.target.value})} placeholder={t('productName')} className="w-full p-2 border rounded"/>
                                 <div className="flex gap-2"><input type="number" value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: e.target.value})} placeholder={t('productPrice')} className="flex-1 p-2 border rounded"/><select value={newProduct.category} onChange={e => setNewProduct({...newProduct, category: e.target.value})} className="flex-1 p-2 border rounded"><option value="category_clothes">{t('category_clothes')}</option><option value="category_electronics">{t('category_electronics')}</option><option value="category_accessories">{t('category_accessories')}</option><option value="category_home">{t('category_home')}</option><option value="category_beauty">{t('category_beauty')}</option></select></div>
                                 <input value={newProduct.sizes} onChange={e => setNewProduct({...newProduct, sizes: e.target.value})} placeholder={t('sizesLabel')} className="w-full p-2 border rounded"/>
+                                
+                                {/* NEW COMMISSION & DISCOUNT FIELDS */}
+                                <div className="grid grid-cols-2 gap-3 bg-gray-50 p-3 rounded-lg border">
+                                    <div>
+                                        <label className="text-[10px] font-bold text-gray-500 uppercase">ثمن التخفيض (مع كود)</label>
+                                        <input type="number" value={newProduct.discount_price} onChange={e => setNewProduct({...newProduct, discount_price: e.target.value})} placeholder="مثال: 4500" className="w-full p-2 border rounded mt-1 bg-white"/>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-bold text-green-600 uppercase">ربح المسوق (Commission)</label>
+                                        <input type="number" value={newProduct.affiliate_commission} onChange={e => setNewProduct({...newProduct, affiliate_commission: e.target.value})} placeholder="مثال: 100" className="w-full p-2 border rounded mt-1 bg-white border-green-200"/>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-2 bg-gray-100 p-3 rounded">
+                                    <input type="checkbox" checked={newProduct.is_featured} onChange={e => setNewProduct({...newProduct, is_featured: e.target.checked})} id="featured"/>
+                                    <label htmlFor="featured" className="text-sm font-bold">Featured in Feed (عرض خاص)</label>
+                                </div>
+
                                 <textarea value={newProduct.description} onChange={e => setNewProduct({...newProduct, description: e.target.value})} placeholder={t('description')} className="w-full p-2 border rounded"/>
                                 <button onClick={() => fileRef.current?.click()} className="w-full py-2 border border-dashed rounded flex items-center justify-center gap-2 text-gray-500"><Plus size={18}/> Add Image</button><input type="file" ref={fileRef} hidden onChange={handleProductImageUpload} />
                                 <div className="grid grid-cols-4 gap-2">{newProduct.image && (<div className="relative border rounded h-16 w-full"><img src={newProduct.image} className="h-full w-full object-cover rounded"/><span className="absolute bottom-0 right-0 bg-black text-white text-[9px] px-1">Main</span></div>)}{newProduct.images.map((img, idx) => (<div key={idx} className="relative border rounded h-16 w-full group"><img src={img} className="h-full w-full object-cover rounded"/><button onClick={() => removeImage(idx)} className="absolute top-0 right-0 bg-red-500 text-white p-0.5 rounded-bl"><X size={10}/></button></div>))}</div>
                                 <button onClick={handleSaveProduct} disabled={loading} className={`w-full text-white py-2 rounded font-bold ${editingProductId ? 'bg-blue-600' : 'bg-orange-600'}`}>{loading ? <Loader2 className="animate-spin mx-auto"/> : (editingProductId ? t('save') : t('save'))}</button>
                             </div>
                         </div>
-                        <div className="space-y-2">{products.map(p => (<div key={p.id} className="bg-white p-2 rounded-lg border flex justify-between items-center shadow-sm"><div className="flex items-center gap-3"><img src={p.image_url} className="w-12 h-12 rounded bg-gray-100 object-cover"/><div><p className="font-bold text-sm">{p.name}</p><p className="text-xs text-orange-600 font-bold">{p.price} DH</p></div></div><div className="flex gap-2"><button onClick={() => handleEditProduct(p)} className="p-2 text-blue-500 hover:bg-blue-50 rounded"><Edit size={18}/></button><button onClick={() => handleDeleteProduct(p.id)} className="p-2 text-red-500 hover:bg-red-50 rounded"><Trash2 size={18}/></button></div></div>))}</div>
+                        <div className="space-y-2">{products.map(p => (<div key={p.id} className="bg-white p-2 rounded-lg border flex justify-between items-center shadow-sm"><div className="flex items-center gap-3"><img src={p.image_url} className="w-12 h-12 rounded bg-gray-100 object-cover"/><div><p className="font-bold text-sm">{p.name}</p><p className="text-xs text-orange-600 font-bold">{p.price} DH {p.discount_price && <span className="text-green-600">-> {p.discount_price}</span>}</p><p className="text-[9px] text-green-600">Comm: {p.affiliate_commission || '5%'} DH</p></div></div><div className="flex gap-2"><button onClick={() => handleEditProduct(p)} className="p-2 text-blue-500 hover:bg-blue-50 rounded"><Edit size={18}/></button><button onClick={() => handleDeleteProduct(p.id)} className="p-2 text-red-500 hover:bg-red-50 rounded"><Trash2 size={18}/></button></div></div>))}</div>
                     </div>
                 )}
 
@@ -204,7 +335,61 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                     <div className="space-y-4">
                         <div className="bg-teal-50 p-4 rounded-xl border border-teal-200"><h3 className="font-bold text-teal-800">{t('storeOrders')}</h3><p className="text-xs text-teal-600">Review requests and contact customers.</p></div>
                         {orders.length === 0 && <p className="text-center text-gray-400 py-10">No orders yet.</p>}
-                        {orders.map(o => (<div key={o.id} className="bg-white p-4 rounded-xl border shadow-sm space-y-3"><div className="flex justify-between items-start"><div><h4 className="font-bold flex items-center gap-2">{o.customer_details?.name || 'Unknown User'} <span className={`text-[10px] px-2 py-0.5 rounded-full ${o.status === 'delivered' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{o.status}</span></h4><p className="text-sm text-gray-600 flex items-center gap-1 mt-1"><Phone size={12}/> <a href={`tel:${o.customer_details?.phone}`} className="hover:underline">{o.customer_details?.phone || 'No phone'}</a></p><p className="text-[10px] text-gray-400">{new Date(o.created_at).toLocaleString()}</p></div><div className="text-right"><span className="font-black text-lg text-orange-600">{o.total_amount} DH</span></div></div><div className="bg-gray-50 p-3 rounded-lg text-sm border"><ul className="space-y-1">{o.items.map((item: any, idx: number) => (<li key={idx} className="flex justify-between text-xs"><span>{item.name} <span className="text-gray-500">x{item.quantity}</span> {item.selectedSize && <span className="font-bold bg-white px-1 border rounded">{item.selectedSize}</span>}</span><span className="font-bold">{item.price * item.quantity} DH</span></li>))}</ul></div>{o.status === 'pending' && (<button onClick={() => handleUpdateOrderStatus(o.id, 'delivered')} className="w-full py-2 bg-green-600 text-white rounded-lg font-bold text-xs flex items-center justify-center gap-2 hover:bg-green-700 transition-colors"><CheckCircle size={14}/> {t('markDelivered')} (Connect)</button>)}</div>))}
+                        {orders.map(o => (<div key={o.id} className="bg-white p-4 rounded-xl border shadow-sm space-y-3"><div className="flex justify-between items-start"><div><h4 className="font-bold flex items-center gap-2">{o.customer_details?.name || 'Unknown User'} <span className={`text-[10px] px-2 py-0.5 rounded-full ${o.status === 'delivered' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{o.status}</span></h4><p className="text-sm text-gray-600 flex items-center gap-1 mt-1"><Phone size={12}/> <a href={`tel:${o.customer_details?.phone}`} className="hover:underline">{o.customer_details?.phone || 'No phone'}</a></p><p className="text-[10px] text-gray-400">{new Date(o.created_at).toLocaleString()}</p></div><div className="text-right"><span className="font-black text-lg text-orange-600">{o.total_amount} DH</span>{o.promo_code && <span className="block text-[10px] bg-green-100 text-green-700 px-1 rounded mt-1">{o.promo_code}</span>}</div></div><div className="bg-gray-50 p-3 rounded-lg text-sm border"><ul className="space-y-1">{o.items.map((item: any, idx: number) => (<li key={idx} className="flex justify-between text-xs"><span>{item.name} <span className="text-gray-500">x{item.quantity}</span> {item.selectedSize && <span className="font-bold bg-white px-1 border rounded">{item.selectedSize}</span>}</span><span className="font-bold">{item.price * item.quantity} DH</span></li>))}</ul></div>{o.status === 'pending' && (<button onClick={() => handleUpdateOrderStatus(o.id, 'delivered')} className="w-full py-2 bg-green-600 text-white rounded-lg font-bold text-xs flex items-center justify-center gap-2 hover:bg-green-700 transition-colors"><CheckCircle size={14}/> {t('markDelivered')} (Release Commission)</button>)}</div>))}
+                    </div>
+                )}
+
+                {/* WITHDRAWALS TAB */}
+                {activeTab === 'WITHDRAWALS' && (
+                    <div className="space-y-4">
+                        <div className="bg-cyan-50 p-4 rounded-xl border border-cyan-200 mb-2">
+                             <h3 className="font-bold text-cyan-800">طلبات السحب (Withdrawals)</h3>
+                             <p className="text-xs text-cyan-600">Approve payments to partners.</p>
+                        </div>
+                        {withdrawals.length === 0 && <p className="text-center text-gray-400 py-10">No withdrawal requests.</p>}
+                        
+                        <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+                            <table className="w-full text-sm">
+                                <thead className="bg-gray-100 text-gray-600 font-bold">
+                                    <tr>
+                                        <th className="p-3 text-right">Partner</th>
+                                        <th className="p-3 text-center">Amount</th>
+                                        <th className="p-3 text-center">Status</th>
+                                        <th className="p-3 text-center">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {withdrawals.map((req, i) => (
+                                        <tr key={i} className={`border-t hover:bg-gray-50 ${req.status === 'pending' ? 'bg-yellow-50/50' : ''}`}>
+                                            <td className="p-3">
+                                                <p className="font-bold">{req.affiliate_partners?.clients?.full_name}</p>
+                                                <p className="text-xs text-gray-500">{req.affiliate_partners?.clients?.phone}</p>
+                                            </td>
+                                            <td className="p-3 text-center font-black text-green-600">{req.amount} DH</td>
+                                            <td className="p-3 text-center">
+                                                <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${req.status === 'approved' ? 'bg-green-100 text-green-700' : req.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>
+                                                    {req.status}
+                                                </span>
+                                            </td>
+                                            <td className="p-3 text-center">
+                                                {req.status === 'pending' ? (
+                                                    <div className="flex gap-1 justify-center">
+                                                        <button onClick={() => handleWithdrawalAction(req.id, 'approved')} disabled={actionLoading === req.id} className="p-1.5 bg-green-500 text-white rounded hover:bg-green-600">
+                                                            <Check size={14}/>
+                                                        </button>
+                                                        <button onClick={() => handleWithdrawalAction(req.id, 'rejected')} disabled={actionLoading === req.id} className="p-1.5 bg-red-500 text-white rounded hover:bg-red-600">
+                                                            <X size={14}/>
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-xs text-gray-400">-</span>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 )}
 

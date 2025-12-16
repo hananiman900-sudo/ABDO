@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLocalization } from '../hooks/useLocalization';
 import { Product, CartItem, AuthenticatedUser, AdRequest, Order, ProductReview } from '../types';
 import { supabase } from '../services/supabaseClient';
-import { ShoppingBag, ShoppingCart, X, Check, Loader2, ArrowLeft, Truck, Star, Heart, Send, Settings, Image as ImageIcon, Plus, List, ChevronLeft, ChevronRight, MessageSquare, ListChecks, Hash, User, Globe, Search, Tag, CheckCircle } from 'lucide-react';
+import { ShoppingBag, ShoppingCart, X, Check, Loader2, ArrowLeft, Truck, Star, Heart, Send, Settings, Image as ImageIcon, Plus, List, ChevronLeft, ChevronRight, MessageSquare, ListChecks, Hash, User, Globe, Search, Tag, CheckCircle, Gem } from 'lucide-react';
 
 interface StoreProps {
     isOpen: boolean;
@@ -105,6 +105,8 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
 
     const isAdmin = currentUser?.phone === '0617774846' && currentUser?.accountType === 'PROVIDER';
 
+    // --- STRICT CART KEY LOGIC ---
+    // This ensures cart is strictly isolated to the user ID. Guest cart is separate.
     const getCartKey = () => {
         if (currentUser) return `tanger_cart_${currentUser.id}`;
         return 'tanger_cart_guest';
@@ -123,7 +125,7 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
         }
     }, [initialProduct]);
 
-    // LOAD CART
+    // LOAD CART ON USER CHANGE
     useEffect(() => {
         const key = getCartKey();
         const savedCart = localStorage.getItem(key);
@@ -135,9 +137,10 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                 setCart([]);
             }
         } else {
+            // Important: If switching users and no cart found, Reset!
             setCart([]);
         }
-    }, [currentUser]);
+    }, [currentUser?.id]); // Re-run strictly when ID changes
 
     // SAVE CART
     useEffect(() => {
@@ -181,6 +184,7 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
         const { data } = await supabase.from('affiliate_partners').select('*').eq('promo_code', promoCode.toUpperCase()).single();
         
         if (data) {
+            // Allow providers to use codes too, only block if it's THEIR OWN code
             if (currentUser && data.user_id === currentUser.id) {
                 notify("You cannot use your own promo code!", 'error');
             } else if (data.status !== 'approved') {
@@ -196,24 +200,52 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
         setPromoLoading(false);
     };
 
+    // Calculate final price for a product based on discount logic
+    const calculatePrice = (p: Product) => {
+        if (!appliedDiscount) return p.price;
+        // If product has specific discount price set, use it
+        if (p.discount_price && p.discount_price > 0) return p.discount_price;
+        // Fallback to default percentage
+        return Math.round(p.price * (1 - appliedDiscount.rate));
+    }
+
     const handleCheckout = async () => {
         if(!currentUser) { onOpenAuth(); return; }
         setLoading(true);
         
-        const subtotal = cart.reduce((a,b) => a + b.price * b.quantity, 0);
-        let finalAmount = subtotal;
-        let discountAmount = 0;
+        // Calculate total based on dynamic pricing per item
+        let finalAmount = 0;
+        let originalAmount = 0;
+        let totalCommission = 0;
 
-        if (appliedDiscount) {
-            discountAmount = Math.round(subtotal * appliedDiscount.rate);
-            finalAmount = subtotal - discountAmount;
-        }
+        cart.forEach(item => {
+            originalAmount += item.price * item.quantity; // item.price is original here (from addToCart logic below)
+            
+            // Calculate final price for this item
+            const itemPrice = appliedDiscount 
+                ? (item.discount_price && item.discount_price > 0 ? item.discount_price : Math.round(item.price * (1 - appliedDiscount.rate)))
+                : item.price;
+            
+            finalAmount += itemPrice * item.quantity;
+
+            // Calculate Commission
+            if (appliedDiscount) {
+                if (item.affiliate_commission && item.affiliate_commission > 0) {
+                    totalCommission += (item.affiliate_commission * item.quantity);
+                } else {
+                    const commissionRate = 0.05; 
+                    totalCommission += (itemPrice * item.quantity * commissionRate);
+                }
+            }
+        });
+
+        const discountAmount = originalAmount - finalAmount;
 
         const { data: orderData, error } = await supabase.from('orders').insert({
             user_id: currentUser.id,
             user_type: currentUser.accountType,
             total_amount: finalAmount,
-            items: cart,
+            items: cart, // Note: items in cart currently hold ORIGINAL price
             status: 'pending',
             customer_details: { 
                 name: currentUser.name, 
@@ -224,21 +256,18 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
         }).select().single();
 
         if (!error && orderData) {
-            // --- UPDATE AFFILIATE SALES (IF APPLICABLE) ---
+            // --- UPDATE AFFILIATE SALES ---
             if (appliedDiscount) {
-                const commission = Math.round(finalAmount * 0.05); // 5% Commission based on final amount
+                totalCommission = Math.round(totalCommission);
+
+                // Insert into sales with STATUS 'PENDING'
                 await supabase.from('affiliate_sales').insert({
                     partner_id: appliedDiscount.partnerId,
                     order_id: orderData.id,
                     amount: finalAmount,
-                    commission: commission
+                    commission: totalCommission,
+                    status: 'pending' // Important: Earnings are pending until delivery
                 });
-                
-                // Increment Partner Earnings (RPC would be better, but doing Client Side for simplicity)
-                const { data: partner } = await supabase.from('affiliate_partners').select('total_earnings').eq('id', appliedDiscount.partnerId).single();
-                if (partner) {
-                    await supabase.from('affiliate_partners').update({ total_earnings: (partner.total_earnings || 0) + commission }).eq('id', appliedDiscount.partnerId);
-                }
             }
 
             setCart([]);
@@ -259,13 +288,11 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
             return;
         }
 
-        // Use DISCOUNTED PRICE if active
-        const priceToUse = appliedDiscount ? Math.round(p.price * (1 - appliedDiscount.rate)) : p.price;
-
+        // Add with ORIGINAL PRICE. Discount is calculated at display/checkout time
         setCart(prev => {
             const ex = prev.find(i => i.id === p.id && i.selectedSize === selectedSize);
             if(ex) return prev.map(i => (i.id === p.id && i.selectedSize === selectedSize) ? {...i, quantity: i.quantity + 1} : i);
-            return [...prev, {...p, price: priceToUse, quantity: 1, selectedSize: selectedSize || undefined}];
+            return [...prev, {...p, quantity: 1, selectedSize: selectedSize || undefined}];
         });
         notify(t('addToCart'), 'success');
     }
@@ -322,10 +349,17 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
         fetchReviews(p.id);
     }
 
-    // Calculations for Cart View
-    const subtotal = cart.reduce((a,b)=>a+b.price*b.quantity,0);
-    // Since we add to cart with discounted price already if active, display logic simplifies here
-    const total = subtotal;
+    // Calculations for Cart View Display
+    const calculateCartTotal = () => {
+        return cart.reduce((total, item) => {
+            const price = appliedDiscount 
+                ? (item.discount_price && item.discount_price > 0 ? item.discount_price : Math.round(item.price * (1 - appliedDiscount.rate)))
+                : item.price;
+            return total + (price * item.quantity);
+        }, 0);
+    };
+
+    const cartTotal = calculateCartTotal();
 
     if(!isOpen) return null;
 
@@ -436,23 +470,35 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                             </div>
                             {cart.length === 0 ? <p className="text-center text-gray-500 py-6">{t('cartEmpty')}</p> : (
                                 <>
-                                    {cart.map(i => (
-                                        <div key={`${i.id}-${i.selectedSize}`} className="flex justify-between border-b py-2">
-                                            <span className="text-sm">{i.name} {i.selectedSize && `(${i.selectedSize})`} x{i.quantity}</span>
-                                            <span className="font-bold">{i.price * i.quantity} DH</span>
-                                        </div>
-                                    ))}
+                                    {cart.map(i => {
+                                        // Dynamic calculation for display
+                                        const finalItemPrice = appliedDiscount 
+                                            ? (i.discount_price && i.discount_price > 0 ? i.discount_price : Math.round(i.price * (1 - appliedDiscount.rate)))
+                                            : i.price;
+
+                                        return (
+                                            <div key={`${i.id}-${i.selectedSize}`} className="flex justify-between border-b py-2">
+                                                <span className="text-sm">{i.name} {i.selectedSize && `(${i.selectedSize})`} x{i.quantity}</span>
+                                                <div className="text-right">
+                                                    {appliedDiscount && (
+                                                        <span className="text-[10px] text-gray-400 line-through mr-1">{i.price * i.quantity}</span>
+                                                    )}
+                                                    <span className="font-bold">{finalItemPrice * i.quantity} DH</span>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
                                     
                                     <div className="py-4">
                                         {appliedDiscount && (
                                             <div className="flex justify-between text-sm mb-1 text-green-600 font-bold">
                                                 <span>Discount Applied</span>
-                                                <span>{(appliedDiscount.rate * 100)}% OFF</span>
+                                                <span>{appliedDiscount.code}</span>
                                             </div>
                                         )}
                                         <div className="flex justify-between font-black text-xl mt-2">
                                             <span>{t('total')}</span>
-                                            <span className="text-orange-600">{total} DH</span>
+                                            <span className="text-orange-600">{cartTotal} DH</span>
                                         </div>
                                     </div>
 
@@ -497,8 +543,9 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                         <div className="grid grid-cols-2 gap-1 p-1 pb-20">
                              {filteredProducts.map(p => {
                                  // CALCULATE DISPLAY PRICE
-                                 const originalPrice = p.price;
-                                 const displayPrice = appliedDiscount ? Math.round(originalPrice * (1 - appliedDiscount.rate)) : originalPrice;
+                                 const displayPrice = appliedDiscount 
+                                    ? (p.discount_price && p.discount_price > 0 ? p.discount_price : Math.round(p.price * (1 - appliedDiscount.rate)))
+                                    : p.price;
 
                                  return (
                                      <div key={p.id} onClick={() => openProduct(p)} className="bg-white p-2 flex flex-col gap-1 cursor-pointer hover:shadow-md transition-shadow relative">
@@ -507,17 +554,33 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                                                  SALE
                                              </div>
                                          )}
+                                         {p.is_featured && (
+                                             <div className="absolute top-2 left-2 bg-purple-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded z-10 shadow-sm flex items-center gap-1">
+                                                 <Gem size={8}/> Featured
+                                             </div>
+                                         )}
                                          <div className="aspect-[4/5] bg-gray-100 relative mb-1 overflow-hidden rounded-sm">
                                              <img src={p.image_url} className="w-full h-full object-cover"/>
                                          </div>
                                          <h3 className="text-xs line-clamp-1 text-gray-700">{p.name}</h3>
+                                         
+                                         {/* SHOW COMMISSION TO LOGGED IN USERS ONLY (AFFILIATES) */}
+                                         {currentUser && (
+                                             <div className="text-[9px] bg-green-50 text-green-700 px-1 rounded inline-block font-bold w-fit">
+                                                 ربح: {p.affiliate_commission ? `${p.affiliate_commission} DH` : `${Math.round(p.price * 0.05)} DH`}
+                                             </div>
+                                         )}
+
                                          <div className="flex items-baseline gap-1 flex-wrap">
                                              <span className="text-orange-600 font-black text-lg">{displayPrice}<span className="text-xs">DH</span></span>
-                                             {/* SHOW ORIGINAL CROSSED OUT IF DISCOUNTED OR FAKE DISCOUNT */}
-                                             <span className="text-gray-400 text-[10px] line-through">
-                                                 {appliedDiscount ? originalPrice : (p.price * 1.5).toFixed(0)}
-                                             </span>
+                                             {appliedDiscount && (
+                                                 <span className="text-gray-400 text-[10px] line-through relative">
+                                                     {p.price}
+                                                     <div className="absolute top-1/2 left-0 w-full h-[1px] bg-red-500"></div>
+                                                 </span>
+                                             )}
                                          </div>
+                                         
                                          <div className="flex items-center gap-1">
                                              <Star size={8} className="fill-yellow-400 text-yellow-400"/>
                                              <span className="text-[10px] text-gray-400">4.9</span>
@@ -577,12 +640,20 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                                 <div className="flex justify-between items-start mb-2">
                                     <div>
                                         <div className="text-3xl font-black text-orange-600">
-                                            {appliedDiscount ? Math.round(selectedProduct.price * (1 - appliedDiscount.rate)) : selectedProduct.price} 
+                                            {appliedDiscount 
+                                                ? (selectedProduct.discount_price && selectedProduct.discount_price > 0 ? selectedProduct.discount_price : Math.round(selectedProduct.price * (1 - appliedDiscount.rate)))
+                                                : selectedProduct.price} 
                                             <span className="text-sm text-gray-500 font-normal">DH</span>
                                         </div>
                                         {appliedDiscount && (
-                                            <div className="text-sm text-gray-400 line-through">
+                                            <div className="text-sm text-gray-400 line-through decoration-red-500">
                                                 {selectedProduct.price} DH
+                                            </div>
+                                        )}
+                                        {/* Show Commission to Affiliates */}
+                                        {currentUser && (
+                                            <div className="mt-1 bg-green-50 text-green-700 text-xs px-2 py-1 rounded inline-block font-bold border border-green-200">
+                                                ربح المسوق: {selectedProduct.affiliate_commission ? `${selectedProduct.affiliate_commission} DH` : `${Math.round(selectedProduct.price * 0.05)} DH`}
                                             </div>
                                         )}
                                     </div>

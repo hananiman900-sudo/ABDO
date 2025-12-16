@@ -113,6 +113,10 @@ export interface Product {
     category: string; 
     sizes?: string[]; 
     created_at: string; 
+    // NEW FIELDS
+    affiliate_commission?: number; // Specific commission for this product
+    discount_price?: number; // Price when using promo code
+    is_featured?: boolean; // Show in Feed as Ad
 }
 
 export interface ProductReview {
@@ -219,5 +223,15 @@ export interface AffiliateSale {
     order_id: number;
     amount: number;
     commission: number;
+    status: 'pending' | 'completed'; // Pending until delivery
     created_at: string;
+}
+
+export interface WithdrawalRequest {
+    id: number;
+    partner_id: number;
+    amount: number;
+    status: 'pending' | 'approved' | 'rejected';
+    created_at: string;
+    affiliate_partners?: { clients: { full_name: string; phone: string; } };
 }

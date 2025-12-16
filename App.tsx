@@ -445,16 +445,18 @@ const SuggestedProviders: React.FC<{ currentUser: AuthenticatedUser; onOpenProfi
     if(suggestions.length === 0) return null; return (<div className="mb-6"><h3 className="font-bold text-gray-800 text-sm mb-3 px-1">{t('suggestedProviders')}</h3><div className="flex gap-3 overflow-x-auto no-scrollbar pb-2 px-1">{suggestions.map(p => (<div key={p.id} className="w-28 flex flex-col items-center bg-white p-3 rounded-xl border shadow-sm shrink-0"><div className="w-14 h-14 rounded-full bg-gray-200 mb-2 overflow-hidden border cursor-pointer" onClick={() => onOpenProfile(p)}><img src={p.profile_image_url || `https://ui-avatars.com/api/?name=${p.name}`} className="w-full h-full object-cover"/></div><h4 className="font-bold text-xs truncate w-full text-center">{p.name}</h4><p className="text-sm text-gray-500 truncate w-full text-center mb-2">{p.service_type}</p><button onClick={() => handleFollowClick(p.id)} className={`w-full py-1 text-[10px] font-bold rounded-full transition-colors ${followedState[p.id] ? 'bg-gray-100 text-black border' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}>{followedState[p.id] ? t('unfollow') : t('follow')}</button></div>))}</div></div>);
 }
 
+// --- PROFILE TAB (UPDATED FOR SCROLLING) ---
 const ProfileTab: React.FC<{ user: AuthenticatedUser | null; onLogin: () => void; onLogout: () => void; isAdmin: boolean; onNav: (target: string) => void; onUpdateUser: (u: Partial<AuthenticatedUser>) => void; notify: (msg: string, type: 'success' | 'error') => void; onOpenSettings: () => void; }> = ({ user, onLogin, onLogout, isAdmin, onNav, onUpdateUser, notify, onOpenSettings }) => {
     const { t } = useLocalization(); 
     const [showEdit, setShowEdit] = useState(false); 
     const [viewingProvider, setViewingProvider] = useState<any | null>(null);
-    const [showAffiliate, setShowAffiliate] = useState(false); // New state
+    const [showAffiliate, setShowAffiliate] = useState(false); 
 
-    if (!user) { return (<div className="flex-1 flex flex-col items-center justify-center p-6 bg-gray-50 pb-20"><div className="w-24 h-24 bg-gray-200 rounded-full flex items-center justify-center mb-4 shadow-inner"><User size={48} className="text-gray-400"/></div><h2 className="text-xl font-bold mb-2">{t('guest')}</h2><p className="text-gray-500 text-center mb-6 max-w-xs">{t('appDesc')}</p><button onClick={onLogin} className="px-8 py-3 bg-black text-white rounded-full font-bold shadow-lg active:scale-95 transition-transform">{t('loginRegister')}</button></div>); }
+    if (!user) { return (<div className="flex-1 flex flex-col items-center justify-center p-6 bg-gray-50 pb-20 h-full"><div className="w-24 h-24 bg-gray-200 rounded-full flex items-center justify-center mb-4 shadow-inner"><User size={48} className="text-gray-400"/></div><h2 className="text-xl font-bold mb-2">{t('guest')}</h2><p className="text-gray-500 text-center mb-6 max-w-xs">{t('appDesc')}</p><button onClick={onLogin} className="px-8 py-3 bg-black text-white rounded-full font-bold shadow-lg active:scale-95 transition-transform">{t('loginRegister')}</button></div>); }
     
     return (
-        <div className="flex-1 overflow-y-auto bg-gray-50 pb-20">
+        // IMPORTANT: h-full and flex-1 are crucial for the scrolling container
+        <div className="flex-1 h-full overflow-y-auto bg-gray-50 pb-20">
             <div className="bg-white p-6 border-b shadow-sm mb-4">
                 <div className="flex items-center gap-4">
                     <div className="w-20 h-20 rounded-full bg-gray-200 overflow-hidden border-2 border-white shadow-lg"><img src={user.profile_image_url || `https://ui-avatars.com/api/?name=${user.name}`} className="w-full h-full object-cover"/></div>
@@ -468,7 +470,7 @@ const ProfileTab: React.FC<{ user: AuthenticatedUser | null; onLogin: () => void
             <div className="p-4">
                 {user.accountType === 'CLIENT' && (<SuggestedProviders currentUser={user} onOpenProfile={setViewingProvider}/>)}
                 
-                {/* --- AFFILIATE BANNER (NEW) --- */}
+                {/* --- AFFILIATE BANNER --- */}
                 {user.accountType === 'CLIENT' && (
                     <div onClick={() => setShowAffiliate(true)} className="mb-6 p-4 bg-gradient-to-r from-yellow-500 to-orange-600 rounded-2xl shadow-lg cursor-pointer text-white flex justify-between items-center transform transition-transform hover:scale-[1.02]">
                         <div>
@@ -711,11 +713,11 @@ const AppContent: React.FC = () => {
     return (
         <div className={`flex flex-col h-full min-h-screen bg-gray-50 dark:bg-gray-900 ${language === 'ar' ? 'font-arabic' : 'font-sans'}`} dir={language === 'ar' ? 'rtl' : 'ltr'}>
             
-            <div className="mx-auto w-full max-w-lg md:max-w-2xl lg:max-w-4xl xl:max-w-5xl flex-1 flex flex-col bg-white dark:bg-black shadow-2xl overflow-hidden relative border-x border-gray-100 dark:border-gray-800">
+            <div className="mx-auto w-full max-w-lg md:max-w-2xl lg:max-w-4xl xl:max-w-5xl flex-1 flex flex-col bg-white dark:bg-black shadow-2xl overflow-hidden relative border-x border-gray-100 dark:border-gray-800 h-full">
 
                 {/* NEW HEADER FOR ALL TABS EXCEPT HOME (HOME HAS ITS OWN HEADER IN FEED COMPONENT) */}
                 {activeTab !== 'HOME' && activeTab !== 'CHAT' && (
-                    <div className="bg-white dark:bg-gray-800 px-4 py-3 flex justify-between items-center border-b dark:border-gray-700 shadow-sm sticky top-0 z-30">
+                    <div className="bg-white dark:bg-gray-800 px-4 py-3 flex justify-between items-center border-b dark:border-gray-700 shadow-sm sticky top-0 z-30 shrink-0">
                         <div className="flex items-center gap-2">
                              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold text-xs shadow-md">
                                  <Globe size={16}/>
@@ -790,7 +792,7 @@ const AppContent: React.FC = () => {
 
                 {/* BOTTOM NAVIGATION (Fixed Grid Layout) */}
                 {!hideBottomNav && (
-                    <div className="bg-white dark:bg-gray-800 border-t dark:border-gray-700 grid grid-cols-5 items-center pb-safe pt-2 px-2 shadow-[0_-5px_20px_-5px_rgba(0,0,0,0.05)] z-40 w-full h-16">
+                    <div className="bg-white dark:bg-gray-800 border-t dark:border-gray-700 grid grid-cols-5 items-center pb-safe pt-2 px-2 shadow-[0_-5px_20px_-5px_rgba(0,0,0,0.05)] z-40 w-full h-16 shrink-0">
                         <button onClick={() => setActiveTab('HOME')} className={`flex flex-col items-center justify-center gap-1 w-full h-full transition-all ${activeTab === 'HOME' ? 'text-black dark:text-white font-bold' : 'text-gray-400 dark:text-gray-500'}`}>
                             <Home size={24} className={activeTab === 'HOME' ? 'fill-black dark:fill-white' : ''}/>
                             <span className="text-[10px]">{t('navHome')}</span>
