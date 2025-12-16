@@ -179,6 +179,7 @@ export const ChatProfileModal: React.FC<{ provider: any; onClose: () => void; cu
         else { await supabase.from('follows').insert({ client_id: currentUser.id, provider_id: provider.id }); setStats(prev => ({ ...prev, followers: prev.followers + 1 })); }
         setIsFollowing(!isFollowing);
     }
+    
     return (
         <div className="absolute inset-0 bg-white z-[60] flex flex-col animate-slide-up overflow-y-auto">
              <div className="p-4 bg-gray-50 border-b sticky top-0 flex items-center gap-3"><button onClick={onClose}><ArrowLeft/></button><h2 className="font-bold">{t('navProfile')}</h2></div>
@@ -191,7 +192,39 @@ export const ChatProfileModal: React.FC<{ provider: any; onClose: () => void; cu
                  <div className="flex justify-center gap-8 mb-6 text-center"><div className="flex flex-col items-center"><div className="font-black text-xl">{stats.followers}</div><div className="text-xs text-gray-500 font-bold uppercase tracking-wide">{t('followers')}</div></div><div className="w-px bg-gray-200 h-10"></div><div className="flex flex-col items-center"><div className="font-black text-xl">{stats.posts}</div><div className="text-xs text-gray-500 font-bold uppercase tracking-wide">{t('offers')}</div></div></div>
                  <div className="space-y-4 mb-6"><h3 className="font-bold border-b pb-2">{t('bioLabel')}</h3><p className="text-sm text-gray-600 whitespace-pre-line">{provider.bio || "No bio available."}</p><h3 className="font-bold border-b pb-2">{t('socialLinks')}</h3><div className="flex gap-4 justify-center">{provider.social_links?.instagram && <a href={`https://instagram.com/${provider.social_links.instagram}`} className="text-pink-600 bg-pink-50 p-2 rounded-full"><Instagram/></a>}{provider.social_links?.facebook && <a href={`https://facebook.com/${provider.social_links.facebook}`} className="text-blue-600 bg-blue-50 p-2 rounded-full"><Facebook/></a>}{provider.social_links?.gps && <a href={`https://maps.google.com/?q=${provider.social_links.gps}`} className="text-green-600 bg-green-50 p-2 rounded-full"><MapPin/></a>}</div></div>
                  <h3 className="font-bold border-b pb-2 mb-4 flex items-center gap-2"><Tag size={18}/> {t('offers')}</h3>
-                 {offers.length === 0 ? (<div className="text-center py-8 text-gray-400 bg-gray-50 rounded-xl border border-dashed"><Tag className="mx-auto mb-2 opacity-50"/><p className="text-sm">No active offers currently.</p></div>) : (<div className="grid grid-cols-2 gap-3">{offers.map(o => (<div key={o.id} className="border rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">{o.image_url && <div className="h-24 bg-gray-100"><img src={o.image_url} className="w-full h-full object-cover"/></div><div className="p-3"><h4 className="font-bold text-sm truncate mb-1">{o.title}</h4><div className="flex gap-2 text-xs mb-3 items-center"><span className="line-through text-gray-400">{o.original_price}</span><span className="text-red-600 font-black text-sm">{o.discount_price} DH</span></div><button onClick={() => onBookOffer && onBookOffer(o)} className="w-full bg-black text-white py-2 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 active:scale-95 transition-transform"><Calendar size={12}/> Book Now</button></div></div>))}</div>)}
+                 
+                 {/* FIXED OFFERS RENDERING STRUCTURE */}
+                 {offers.length === 0 ? (
+                    <div className="text-center py-8 text-gray-400 bg-gray-50 rounded-xl border border-dashed">
+                        <Tag className="mx-auto mb-2 opacity-50"/>
+                        <p className="text-sm">No active offers currently.</p>
+                    </div>
+                 ) : (
+                    <div className="grid grid-cols-2 gap-3">
+                        {offers.map(o => (
+                            <div key={o.id} className="border rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                                {o.image_url && (
+                                    <div className="h-24 bg-gray-100">
+                                        <img src={o.image_url} className="w-full h-full object-cover"/>
+                                    </div>
+                                )}
+                                <div className="p-3">
+                                    <h4 className="font-bold text-sm truncate mb-1">{o.title}</h4>
+                                    <div className="flex gap-2 text-xs mb-3 items-center">
+                                        <span className="line-through text-gray-400">{o.original_price}</span>
+                                        <span className="text-red-600 font-black text-sm">{o.discount_price} DH</span>
+                                    </div>
+                                    <button 
+                                        onClick={() => onBookOffer && onBookOffer(o)} 
+                                        className="w-full bg-black text-white py-2 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 active:scale-95 transition-transform"
+                                    >
+                                        <Calendar size={12}/> Book Now
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                 )}
              </div>
         </div>
     )
