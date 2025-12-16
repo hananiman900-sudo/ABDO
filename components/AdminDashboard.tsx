@@ -322,7 +322,28 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
 
                                 <textarea value={newProduct.description} onChange={e => setNewProduct({...newProduct, description: e.target.value})} placeholder={t('description')} className="w-full p-2 border rounded"/>
                                 <button onClick={() => fileRef.current?.click()} className="w-full py-2 border border-dashed rounded flex items-center justify-center gap-2 text-gray-500"><Plus size={18}/> Add Image</button><input type="file" ref={fileRef} hidden onChange={handleProductImageUpload} />
-                                <div className="grid grid-cols-4 gap-2">{newProduct.image && (<div className="relative border rounded h-16 w-full"><img src={newProduct.image} className="h-full w-full object-cover rounded"/><span className="absolute bottom-0 right-0 bg-black text-white text-[9px] px-1">Main</span></div>)}{newProduct.images.map((img, idx) => (<div key={idx} className="relative border rounded h-16 w-full group"><img src={img} className="h-full w-full object-cover rounded"/><button onClick={() => removeImage(idx)} className="absolute top-0 right-0 bg-red-500 text-white p-0.5 rounded-bl"><X size={10}/></button></div>))}</div>
+                                
+                                {/* Image Gallery with Delete Buttons */}
+                                <div className="grid grid-cols-4 gap-2">
+                                    {newProduct.image && (
+                                        <div className="relative border rounded h-16 w-full">
+                                            <img src={newProduct.image} className="h-full w-full object-cover rounded"/>
+                                            <span className="absolute bottom-0 right-0 bg-black text-white text-[9px] px-1">Main</span>
+                                        </div>
+                                    )}
+                                    {newProduct.images.map((img, idx) => (
+                                        <div key={idx} className="relative border rounded h-16 w-full group">
+                                            <img src={img} className="h-full w-full object-cover rounded"/>
+                                            <button 
+                                                onClick={() => removeImage(idx)} 
+                                                className="absolute top-0 right-0 bg-red-500 text-white w-5 h-5 flex items-center justify-center rounded-bl shadow-sm hover:bg-red-600"
+                                            >
+                                                <X size={12}/>
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+
                                 <button onClick={handleSaveProduct} disabled={loading} className={`w-full text-white py-2 rounded font-bold ${editingProductId ? 'bg-blue-600' : 'bg-orange-600'}`}>{loading ? <Loader2 className="animate-spin mx-auto"/> : (editingProductId ? t('save') : t('save'))}</button>
                             </div>
                         </div>

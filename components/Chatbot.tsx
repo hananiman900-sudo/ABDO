@@ -356,6 +356,8 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
                     const formatted: Message[] = data.map((msg: any) => {
                         let bookingDetails = undefined;
                         let isComponent = false;
+                        
+                        // CHECK FOR SAVED BOOKING JSON
                         if (msg.role === 'BOT' && msg.text && msg.text.startsWith('{"appointmentId"')) {
                              try {
                                  bookingDetails = JSON.parse(msg.text);
@@ -366,8 +368,12 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
                                      bookingDetails: bookingDetails,
                                      isComponent: true
                                  };
-                             } catch (e) {}
+                             } catch (e) {
+                                 // Fallback if parse fails
+                                 return { role: Role.BOT, text: msg.text };
+                             }
                         }
+                        
                         return {
                             role: msg.role === 'USER' ? Role.USER : Role.BOT,
                             text: msg.text || '',
@@ -616,6 +622,7 @@ const Chatbot: React.FC<{ currentUser: AuthenticatedUser | null; onOpenAuth: () 
         setMessages(prev => [...prev, msg]);
         
         if(currentUser) {
+            // SAVE JSON TO DB FOR PERSISTENCE
             const persistedData = JSON.stringify(details);
             await supabase.from('chat_history').insert({
                 user_id: currentUser.id,

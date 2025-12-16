@@ -243,6 +243,12 @@ export const Feed: React.FC<FeedProps> = ({ currentUser, onOpenAuth, onOpenNotif
         );
     };
 
+    // Filter Logic based on search query
+    const displayedAds = ads.filter(ad => 
+        ad.message.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        ad.providers?.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
     return (
         <div className="flex flex-col h-full bg-gray-100 dark:bg-gray-900 relative" onClick={() => setActiveMenuId(null)}>
             {/* Header: Logo + UrgentTicker */}
@@ -251,7 +257,13 @@ export const Feed: React.FC<FeedProps> = ({ currentUser, onOpenAuth, onOpenNotif
                 <div className="bg-gray-50 dark:bg-gray-900 border-b dark:border-gray-700 py-1.5 px-3 flex items-center gap-3">
                     <div className="flex-1 flex items-center bg-white dark:bg-gray-800 border dark:border-gray-600 rounded-full px-3 py-1 shadow-sm">
                         <Search size={14} className="text-gray-400"/>
-                        <input placeholder="ابحث عن مهني..." className="bg-transparent border-none outline-none text-xs flex-1 mx-2 dark:text-white" onClick={() => onChatWithProvider(null)} />
+                        {/* Search Input for FEED filtering */}
+                        <input 
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="ابحث عن منشور أو مهني..." 
+                            className="bg-transparent border-none outline-none text-xs flex-1 mx-2 dark:text-white" 
+                        />
                     </div>
                     <div className="flex gap-2 overflow-hidden h-6 items-center">
                         <span className="text-[10px] text-gray-500 whitespace-nowrap animate-pulse">🔥 عروض حصرية اليوم!</span>
@@ -262,14 +274,14 @@ export const Feed: React.FC<FeedProps> = ({ currentUser, onOpenAuth, onOpenNotif
             <div className="flex-1 overflow-y-auto pb-20">
                 <div className="pt-2">
                     {loading && <div className="flex justify-center py-10"><Loader2 className="animate-spin"/></div>}
-                    {!loading && ads.length === 0 && (
+                    {!loading && displayedAds.length === 0 && (
                         <div className="text-center py-20 text-gray-400">
                             <p>{t('noPosts')}</p>
                             <p className="text-xs">Follow providers to see their posts here.</p>
                         </div>
                     )}
 
-                    {ads.map((ad, index) => {
+                    {displayedAds.map((ad, index) => {
                         const isSponsored = ad.is_sponsored && ad.sponsored_end_date && new Date(ad.sponsored_end_date) > new Date();
                         
                         return (

@@ -15,7 +15,6 @@ interface StoreProps {
     initialProduct?: Product | null; 
 }
 
-// ... (StoreHeaderBanner remains unchanged)
 const StoreHeaderBanner = ({ 
     onClose, 
     cartCount, 
@@ -28,9 +27,9 @@ const StoreHeaderBanner = ({
 }: any) => {
     // New curated images for a "Shopping Store" vibe
     const bannerImages = [
-        "https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=800&auto=format&fit=crop", // Clothing Store Interior
-        "https://images.unsplash.com/photo-1472851294608-415522f96319?q=80&w=800&auto=format&fit=crop", // Classy Watch/Accessories
-        "https://images.unsplash.com/photo-1511556820780-d912e42b4980?q=80&w=800&auto=format&fit=crop"  // Product Packaging/Bags
+        "https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=800&auto=format&fit=crop", 
+        "https://images.unsplash.com/photo-1472851294608-415522f96319?q=80&w=800&auto=format&fit=crop", 
+        "https://images.unsplash.com/photo-1511556820780-d912e42b4980?q=80&w=800&auto=format&fit=crop" 
     ];
     const [current, setCurrent] = useState(0);
 
@@ -42,7 +41,8 @@ const StoreHeaderBanner = ({
     }, []);
 
     return (
-        <div className="w-full h-36 relative overflow-hidden shrink-0 shadow-md">
+        // CHANGED: Height reduced from h-36 to h-28 (approx 112px) for smaller footprint
+        <div className="w-full h-28 relative overflow-hidden shrink-0 shadow-md">
             {bannerImages.map((img, idx) => (
                 <div 
                     key={idx} 
@@ -52,7 +52,7 @@ const StoreHeaderBanner = ({
                     <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/20 to-transparent"></div>
                 </div>
             ))}
-            <div className="absolute inset-0 flex flex-col justify-between p-4 z-20">
+            <div className="absolute inset-0 flex flex-col justify-between p-3 z-20">
                 <div className="flex justify-between items-start">
                     <button onClick={onClose} className="w-8 h-8 bg-white/20 backdrop-blur-md border border-white/30 rounded-full flex items-center justify-center text-white hover:bg-white/40 transition-colors"><ArrowLeft size={18}/></button>
                     <div className="flex items-center gap-2">
@@ -64,7 +64,6 @@ const StoreHeaderBanner = ({
                 </div>
                 <div className="flex items-center gap-2 animate-fade-in pb-1"><div className="w-5 h-5 rounded-full bg-white flex items-center justify-center shadow-sm"><ShoppingBag size={12} className="text-orange-600"/></div><span className="font-black text-sm text-white tracking-wide uppercase drop-shadow-md">Tanger Store</span></div>
             </div>
-            <div className="absolute bottom-2 right-4 flex gap-1 z-20">{bannerImages.map((_, idx) => (<div key={idx} className={`h-1 rounded-full transition-all shadow-sm ${idx === current ? 'bg-white w-4' : 'bg-white/40 w-1.5'}`}></div>))}</div>
         </div>
     );
 };
@@ -608,7 +607,8 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                             </button>
                             <h3 className="font-bold text-sm truncate max-w-[200px]">{selectedProduct.name}</h3>
                             <div className="flex items-center gap-2">
-                                <button onClick={() => setView('cart')} className="p-2 bg-black text-white rounded-full relative">
+                                {/* FIXED: Now this button both closes the detail modal AND sets the view to cart */}
+                                <button onClick={() => { setSelectedProduct(null); setView('cart'); }} className="p-2 bg-black text-white rounded-full relative">
                                     <ShoppingCart size={18}/>
                                     {cart.length > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold">{cart.length}</span>}
                                 </button>
@@ -716,7 +716,7 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                                             <div className="flex-1">
                                                 <div className="flex justify-between items-center mb-1">
                                                     <span className="font-bold text-xs text-gray-900">{rev.user_name}</span>
-                                                    <span className="text-[10px] text-gray-400">{new Date(rev.created_at).toLocaleDateString()}</span>
+                                                    <span className="text-[10px] text-gray-400">{new Date(rev.created_at).toLocaleDateString()}</p>
                                                 </div>
                                                 <p className="text-sm text-gray-700 bg-gray-50 p-2 rounded-lg rounded-tl-none">{rev.comment}</p>
                                             </div>

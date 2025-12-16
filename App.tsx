@@ -13,7 +13,7 @@ import { Feed } from './components/Feed'; // Import Feed
 import { AffiliateDashboard } from './components/AffiliateDashboard'; // IMPORT NEW DASHBOARD
 import { useLocalization, LocalizationProvider } from './hooks/useLocalization';
 import { supabase } from './services/supabaseClient';
-import { LogIn, User, MapPin, ShoppingBag, Home, Briefcase, Settings, X, Phone, Globe, LayoutGrid, Heart, List, LogOut, CheckCircle, Edit, Share2, Grid, Bookmark, Menu, Users, Database, Instagram, Facebook, Tag, Sparkles, MessageCircle, Calendar, Bell, Eye, EyeOff, Camera, Loader2, UserPlus, UserCheck, Megaphone, Clock, ArrowLeft, Moon, Sun, AlertCircle, Zap, Scan, BrainCircuit, ShieldCheck, Gem, RefreshCw, Copy, Terminal, Star, CheckSquare, Search, Handshake } from 'lucide-react';
+import { LogIn, User, MapPin, ShoppingBag, Home, Briefcase, Settings, X, Phone, Globe, LayoutGrid, Heart, List, LogOut, CheckCircle, Edit, Share2, Grid, Bookmark, Menu, Users, Database, Instagram, Facebook, Tag, Sparkles, MessageCircle, Calendar, Bell, Eye, EyeOff, Camera, Loader2, UserPlus, UserCheck, Megaphone, Clock, ArrowLeft, Moon, Sun, AlertCircle, Zap, Scan, BrainCircuit, ShieldCheck, Gem, RefreshCw, Copy, Terminal, Star, CheckSquare, Search, Handshake, MessageSquare as MessageSquareIcon, HelpCircle } from 'lucide-react';
 
 // ... (ToastNotification, ProviderPendingView, SettingsModal, AuthModal, ClientNotificationsModal, ProviderDirectory, ServicesHub, EditClientProfileModal, SuggestedProviders - KEEP ALL AS IS)
 
@@ -466,6 +466,16 @@ const ProfileTab: React.FC<{ user: AuthenticatedUser | null; onLogin: () => void
                     <button onClick={() => setShowEdit(true)} className="flex-1 py-2 bg-gray-100 rounded-lg font-bold text-xs">{t('editProfile')}</button>
                     <button onClick={onLogout} className="flex-1 py-2 bg-red-50 text-red-500 rounded-lg font-bold text-xs flex items-center justify-center gap-1"><LogOut size={14}/> {t('logout')}</button>
                 </div>
+                
+                {/* WHATSAPP SUPPORT BUTTON (ADDED) */}
+                <a 
+                    href="https://wa.me/212621572534" 
+                    target="_blank" 
+                    rel="noreferrer"
+                    className="mt-3 w-full py-2.5 bg-green-100 text-green-700 rounded-lg font-bold text-xs flex items-center justify-center gap-2 hover:bg-green-200 transition-colors"
+                >
+                    <HelpCircle size={16}/> الدعم التقني (WhatsApp)
+                </a>
             </div>
             <div className="p-4">
                 {user.accountType === 'CLIENT' && (<SuggestedProviders currentUser={user} onOpenProfile={setViewingProvider}/>)}
