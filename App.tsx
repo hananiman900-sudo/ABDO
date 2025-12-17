@@ -9,13 +9,11 @@ import Store from './components/Store';
 import { RealEstate } from './components/RealEstate';
 import { JobBoard } from './components/JobBoard';
 import { AdminDashboard } from './components/AdminDashboard';
-import { Feed } from './components/Feed'; // Import Feed
-import { AffiliateDashboard } from './components/AffiliateDashboard'; // IMPORT NEW DASHBOARD
+import { Feed } from './components/Feed';
+import { AffiliateDashboard } from './components/AffiliateDashboard';
 import { useLocalization, LocalizationProvider } from './hooks/useLocalization';
 import { supabase } from './services/supabaseClient';
 import { LogIn, User, MapPin, ShoppingBag, Home, Briefcase, Settings, X, Phone, Globe, LayoutGrid, Heart, List, LogOut, CheckCircle, Edit, Share2, Grid, Bookmark, Menu, Users, Database, Instagram, Facebook, Tag, Sparkles, MessageCircle, Calendar, Bell, Eye, EyeOff, Camera, Loader2, UserPlus, UserCheck, Megaphone, Clock, ArrowLeft, Moon, Sun, AlertCircle, Zap, Scan, BrainCircuit, ShieldCheck, Gem, RefreshCw, Copy, Terminal, Star, CheckSquare, Search, Handshake, MessageSquare as MessageSquareIcon, HelpCircle } from 'lucide-react';
-
-// ... (ToastNotification, ProviderPendingView, SettingsModal, AuthModal, ClientNotificationsModal, ProviderDirectory, ServicesHub, EditClientProfileModal, SuggestedProviders - KEEP ALL AS IS)
 
 // --- CUSTOM TOAST NOTIFICATION ---
 const ToastNotification: React.FC<{ message: string; type: 'success' | 'error'; onClose: () => void }> = ({ message, type, onClose }) => {
@@ -38,13 +36,10 @@ const ProviderPendingView: React.FC<{ user: AuthenticatedUser; onLogout: () => v
     const [checking, setChecking] = useState(false);
     const [diagnosticLog, setDiagnosticLog] = useState<string>('');
 
-    // Internal check handler to manage UI state and display logs
     const handleCheck = async () => {
         setChecking(true);
         try {
             const resultMsg = await onCheckStatus();
-            // Don't show log anymore, user wants simple Arabic feedback
-            // setDiagnosticLog(resultMsg); 
         } catch (e: any) {
             setDiagnosticLog(`خطأ غير متوقع: ${e.message}`);
         } finally {
@@ -54,25 +49,20 @@ const ProviderPendingView: React.FC<{ user: AuthenticatedUser; onLogout: () => v
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-blue-900 to-black text-white flex flex-col items-center justify-center p-6 relative overflow-hidden z-[50]" dir="rtl">
-            {/* Background Decorations */}
             <div className="absolute top-0 left-0 w-80 h-80 bg-blue-500/20 rounded-full blur-[100px] -translate-x-1/2 -translate-y-1/2"></div>
             <div className="absolute bottom-0 right-0 w-80 h-80 bg-purple-500/20 rounded-full blur-[100px] translate-x-1/2 translate-y-1/2"></div>
 
             <div className="relative z-10 w-full max-w-sm bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl p-8 shadow-2xl animate-slide-up flex flex-col items-center">
-                
                 <div className="w-24 h-24 bg-gradient-to-tr from-yellow-400 to-orange-500 rounded-full mb-6 flex items-center justify-center shadow-lg border-4 border-white/20 relative">
                     <Clock size={48} className="text-white animate-pulse"/>
                     <div className="absolute -bottom-2 bg-black text-white text-[10px] px-2 py-0.5 rounded-full border border-white/20 font-mono">
                        ID: {user.id}
                     </div>
                 </div>
-                
                 <h1 className="text-2xl font-black mb-2 text-center">مرحباً، {user.name}</h1>
                 <p className="text-blue-200 text-sm text-center mb-6 px-4 leading-relaxed">
                     حسابك في طور المراجعة من طرف الإدارة. سيتم تفعيله قريباً.
                 </p>
-
-                {/* Feature Preview List */}
                 <div className="w-full bg-black/40 p-4 rounded-xl border border-white/10 mb-6 space-y-3">
                     <h3 className="text-xs text-yellow-400 font-bold uppercase mb-2 text-center flex items-center justify-center gap-1">
                         <Star size={12}/> مميزات حسابك المهني
@@ -90,15 +80,12 @@ const ProviderPendingView: React.FC<{ user: AuthenticatedUser; onLogout: () => v
                         <span>نشر إعلانات عاجلة في التطبيق</span>
                     </div>
                 </div>
-
-                {/* Admin Info Box */}
                 <div className="w-full bg-black/40 p-3 rounded-xl border border-white/10 mb-6 text-center">
                     <p className="text-[10px] text-gray-400 uppercase mb-1">رقم هاتفك للتفعيل</p>
                     <p className="text-lg font-mono font-bold text-yellow-400 tracking-wider flex items-center justify-center gap-2">
                         {user.phone} <Copy size={14} className="cursor-pointer opacity-50 hover:opacity-100" onClick={() => navigator.clipboard.writeText(user.phone || '')}/>
                     </p>
                 </div>
-
                 <div className="w-full flex gap-3 mb-4">
                     <button onClick={onLogout} className="flex-1 py-3 bg-white/10 hover:bg-white/20 text-white font-bold rounded-xl transition-all border border-white/10 flex items-center justify-center gap-2 text-sm">
                         <LogOut size={16}/> خروج
@@ -113,7 +100,6 @@ const ProviderPendingView: React.FC<{ user: AuthenticatedUser; onLogout: () => v
 }
 
 const SettingsModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ isOpen, onClose }) => {
-    // ... existing implementation
     const { t, language, setLanguage } = useLocalization();
     const [isDark, setIsDark] = useState(document.documentElement.classList.contains('dark'));
 
@@ -136,9 +122,7 @@ const SettingsModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ is
             <div className="bg-white dark:bg-gray-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl relative">
                 <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 dark:text-gray-300"><X/></button>
                 <h2 className="text-xl font-black mb-6 flex items-center gap-2 dark:text-white"><Settings className="text-gray-400"/> {t('menu')}</h2>
-                
                 <div className="space-y-6">
-                    {/* Language Selector */}
                     <div>
                         <h3 className="text-xs font-bold text-gray-400 uppercase mb-3 flex items-center gap-1"><Globe size={14}/> Language</h3>
                         <div className="grid grid-cols-3 gap-2">
@@ -153,8 +137,6 @@ const SettingsModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ is
                             ))}
                         </div>
                     </div>
-
-                    {/* Dark Mode Toggle */}
                     <div>
                         <h3 className="text-xs font-bold text-gray-400 uppercase mb-3 flex items-center gap-1"><Moon size={14}/> Appearance</h3>
                         <button 
@@ -168,7 +150,6 @@ const SettingsModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ is
                         </button>
                     </div>
                 </div>
-
                 <div className="mt-8 pt-4 border-t dark:border-gray-700 text-center">
                     <p className="text-xs text-gray-400">TangerConnect v2.1</p>
                 </div>
@@ -178,7 +159,6 @@ const SettingsModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ is
 }
 
 const AuthModal: React.FC<{ isOpen: boolean; onClose: () => void; onLogin: (user: AuthenticatedUser) => void; notify: (msg: string, type: 'success'|'error') => void }> = ({ isOpen, onClose, onLogin, notify }) => {
-    // ... (Existing implementation, kept for brevity)
     const { t, language } = useLocalization();
     const [isRegister, setIsRegister] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -266,7 +246,7 @@ const AuthModal: React.FC<{ isOpen: boolean; onClose: () => void; onLogin: (user
                 onLogin(newUser);
 
                 if (isProvider && !forcedActiveStatus) {
-                    // Pending View will show
+                    // Pending View
                 } else {
                     notify(t('success'), 'success');
                 }
@@ -335,17 +315,14 @@ const AuthModal: React.FC<{ isOpen: boolean; onClose: () => void; onLogin: (user
         <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 animate-fade-in backdrop-blur-sm">
             <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-3xl overflow-hidden shadow-2xl relative flex flex-col max-h-[90vh]">
                 <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 z-10"><X/></button>
-                
                 <div className="flex border-b">
                     <button onClick={() => setAccountType(AccountType.CLIENT)} className={`flex-1 py-4 text-center font-bold text-sm transition-colors flex flex-col items-center gap-2 ${accountType === AccountType.CLIENT ? 'bg-white text-blue-600 border-b-2 border-blue-600' : 'bg-gray-50 text-gray-500'}`}><User size={20} />{t('client')} (Zobana2)</button>
                     <button onClick={() => setAccountType(AccountType.PROVIDER)} className={`flex-1 py-4 text-center font-bold text-sm transition-colors flex flex-col items-center gap-2 ${accountType === AccountType.PROVIDER ? 'bg-white text-purple-600 border-b-2 border-purple-600' : 'bg-gray-50 text-gray-500'}`}><Briefcase size={20} />{t('provider')} (Mihani)</button>
                 </div>
-
                 <div className="p-8 overflow-y-auto">
                     <h2 className="text-xl font-black mb-6 text-center dark:text-white flex items-center justify-center gap-2">
                          {isRegister ? t('registerTitle') : t('loginTitle')}
                     </h2>
-
                     <div className="space-y-4">
                         {isRegister && (
                             <>
@@ -375,16 +352,12 @@ const AuthModal: React.FC<{ isOpen: boolean; onClose: () => void; onLogin: (user
                                 )}
                             </>
                         )}
-                        
                         <input type="text" placeholder={accountType === AccountType.PROVIDER ? t('phoneOrUsername') : t('phone')} value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl outline-none border focus:border-black transition-colors"/>
-                        
                         <div className="relative">
                             <input type={showPassword ? "text" : "password"} placeholder={t('password')} value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl outline-none pr-10 border focus:border-black transition-colors" style={{ direction: 'ltr' }}/>
                             <button onClick={() => setShowPassword(!showPassword)} className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 z-10" tabIndex={-1}>{showPassword ? <EyeOff size={20}/> : <Eye size={20}/>}</button>
                         </div>
-
                         <button onClick={handleSubmit} disabled={loading} className={`w-full py-3 text-white font-bold rounded-xl shadow-lg active:scale-95 transition-transform flex justify-center items-center gap-2 ${accountType === AccountType.CLIENT ? 'bg-blue-600 hover:bg-blue-700' : 'bg-purple-600 hover:bg-purple-700'}`}>{loading ? <Loader2 className="animate-spin"/> : (isRegister ? t('registerButton') : t('loginButton'))}</button>
-                        
                         <div className="relative py-2"><div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200"></div></div><div className="relative flex justify-center text-sm"><span className="px-2 bg-white text-gray-500">Or</span></div></div>
                         <button onClick={() => setIsRegister(!isRegister)} className="w-full py-3 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition-colors">{isRegister ? t('loginTitle') : t('registerTitle')}</button>
                     </div>
@@ -394,12 +367,7 @@ const AuthModal: React.FC<{ isOpen: boolean; onClose: () => void; onLogin: (user
     );
 };
 
-// ... (ClientNotificationsModal, ProviderDirectory, ServicesHub, EditClientProfileModal, SuggestedProviders - KEEP AS IS)
-
-// --- REUSED COMPONENTS TO AVOID REDECLARATION ERRORS (Minimal versions for context) ---
-// (In a real scenario, these are already defined in the file)
 const ClientNotificationsModal: React.FC<{ isOpen: boolean; onClose: () => void; userId: number }> = ({ isOpen, onClose, userId }) => {
-    // ... existing implementation
     const { t } = useLocalization();
     const [ads, setAds] = useState<UrgentAd[]>([]);
     const [loading, setLoading] = useState(false);
@@ -410,7 +378,6 @@ const ClientNotificationsModal: React.FC<{ isOpen: boolean; onClose: () => void;
 }
 
 const ProviderDirectory: React.FC<{ isOpen: boolean; onClose: () => void; currentUser: AuthenticatedUser | null }> = ({ isOpen, onClose, currentUser }) => {
-    // ... existing implementation
     const { t } = useLocalization(); 
     const [providers, setProviders] = useState<any[]>([]); 
     const [loading, setLoading] = useState(false); 
@@ -424,13 +391,11 @@ const ProviderDirectory: React.FC<{ isOpen: boolean; onClose: () => void; curren
 }
 
 const ServicesHub: React.FC<{ onNav: (target: string) => void; isAdmin: boolean }> = ({ onNav, isAdmin }) => {
-    // ... existing implementation
     const { t } = useLocalization(); const ServiceCard = ({ icon: Icon, title, color, bg, onClick }: any) => (<button onClick={onClick} className={`${bg} border border-transparent hover:border-${color.split('-')[1]}-200 p-6 rounded-2xl flex flex-col items-center justify-center gap-3 shadow-sm active:scale-95 transition-all`}><div className={`w-14 h-14 rounded-full ${color} text-white flex items-center justify-center shadow-md`}><Icon size={28}/></div><span className="font-bold text-gray-800 text-sm">{title}</span></button>);
     return (<div className="flex-1 overflow-y-auto p-4 bg-gray-50 pb-20"><div className="mb-6"><h2 className="text-2xl font-black text-gray-900">{t('servicesHubTitle')}</h2><p className="text-gray-500 text-sm">{t('servicesHubDesc')}</p></div><div className="grid grid-cols-2 md:grid-cols-4 gap-4"><ServiceCard icon={Home} title={t('realEstateTitle')} color="bg-purple-500" bg="bg-white" onClick={() => onNav('REAL_ESTATE')}/><ServiceCard icon={Briefcase} title={t('jobBoardTitle')} color="bg-green-500" bg="bg-white" onClick={() => onNav('JOBS')}/><ServiceCard icon={Users} title={t('providerDirectory')} color="bg-blue-500" bg="bg-white" onClick={() => onNav('DIRECTORY')}/><ServiceCard icon={Calendar} title={t('myAppointments')} color="bg-teal-500" bg="bg-white" onClick={() => onNav('APPOINTMENTS')}/>{isAdmin && (<ServiceCard icon={Database} title={t('databaseSetupTitle')} color="bg-red-500" bg="bg-white" onClick={() => onNav('DB')}/>)}</div></div>);
 }
 
 const EditClientProfileModal: React.FC<{ user: AuthenticatedUser; onClose: () => void; onUpdateUser: (updates: Partial<AuthenticatedUser>) => void; notify: (m: string, t: any) => void }> = ({ user, onClose, onUpdateUser, notify }) => {
-    // ... existing implementation
     const { t } = useLocalization(); const [name, setName] = useState(user.name); const [bio, setBio] = useState(user.bio || ''); const [image, setImage] = useState(user.profile_image_url || ''); const [loading, setLoading] = useState(false); const fileRef = useRef<HTMLInputElement>(null);
     const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => { const file = e.target.files?.[0]; if(!file) return; setLoading(true); try { const fileName = `client_${user.id}_${Date.now()}`; await supabase.storage.from('profiles').upload(fileName, file); const { data } = supabase.storage.from('profiles').getPublicUrl(fileName); setImage(data.publicUrl); } catch(e) {} finally { setLoading(false); } }
     const handleSave = async () => { setLoading(true); const table = user.accountType === AccountType.PROVIDER ? 'providers' : 'clients'; const updates: any = { bio, profile_image_url: image }; if(user.accountType === AccountType.CLIENT) updates.full_name = name; else updates.name = name; const { error } = await supabase.from(table).update(updates).eq('id', user.id); if(!error) { onUpdateUser({ name, bio, profile_image_url: image }); notify(t('success'), 'success'); onClose(); } else notify(t('errorMessage'), 'error'); setLoading(false); }
@@ -438,7 +403,6 @@ const EditClientProfileModal: React.FC<{ user: AuthenticatedUser; onClose: () =>
 }
 
 const SuggestedProviders: React.FC<{ currentUser: AuthenticatedUser; onOpenProfile: (provider: any) => void }> = ({ currentUser, onOpenProfile }) => {
-    // ... existing implementation
     const { t } = useLocalization(); const [suggestions, setSuggestions] = useState<any[]>([]); const [followedState, setFollowedState] = useState<Record<number, boolean>>({});
     useEffect(() => { const fetch = async () => { const { data: follows } = await supabase.from('follows').select('provider_id').eq('client_id', currentUser.id); const followedIds = follows?.map(f => f.provider_id) || []; let query = supabase.from('providers').select('*').eq('is_active', true).limit(10); if(followedIds.length > 0) { query = query.not('id', 'in', `(${followedIds.join(',')})`); } const { data } = await query; setSuggestions(data || []); }; fetch(); }, [currentUser]);
     const handleFollowClick = async (providerId: number) => { const isFollowed = followedState[providerId]; setFollowedState(prev => ({ ...prev, [providerId]: !isFollowed })); if (isFollowed) { await supabase.from('follows').delete().eq('client_id', currentUser.id).eq('provider_id', providerId); } else { await supabase.from('follows').insert({ client_id: currentUser.id, provider_id: providerId }); } };
@@ -455,7 +419,6 @@ const ProfileTab: React.FC<{ user: AuthenticatedUser | null; onLogin: () => void
     if (!user) { return (<div className="flex-1 flex flex-col items-center justify-center p-6 bg-gray-50 pb-20 h-full"><div className="w-24 h-24 bg-gray-200 rounded-full flex items-center justify-center mb-4 shadow-inner"><User size={48} className="text-gray-400"/></div><h2 className="text-xl font-bold mb-2">{t('guest')}</h2><p className="text-gray-500 text-center mb-6 max-w-xs">{t('appDesc')}</p><button onClick={onLogin} className="px-8 py-3 bg-black text-white rounded-full font-bold shadow-lg active:scale-95 transition-transform">{t('loginRegister')}</button></div>); }
     
     return (
-        // IMPORTANT: h-full and flex-1 are crucial for the scrolling container
         <div className="flex-1 h-full overflow-y-auto bg-gray-50 pb-20">
             <div className="bg-white p-6 border-b shadow-sm mb-4">
                 <div className="flex items-center gap-4">
@@ -467,20 +430,13 @@ const ProfileTab: React.FC<{ user: AuthenticatedUser | null; onLogin: () => void
                     <button onClick={onLogout} className="flex-1 py-2 bg-red-50 text-red-500 rounded-lg font-bold text-xs flex items-center justify-center gap-1"><LogOut size={14}/> {t('logout')}</button>
                 </div>
                 
-                {/* WHATSAPP SUPPORT BUTTON (ADDED) */}
-                <a 
-                    href="https://wa.me/212621572534" 
-                    target="_blank" 
-                    rel="noreferrer"
-                    className="mt-3 w-full py-2.5 bg-green-100 text-green-700 rounded-lg font-bold text-xs flex items-center justify-center gap-2 hover:bg-green-200 transition-colors"
-                >
+                <a href="https://wa.me/212621572534" target="_blank" rel="noreferrer" className="mt-3 w-full py-2.5 bg-green-100 text-green-700 rounded-lg font-bold text-xs flex items-center justify-center gap-2 hover:bg-green-200 transition-colors">
                     <HelpCircle size={16}/> الدعم التقني (WhatsApp)
                 </a>
             </div>
             <div className="p-4">
                 {user.accountType === 'CLIENT' && (<SuggestedProviders currentUser={user} onOpenProfile={setViewingProvider}/>)}
                 
-                {/* --- AFFILIATE BANNER --- */}
                 {user.accountType === 'CLIENT' && (
                     <div onClick={() => setShowAffiliate(true)} className="mb-6 p-4 bg-gradient-to-r from-yellow-500 to-orange-600 rounded-2xl shadow-lg cursor-pointer text-white flex justify-between items-center transform transition-transform hover:scale-[1.02]">
                         <div>
@@ -505,7 +461,6 @@ const ProfileTab: React.FC<{ user: AuthenticatedUser | null; onLogin: () => void
     );
 }
 
-// ... (SplashScreen - KEEP AS IS)
 const SplashScreen: React.FC = () => {
     return (<div className="fixed inset-0 bg-white z-[100] flex flex-col items-center justify-center animate-fade-in"><div className="w-24 h-24 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white shadow-xl mb-6 animate-slide-up"><Globe size={48} className="animate-spin-slow"/></div><h1 className="text-2xl font-black text-gray-900 tracking-tight animate-pulse">Tanger IA</h1><p className="text-gray-400 text-sm mt-2">Connect. Smart. Easy.</p></div>);
 }
@@ -516,21 +471,13 @@ const AppContent: React.FC = () => {
     const [user, setUser] = useState<AuthenticatedUser | null>(null);
     const [userView, setUserView] = useState<UserView>(UserView.CLIENT);
     const [showSplash, setShowSplash] = useState(true);
-    
-    // TAB STATE
     const [activeTab, setActiveTab] = useState<'HOME' | 'CHAT' | 'STORE' | 'SERVICES' | 'PROFILE'>('HOME');
     const [hideBottomNav, setHideBottomNav] = useState(false);
-    
-    // Deep Linking State
     const [chatInitialProvider, setChatInitialProvider] = useState<any | null>(null);
     const [chatInitialMessage, setChatInitialMessage] = useState<string | undefined>(undefined);
     const [storeInitialProduct, setStoreInitialProduct] = useState<Product | null>(null);
-
-    // Notifications State
     const [unreadNotifs, setUnreadNotifs] = useState(0);
     const [showClientNotifs, setShowClientNotifs] = useState(false);
-
-    // Modals
     const [showAuth, setShowAuth] = useState(false);
     const [showRealEstate, setShowRealEstate] = useState(false);
     const [showJobBoard, setShowJobBoard] = useState(false);
@@ -539,23 +486,16 @@ const AppContent: React.FC = () => {
     const [showDirectory, setShowDirectory] = useState(false); 
     const [showSettings, setShowSettings] = useState(false);
     const [showAdminDashboard, setShowAdminDashboard] = useState(false);
-    
-    // Internal Navigation for Feed to Profile
     const [feedViewingProvider, setFeedViewingProvider] = useState<any | null>(null);
-
-    // BOOKING FROM FEED PROFILE STATE
     const [showBookingModal, setShowBookingModal] = useState(false);
     const [bookingTargetProvider, setBookingTargetProvider] = useState<any>(null);
     const [bookingTargetOffer, setBookingTargetOffer] = useState<Offer | null>(null);
-
-    // Custom Toast State
     const [toast, setToast] = useState<{message: string, type: 'success' | 'error'} | null>(null);
 
     const showToast = (message: string, type: 'success' | 'error' = 'success') => {
         setToast({ message, type });
     };
 
-    // DARK MODE INIT
     useEffect(() => {
         const theme = localStorage.getItem('theme');
         if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
@@ -567,8 +507,6 @@ const AppContent: React.FC = () => {
 
     useEffect(() => {
         const timer = setTimeout(() => setShowSplash(false), 2500);
-        
-        // 1. Load User from Local Storage
         const stored = localStorage.getItem('tanger_user');
         if (stored) {
             const u = JSON.parse(stored);
@@ -581,7 +519,6 @@ const AppContent: React.FC = () => {
         return () => clearTimeout(timer);
     }, []);
 
-    // --- GLOBAL PROVIDER STATUS WATCHER ---
     useEffect(() => {
         let interval: any;
         if (user?.accountType === AccountType.PROVIDER && user.isActive === false) {
@@ -600,7 +537,6 @@ const AppContent: React.FC = () => {
         return () => { if(interval) clearInterval(interval); }
     }, [user?.isActive, user?.id]);
 
-    // REAL-TIME NOTIFICATION SUBSCRIPTION
     useEffect(() => {
         if (!user) return;
         const subscription = supabase
@@ -679,7 +615,6 @@ const AppContent: React.FC = () => {
         }
     }
 
-    // --- DEEP LINK HANDLERS FROM FEED ---
     const handleChatFromFeed = (provider: any, message?: string) => {
         setChatInitialProvider(provider);
         setChatInitialMessage(message);
@@ -691,7 +626,6 @@ const AppContent: React.FC = () => {
         setActiveTab('STORE');
     }
 
-    // --- BOOKING HANDLERS ---
     const handleOpenBooking = (provider: any, offer: Offer) => {
         setBookingTargetProvider(provider);
         setBookingTargetOffer(offer);
@@ -721,11 +655,10 @@ const AppContent: React.FC = () => {
     }
 
     return (
-        <div className={`flex flex-col h-full min-h-screen bg-gray-50 dark:bg-gray-900 ${language === 'ar' ? 'font-arabic' : 'font-sans'}`} dir={language === 'ar' ? 'rtl' : 'ltr'}>
+        <div className={`flex flex-col h-[100dvh] bg-gray-50 dark:bg-gray-900 ${language === 'ar' ? 'font-arabic' : 'font-sans'}`} dir={language === 'ar' ? 'rtl' : 'ltr'}>
             
             <div className="mx-auto w-full max-w-lg md:max-w-2xl lg:max-w-4xl xl:max-w-5xl flex-1 flex flex-col bg-white dark:bg-black shadow-2xl overflow-hidden relative border-x border-gray-100 dark:border-gray-800 h-full">
 
-                {/* NEW HEADER FOR ALL TABS EXCEPT HOME (HOME HAS ITS OWN HEADER IN FEED COMPONENT) */}
                 {activeTab !== 'HOME' && activeTab !== 'CHAT' && (
                     <div className="bg-white dark:bg-gray-800 px-4 py-3 flex justify-between items-center border-b dark:border-gray-700 shadow-sm sticky top-0 z-30 shrink-0">
                         <div className="flex items-center gap-2">
@@ -757,9 +690,7 @@ const AppContent: React.FC = () => {
                     </div>
                 )}
 
-                {/* CONTENT AREA */}
                 <div className="flex-1 overflow-hidden relative">
-                    {/* HOME FEED (INSTAGRAM STYLE) */}
                     {activeTab === 'HOME' && (
                         <Feed 
                             currentUser={user} 
@@ -771,7 +702,6 @@ const AppContent: React.FC = () => {
                         />
                     )}
                     
-                    {/* CHAT/PROVIDERS LIST (OLD HOME) */}
                     {activeTab === 'CHAT' && (
                         <Chatbot 
                             currentUser={user} 
@@ -779,7 +709,7 @@ const AppContent: React.FC = () => {
                             onDiscover={() => setActiveTab('SERVICES')} 
                             onToggleNav={(hidden) => setHideBottomNav(hidden)} 
                             onOpenNotifications={() => setShowClientNotifs(true)} 
-                            initialProvider={chatInitialProvider} // Pass deep link data
+                            initialProvider={chatInitialProvider} 
                             initialMessage={chatInitialMessage}
                         />
                     )}
@@ -792,7 +722,7 @@ const AppContent: React.FC = () => {
                             onOpenAuth={() => setShowAuth(true)} 
                             onGoToProfile={() => setActiveTab('PROFILE')} 
                             notify={showToast} 
-                            initialProduct={storeInitialProduct} // Pass deep link data
+                            initialProduct={storeInitialProduct} 
                         />
                     )}
                     
@@ -800,9 +730,8 @@ const AppContent: React.FC = () => {
                     {activeTab === 'PROFILE' && <ProfileTab user={user} onLogin={() => setShowAuth(true)} onLogout={handleLogout} isAdmin={isAdmin} onNav={handleNav} onUpdateUser={handleUpdateUser} notify={showToast} onOpenSettings={() => setShowSettings(true)}/>}
                 </div>
 
-                {/* BOTTOM NAVIGATION (Fixed Grid Layout) */}
                 {!hideBottomNav && (
-                    <div className="bg-white dark:bg-gray-800 border-t dark:border-gray-700 grid grid-cols-5 items-center pb-safe pt-2 px-2 shadow-[0_-5px_20px_-5px_rgba(0,0,0,0.05)] z-40 w-full h-16 shrink-0">
+                    <div className="sticky bottom-0 bg-white dark:bg-gray-800 border-t dark:border-gray-700 grid grid-cols-5 items-center pb-safe pt-2 px-2 shadow-[0_-5px_20px_-5px_rgba(0,0,0,0.05)] z-40 w-full h-16 shrink-0">
                         <button onClick={() => setActiveTab('HOME')} className={`flex flex-col items-center justify-center gap-1 w-full h-full transition-all ${activeTab === 'HOME' ? 'text-black dark:text-white font-bold' : 'text-gray-400 dark:text-gray-500'}`}>
                             <Home size={24} className={activeTab === 'HOME' ? 'fill-black dark:fill-white' : ''}/>
                             <span className="text-[10px]">{t('navHome')}</span>
@@ -831,7 +760,6 @@ const AppContent: React.FC = () => {
                 )}
             </div>
 
-            {/* GLOBAL MODALS */}
             <AuthModal isOpen={showAuth} onClose={() => setShowAuth(false)} onLogin={handleLogin} notify={showToast} />
             <RealEstate isOpen={showRealEstate} onClose={() => setShowRealEstate(false)} currentUser={user}/>
             <JobBoard isOpen={showJobBoard} onClose={() => setShowJobBoard(false)} currentUser={user} notify={showToast}/>
@@ -861,7 +789,6 @@ const AppContent: React.FC = () => {
                 />
             )}
 
-            {/* GLOBAL TOAST */}
             {toast && <ToastNotification message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
         </div>
     );

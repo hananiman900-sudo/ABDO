@@ -25,44 +25,75 @@ const StoreHeaderBanner = ({
     currentUser, 
     isAdmin 
 }: any) => {
-    // New curated images for a "Shopping Store" vibe
-    const bannerImages = [
-        "https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=800&auto=format&fit=crop", 
-        "https://images.unsplash.com/photo-1472851294608-415522f96319?q=80&w=800&auto=format&fit=crop", 
-        "https://images.unsplash.com/photo-1511556820780-d912e42b4980?q=80&w=800&auto=format&fit=crop" 
-    ];
-    const [current, setCurrent] = useState(0);
+    const [typedText, setTypedText] = useState('');
+    const [isFinished, setIsFinished] = useState(false);
+    const fullText = "Marhaba bik f l-matjar dyalna... Ahsan l-3orod f Tanja!";
 
     useEffect(() => {
-        const timer = setInterval(() => {
-            setCurrent(prev => (prev + 1) % bannerImages.length);
-        }, 5000);
-        return () => clearInterval(timer);
+        let index = 0;
+        const interval = setInterval(() => {
+            setTypedText(fullText.slice(0, index));
+            index++;
+            if (index > fullText.length) {
+                clearInterval(interval);
+                setIsFinished(true);
+            }
+        }, 600); // Slightly slower typing for clarity on white background
+        return () => clearInterval(interval);
     }, []);
 
     return (
-        // CHANGED: Height reduced from h-36 to h-28 (approx 112px) for smaller footprint
-        <div className="w-full h-28 relative overflow-hidden shrink-0 shadow-md">
-            {bannerImages.map((img, idx) => (
-                <div 
-                    key={idx} 
-                    className={`absolute inset-0 transition-opacity duration-1000 ${idx === current ? 'opacity-100' : 'opacity-0'}`}
-                >
-                    <img src={img} className="w-full h-full object-cover"/>
-                    <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/20 to-transparent"></div>
-                </div>
-            ))}
-            <div className="absolute inset-0 flex flex-col justify-between p-3 z-20">
-                <div className="flex justify-between items-start">
-                    <button onClick={onClose} className="w-8 h-8 bg-white/20 backdrop-blur-md border border-white/30 rounded-full flex items-center justify-center text-white hover:bg-white/40 transition-colors"><ArrowLeft size={18}/></button>
-                    <div className="flex items-center gap-2">
-                        {currentUser && (<button onClick={onOpenOrders} className="w-8 h-8 bg-white/20 backdrop-blur-md border border-white/30 rounded-full flex items-center justify-center text-white hover:bg-white/40"><ListChecks size={16}/></button>)}
-                        {isAdmin && (<button onClick={onOpenAdmin} className="w-8 h-8 bg-black/50 text-white rounded-full flex items-center justify-center"><Settings size={16}/></button>)}
-                        <button onClick={onOpenCart} className="w-8 h-8 bg-orange-500 text-white rounded-full flex items-center justify-center relative shadow-lg border border-white/20"><ShoppingBag size={16}/>{cartCount > 0 && (<span className="absolute -top-1 -right-1 bg-red-600 text-white text-[9px] w-3.5 h-3.5 rounded-full flex items-center justify-center border border-white font-bold">{cartCount}</span>)}</button>
-                        {currentUser && (<button onClick={onProfile} className="w-8 h-8 rounded-full overflow-hidden border-2 border-white/50 shadow-sm"><img src={currentUser.profile_image_url || `https://ui-avatars.com/api/?name=${currentUser.name}`} className="w-full h-full object-cover"/></button>)}
+        // COMPACT HEADER: Height reduced to h-16 (Temu Style)
+        <div className="w-full h-20 shrink-0 bg-white border-b border-gray-100 sticky top-0 z-40 px-3 flex flex-col justify-center gap-1 shadow-sm">
+            <div className="flex justify-between items-center">
+                {/* Left Side: Back & Branding */}
+                <div className="flex items-center gap-2.5">
+                    <button onClick={onClose} className="w-9 h-9 bg-gray-50 rounded-full flex items-center justify-center text-gray-600 hover:bg-gray-100 transition-all border border-gray-100">
+                        <ArrowLeft size={20}/>
+                    </button>
+                    <div className="flex flex-col leading-none">
+                        <div className="flex items-center gap-1">
+                            <span className={`font-black text-sm tracking-tight uppercase transition-all duration-700 ${isFinished ? 'text-orange-600' : 'text-gray-900'}`}>
+                                Tanger Store
+                            </span>
+                            {isFinished && <div className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-pulse shadow-[0_0_5px_orange]"></div>}
+                        </div>
+                        {/* Compact Typing Text */}
+                        <div className="h-3">
+                            <p className="text-[9px] text-gray-400 font-bold italic truncate max-w-[140px]">
+                                {typedText}
+                                <span className={`inline-block w-0.5 h-2.5 bg-orange-500 ml-0.5 ${isFinished ? 'hidden' : 'animate-pulse'}`}></span>
+                            </p>
+                        </div>
                     </div>
                 </div>
-                <div className="flex items-center gap-2 animate-fade-in pb-1"><div className="w-5 h-5 rounded-full bg-white flex items-center justify-center shadow-sm"><ShoppingBag size={12} className="text-orange-600"/></div><span className="font-black text-sm text-white tracking-wide uppercase drop-shadow-md">Tanger Store</span></div>
+
+                {/* Right Side: Tools & Profile */}
+                <div className="flex items-center gap-1.5">
+                    {currentUser && (
+                        <button onClick={onOpenOrders} className="w-9 h-9 bg-gray-50 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-100 border border-gray-100">
+                            <ListChecks size={18}/>
+                        </button>
+                    )}
+                    {isAdmin && (
+                        <button onClick={onOpenAdmin} className="w-9 h-9 bg-gray-900 text-white rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-transform">
+                            <Settings size={18}/>
+                        </button>
+                    )}
+                    <button onClick={onOpenCart} className="w-9 h-9 bg-orange-600 text-white rounded-full flex items-center justify-center relative shadow-lg hover:scale-105 transition-transform">
+                        <ShoppingCart size={18}/>
+                        {cartCount > 0 && (
+                            <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[9px] w-4 h-4 rounded-full flex items-center justify-center border-2 border-white font-black">
+                                {cartCount}
+                            </span>
+                        )}
+                    </button>
+                    {currentUser && (
+                        <button onClick={onProfile} className="w-9 h-9 rounded-full overflow-hidden border-2 border-gray-50 shadow-sm hover:ring-2 hover:ring-orange-100 transition-all">
+                            <img src={currentUser.profile_image_url || `https://ui-avatars.com/api/?name=${currentUser.name}`} className="w-full h-full object-cover"/>
+                        </button>
+                    )}
+                </div>
             </div>
         </div>
     );
@@ -98,6 +129,9 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
     const [promoCode, setPromoCode] = useState('');
     const [appliedDiscount, setAppliedDiscount] = useState<{code: string, rate: number, partnerId: number} | null>(null);
     const [promoLoading, setPromoLoading] = useState(false);
+    
+    // --- AFFILIATE CHECK STATE ---
+    const [isApprovedAffiliate, setIsApprovedAffiliate] = useState(false);
 
     // Categories
     const categories = ['category_all', 'category_clothes', 'category_electronics', 'category_accessories', 'category_home', 'category_beauty'];
@@ -105,7 +139,6 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
     const isAdmin = currentUser?.phone === '0617774846' && currentUser?.accountType === 'PROVIDER';
 
     // --- STRICT CART KEY LOGIC ---
-    // This ensures cart is strictly isolated to the user ID. Guest cart is separate.
     const getCartKey = () => {
         if (currentUser) return `tanger_cart_${currentUser.id}`;
         return 'tanger_cart_guest';
@@ -114,6 +147,28 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
     useEffect(() => {
         if(isOpen) fetchProducts();
     }, [isOpen]);
+
+    // Check Affiliate Status
+    useEffect(() => {
+        const checkAffiliateStatus = async () => {
+            if (currentUser) {
+                const { data } = await supabase
+                    .from('affiliate_partners')
+                    .select('status')
+                    .eq('user_id', currentUser.id)
+                    .single();
+                
+                if (data && data.status === 'approved') {
+                    setIsApprovedAffiliate(true);
+                } else {
+                    setIsApprovedAffiliate(false);
+                }
+            } else {
+                setIsApprovedAffiliate(false);
+            }
+        };
+        checkAffiliateStatus();
+    }, [currentUser, isOpen]);
 
     // Handle Deep Link updates
     useEffect(() => {
@@ -136,10 +191,9 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                 setCart([]);
             }
         } else {
-            // Important: If switching users and no cart found, Reset!
             setCart([]);
         }
-    }, [currentUser?.id]); // Re-run strictly when ID changes
+    }, [currentUser?.id]);
 
     // SAVE CART
     useEffect(() => {
@@ -179,11 +233,9 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
     const validatePromo = async () => {
         if (!promoCode.trim()) return;
         setPromoLoading(true);
-        // Ensure user doesn't use their own code
         const { data } = await supabase.from('affiliate_partners').select('*').eq('promo_code', promoCode.toUpperCase()).single();
         
         if (data) {
-            // Allow providers to use codes too, only block if it's THEIR OWN code
             if (currentUser && data.user_id === currentUser.id) {
                 notify("You cannot use your own promo code!", 'error');
             } else if (data.status !== 'approved') {
@@ -199,35 +251,21 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
         setPromoLoading(false);
     };
 
-    // Calculate final price for a product based on discount logic
-    const calculatePrice = (p: Product) => {
-        if (!appliedDiscount) return p.price;
-        // If product has specific discount price set, use it
-        if (p.discount_price && p.discount_price > 0) return p.discount_price;
-        // Fallback to default percentage
-        return Math.round(p.price * (1 - appliedDiscount.rate));
-    }
-
     const handleCheckout = async () => {
         if(!currentUser) { onOpenAuth(); return; }
         setLoading(true);
         
-        // Calculate total based on dynamic pricing per item
         let finalAmount = 0;
         let originalAmount = 0;
         let totalCommission = 0;
 
         cart.forEach(item => {
-            originalAmount += item.price * item.quantity; // item.price is original here (from addToCart logic below)
-            
-            // Calculate final price for this item
+            originalAmount += item.price * item.quantity;
             const itemPrice = appliedDiscount 
                 ? (item.discount_price && item.discount_price > 0 ? item.discount_price : Math.round(item.price * (1 - appliedDiscount.rate)))
                 : item.price;
-            
             finalAmount += itemPrice * item.quantity;
 
-            // Calculate Commission
             if (appliedDiscount) {
                 if (item.affiliate_commission && item.affiliate_commission > 0) {
                     totalCommission += (item.affiliate_commission * item.quantity);
@@ -244,7 +282,7 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
             user_id: currentUser.id,
             user_type: currentUser.accountType,
             total_amount: finalAmount,
-            items: cart, // Note: items in cart currently hold ORIGINAL price
+            items: cart,
             status: 'pending',
             customer_details: { 
                 name: currentUser.name, 
@@ -255,17 +293,14 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
         }).select().single();
 
         if (!error && orderData) {
-            // --- UPDATE AFFILIATE SALES ---
             if (appliedDiscount) {
                 totalCommission = Math.round(totalCommission);
-
-                // Insert into sales with STATUS 'PENDING'
                 await supabase.from('affiliate_sales').insert({
                     partner_id: appliedDiscount.partnerId,
                     order_id: orderData.id,
                     amount: finalAmount,
                     commission: totalCommission,
-                    status: 'pending' // Important: Earnings are pending until delivery
+                    status: 'pending'
                 });
             }
 
@@ -287,7 +322,6 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
             return;
         }
 
-        // Add with ORIGINAL PRICE. Discount is calculated at display/checkout time
         setCart(prev => {
             const ex = prev.find(i => i.id === p.id && i.selectedSize === selectedSize);
             if(ex) return prev.map(i => (i.id === p.id && i.selectedSize === selectedSize) ? {...i, quantity: i.quantity + 1} : i);
@@ -303,15 +337,13 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
         }
         if(!selectedProduct || !newReview.trim()) return;
         setReviewLoading(true);
-        
         const { error } = await supabase.from('product_reviews').insert({
             product_id: selectedProduct.id,
             user_name: currentUser.name,
             comment: newReview
         });
-
         if (error) {
-            notify("خطأ في حفظ التعليق. تأكد من إعداد قاعدة البيانات (V28)", 'error');
+            notify("خطأ في حفظ التعليق.", 'error');
         } else {
             setNewReview('');
             fetchReviews(selectedProduct.id);
@@ -319,7 +351,6 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
         setReviewLoading(false);
     }
     
-    // --- FILTER LOGIC ---
     const filteredProducts = products.filter(p => {
         const matchesCategory = activeCategory === 'category_all' || p.category === activeCategory;
         const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -332,14 +363,8 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
     }
     
     const sliderImages = selectedProduct ? getImages(selectedProduct) : [];
-    
-    const nextImage = () => {
-        setCurrentImageIndex((prev) => (prev + 1) % sliderImages.length);
-    }
-    
-    const prevImage = () => {
-        setCurrentImageIndex((prev) => (prev - 1 + sliderImages.length) % sliderImages.length);
-    }
+    const nextImage = () => setCurrentImageIndex((prev) => (prev + 1) % sliderImages.length);
+    const prevImage = () => setCurrentImageIndex((prev) => (prev - 1 + sliderImages.length) % sliderImages.length);
 
     const openProduct = (p: Product) => {
         setSelectedProduct(p);
@@ -348,7 +373,6 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
         fetchReviews(p.id);
     }
 
-    // Calculations for Cart View Display
     const calculateCartTotal = () => {
         return cart.reduce((total, item) => {
             const price = appliedDiscount 
@@ -358,15 +382,21 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
         }, 0);
     };
 
+    // FIX: Define displayPriceForSelectedProduct to resolve the reference error in the product detail view.
+    const displayPriceForSelectedProduct = selectedProduct ? (
+        appliedDiscount 
+            ? (selectedProduct.discount_price && selectedProduct.discount_price > 0 ? selectedProduct.discount_price : Math.round(selectedProduct.price * (1 - appliedDiscount.rate)))
+            : selectedProduct.price
+    ) : 0;
+
     const cartTotal = calculateCartTotal();
 
     if(!isOpen) return null;
 
     return (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-0 md:p-4">
-            <div className="bg-gray-100 w-full h-full md:rounded-3xl flex flex-col overflow-hidden relative">
+            <div className="bg-white w-full h-full md:rounded-3xl flex flex-col overflow-hidden relative">
                 
-                {/* --- HEADER IS NOW THE BANNER ITSELF --- */}
                 {view === 'catalog' ? (
                     <StoreHeaderBanner 
                         onClose={onClose}
@@ -379,7 +409,6 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                         isAdmin={isAdmin}
                     />
                 ) : (
-                    /* Simple Header for other views */
                     <div className="bg-white p-3 flex justify-between items-center shadow-sm z-10 border-b relative">
                         <button onClick={() => setView('catalog')} className="p-2"><ArrowLeft/></button>
                         <h2 className="font-bold text-lg text-orange-600">{view === 'admin' ? t('adminPanel') : (view === 'my_orders' ? t('myOrders') : t('shop'))}</h2>
@@ -387,50 +416,49 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                     </div>
                 )}
 
-                {/* ... (Rest of Store UI) */}
+                <div className="flex-1 flex flex-col overflow-hidden">
                 {view === 'catalog' && (
                     <>
-                        {/* --- SEARCH BAR & PROMO CODE INPUT --- */}
-                        <div className="bg-white p-3 border-b border-gray-100 flex gap-2">
-                            <div className="bg-gray-50 border border-gray-200 rounded-xl flex items-center px-3 py-2 shadow-sm focus-within:ring-2 focus-within:ring-orange-100 transition-all flex-1">
-                                <Search size={18} className="text-gray-400"/>
+                        {/* SEARCH & PROMO: Ultra-compact */}
+                        <div className="bg-white p-2 border-b border-gray-50 flex gap-2">
+                            <div className="bg-gray-100 rounded-full flex items-center px-4 py-2 transition-all flex-1">
+                                <Search size={16} className="text-gray-400"/>
                                 <input 
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
                                     placeholder={t('search')} 
-                                    className="bg-transparent border-none outline-none flex-1 mx-2 text-sm text-gray-800 placeholder-gray-400 h-full"
+                                    className="bg-transparent border-none outline-none flex-1 mx-2 text-xs text-gray-800"
                                 />
                             </div>
                             
-                            {/* NEW PROMO CODE TRIGGER */}
-                            <div className="relative group">
-                                <div className={`flex items-center bg-gray-50 border ${appliedDiscount ? 'border-green-500 bg-green-50' : 'border-gray-200'} rounded-xl px-2 py-1 h-full shadow-sm`}>
-                                    <Tag size={16} className={appliedDiscount ? "text-green-600" : "text-gray-400"}/>
+                            <div className="relative">
+                                <div className={`flex items-center bg-gray-100 border ${appliedDiscount ? 'border-green-500 bg-green-50' : 'border-transparent'} rounded-full px-3 py-1 h-full`}>
+                                    <Tag size={14} className={appliedDiscount ? "text-green-600" : "text-gray-400"}/>
                                     <input 
                                         value={promoCode}
                                         onChange={e => setPromoCode(e.target.value)}
                                         placeholder="CODE"
-                                        className="bg-transparent border-none outline-none w-16 text-center text-sm font-bold uppercase mx-1"
+                                        className="bg-transparent border-none outline-none w-14 text-center text-[10px] font-bold uppercase mx-1"
                                         disabled={!!appliedDiscount}
                                     />
                                     {appliedDiscount ? (
-                                        <button onClick={() => { setAppliedDiscount(null); setPromoCode(''); }} className="bg-red-500 text-white rounded-full p-0.5"><X size={12}/></button>
+                                        <button onClick={() => { setAppliedDiscount(null); setPromoCode(''); }} className="bg-red-500 text-white rounded-full p-0.5"><X size={10}/></button>
                                     ) : (
-                                        <button onClick={validatePromo} disabled={!promoCode.trim() || promoLoading} className="text-orange-600 font-bold text-xs px-1">
-                                            {promoLoading ? <Loader2 size={12} className="animate-spin"/> : 'OK'}
+                                        <button onClick={validatePromo} disabled={!promoCode.trim() || promoLoading} className="text-orange-600 font-black text-[10px]">
+                                            {promoLoading ? <Loader2 size={10} className="animate-spin"/> : 'OK'}
                                         </button>
                                     )}
                                 </div>
                             </div>
                         </div>
 
-                        {/* --- CATEGORIES --- */}
-                        <div className="bg-white border-b overflow-x-auto whitespace-nowrap p-2 flex gap-2 no-scrollbar shadow-sm z-10 sticky top-0">
+                        {/* CATEGORIES: Clean & White */}
+                        <div className="bg-white border-b overflow-x-auto whitespace-nowrap px-2 py-2.5 flex gap-2 no-scrollbar z-10 sticky top-0">
                              {categories.map(c => (
                                  <button 
                                     key={c} 
                                     onClick={() => setActiveCategory(c)}
-                                    className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${activeCategory === c ? 'bg-black text-white shadow-md' : 'bg-gray-100 text-gray-600 border border-gray-200'}`}
+                                    className={`px-4 py-1.5 rounded-full text-[11px] font-bold transition-all ${activeCategory === c ? 'bg-black text-white' : 'bg-gray-50 text-gray-500 border border-gray-100'}`}
                                 >
                                     {t(c)}
                                  </button>
@@ -439,8 +467,7 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                     </>
                 )}
 
-                <div className="flex-1 overflow-y-auto bg-gray-50">
-                    {/* ... (Existing Views: Admin, Cart, Orders) ... */}
+                <div className="flex-1 overflow-y-auto bg-gray-50/50">
                     {view === 'admin' ? (
                         <div className="p-4 space-y-4">
                             <h3 className="font-bold">{t('adRequests')}</h3>
@@ -462,7 +489,7 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                             <button className="w-full py-3 bg-black text-white rounded-lg font-bold flex items-center justify-center gap-2"><Plus/> {t('addProduct')}</button>
                         </div>
                     ) : view === 'cart' ? (
-                        <div className="p-4 bg-white m-4 rounded-xl shadow-sm">
+                        <div className="p-4 bg-white m-4 rounded-xl shadow-sm border">
                             <div className="flex justify-between items-center mb-4">
                                 <h3 className="font-bold text-lg">{t('checkout')}</h3>
                                 <button onClick={() => setView('catalog')}><X/></button>
@@ -470,11 +497,9 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                             {cart.length === 0 ? <p className="text-center text-gray-500 py-6">{t('cartEmpty')}</p> : (
                                 <>
                                     {cart.map(i => {
-                                        // Dynamic calculation for display
                                         const finalItemPrice = appliedDiscount 
                                             ? (i.discount_price && i.discount_price > 0 ? i.discount_price : Math.round(i.price * (1 - appliedDiscount.rate)))
                                             : i.price;
-
                                         return (
                                             <div key={`${i.id}-${i.selectedSize}`} className="flex justify-between border-b py-2">
                                                 <span className="text-sm">{i.name} {i.selectedSize && `(${i.selectedSize})`} x{i.quantity}</span>
@@ -487,7 +512,6 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                                             </div>
                                         );
                                     })}
-                                    
                                     <div className="py-4">
                                         {appliedDiscount && (
                                             <div className="flex justify-between text-sm mb-1 text-green-600 font-bold">
@@ -500,11 +524,10 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                                             <span className="text-orange-600">{cartTotal} DH</span>
                                         </div>
                                     </div>
-
-                                    <div className="p-3 bg-yellow-50 text-xs text-yellow-700 rounded-lg mb-4">
+                                    <div className="p-3 bg-yellow-50 text-[10px] text-yellow-700 rounded-lg mb-4 leading-tight">
                                         ℹ️ {t('storeWelcomeMsg')}
                                     </div>
-                                    <button onClick={handleCheckout} className="w-full bg-green-600 text-white py-3 rounded-full font-bold shadow-lg">{loading ? <Loader2 className="animate-spin mx-auto"/> : t('checkout')}</button>
+                                    <button onClick={handleCheckout} className="w-full bg-green-600 text-white py-4 rounded-full font-black shadow-lg uppercase tracking-wider">{loading ? <Loader2 className="animate-spin mx-auto"/> : t('checkout')}</button>
                                 </>
                             )}
                         </div>
@@ -521,7 +544,6 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                                         </span>
                                     </div>
                                     <p className="text-sm text-gray-600">{new Date(o.created_at).toLocaleDateString()}</p>
-                                    
                                     {o.discount_amount && o.discount_amount > 0 ? (
                                         <div className="mt-1">
                                             <span className="line-through text-xs text-gray-400 mr-2">{o.total_amount + o.discount_amount} DH</span>
@@ -531,7 +553,6 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                                     ) : (
                                         <p className="font-bold text-orange-600 mt-1">{o.total_amount} DH</p>
                                     )}
-
                                     <div className="mt-2 text-xs text-gray-500">
                                         {o.items.map((i: any) => `${i.name} ${i.selectedSize ? `(${i.selectedSize})` : ''} (x${i.quantity})`).join(', ')}
                                     </div>
@@ -539,137 +560,116 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                             ))}
                         </div>
                     ) : (
-                        <div className="grid grid-cols-2 gap-1 p-1 pb-20">
+                        <div className="grid grid-cols-2 gap-1.5 p-1.5 pb-24">
                              {filteredProducts.map(p => {
-                                 // CALCULATE DISPLAY PRICE
                                  const displayPrice = appliedDiscount 
                                     ? (p.discount_price && p.discount_price > 0 ? p.discount_price : Math.round(p.price * (1 - appliedDiscount.rate)))
                                     : p.price;
-
                                  return (
-                                     <div key={p.id} onClick={() => openProduct(p)} className="bg-white p-2 flex flex-col gap-1 cursor-pointer hover:shadow-md transition-shadow relative">
+                                     <div key={p.id} onClick={() => openProduct(p)} className="bg-white flex flex-col gap-1.5 cursor-pointer hover:shadow-lg transition-all relative overflow-hidden rounded-xl border border-gray-100 pb-2">
                                          {appliedDiscount && (
-                                             <div className="absolute top-2 right-2 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded z-10 shadow-sm animate-pulse">
+                                             <div className="absolute top-2 right-2 bg-red-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full z-10 shadow-lg">
                                                  SALE
                                              </div>
                                          )}
-                                         {p.is_featured && (
-                                             <div className="absolute top-2 left-2 bg-purple-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded z-10 shadow-sm flex items-center gap-1">
-                                                 <Gem size={8}/> Featured
-                                             </div>
-                                         )}
-                                         <div className="aspect-[4/5] bg-gray-100 relative mb-1 overflow-hidden rounded-sm">
-                                             <img src={p.image_url} className="w-full h-full object-cover"/>
+                                         <div className="aspect-[4/5] bg-gray-50 relative overflow-hidden">
+                                             <img src={p.image_url} className="w-full h-full object-cover transform hover:scale-105 transition-transform duration-500"/>
                                          </div>
-                                         <h3 className="text-xs line-clamp-1 text-gray-700">{p.name}</h3>
-                                         
-                                         {/* SHOW COMMISSION TO LOGGED IN USERS ONLY (AFFILIATES) */}
-                                         {currentUser && (
-                                             <div className="text-[9px] bg-green-50 text-green-700 px-1 rounded inline-block font-bold w-fit">
-                                                 ربح: {p.affiliate_commission ? `${p.affiliate_commission} DH` : `${Math.round(p.price * 0.05)} DH`}
-                                             </div>
-                                         )}
-
-                                         <div className="flex items-baseline gap-1 flex-wrap">
-                                             <span className="text-orange-600 font-black text-lg">{displayPrice}<span className="text-xs">DH</span></span>
-                                             {appliedDiscount && (
-                                                 <span className="text-gray-400 text-[10px] line-through relative">
-                                                     {p.price}
-                                                     <div className="absolute top-1/2 left-0 w-full h-[1px] bg-red-500"></div>
-                                                 </span>
-                                             )}
+                                         <div className="px-2 space-y-1">
+                                            <h3 className="text-[11px] font-bold line-clamp-1 text-gray-900">{p.name}</h3>
+                                            {isApprovedAffiliate && (
+                                                <div className="text-[9px] bg-green-50 text-green-700 px-2 py-0.5 rounded-md font-black w-fit border border-green-100">
+                                                    ربح: {p.affiliate_commission ? `${p.affiliate_commission} DH` : `${Math.round(p.price * 0.05)} DH`}
+                                                </div>
+                                            )}
+                                            <div className="flex items-baseline gap-1.5">
+                                                <span className="text-orange-600 font-black text-lg">{displayPrice}<span className="text-[10px] ml-0.5">DH</span></span>
+                                                {appliedDiscount && (
+                                                    <span className="text-gray-400 text-[10px] line-through">
+                                                        {p.price}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-1">
+                                                <div className="flex">
+                                                    {[1,2,3,4,5].map(s => <Star key={s} size={8} className="fill-yellow-400 text-yellow-400"/>)}
+                                                </div>
+                                                <span className="text-[8px] text-gray-400">(48)</span>
+                                            </div>
                                          </div>
-                                         
-                                         <div className="flex items-center gap-1">
-                                             <Star size={8} className="fill-yellow-400 text-yellow-400"/>
-                                             <span className="text-[10px] text-gray-400">4.9</span>
-                                         </div>
-                                         <button 
-                                            onClick={(e) => { e.stopPropagation(); addToCart(p); }} 
-                                            className="w-full mt-1 bg-green-500 text-white text-[10px] rounded-full py-1 font-bold shadow-sm active:scale-95 transition-transform"
-                                         >
-                                             {t('addToCart')}
-                                         </button>
                                      </div>
                                  );
                              })}
-                             {filteredProducts.length === 0 && <p className="col-span-2 text-center py-10 text-gray-400">{t('loading')}</p>}
+                             {filteredProducts.length === 0 && <p className="col-span-2 text-center py-20 text-gray-400 text-xs">{t('loading')}</p>}
                         </div>
                     )}
                 </div>
+                </div>
 
-                {/* --- PRODUCT DETAIL FULL SCREEN --- */}
+                {/* PRODUCT DETAIL FULL SCREEN */}
                 {selectedProduct && (
                     <div className="fixed inset-0 z-50 bg-white flex flex-col animate-slide-up">
                         <div className="bg-white border-b p-3 flex justify-between items-center shadow-sm z-10">
-                            <button onClick={() => setSelectedProduct(null)} className="p-2 bg-gray-100 rounded-full hover:bg-gray-200">
+                            <button onClick={() => setSelectedProduct(null)} className="p-2 bg-gray-50 rounded-full">
                                 <ArrowLeft size={20}/>
                             </button>
-                            <h3 className="font-bold text-sm truncate max-w-[200px]">{selectedProduct.name}</h3>
+                            <h3 className="font-black text-xs uppercase tracking-widest">{selectedProduct.name}</h3>
                             <div className="flex items-center gap-2">
-                                {/* FIXED: Now this button both closes the detail modal AND sets the view to cart */}
-                                <button onClick={() => { setSelectedProduct(null); setView('cart'); }} className="p-2 bg-black text-white rounded-full relative">
+                                <button onClick={() => { setSelectedProduct(null); setView('cart'); }} className="p-2 bg-orange-600 text-white rounded-full relative shadow-md">
                                     <ShoppingCart size={18}/>
-                                    {cart.length > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold">{cart.length}</span>}
+                                    {cart.length > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[9px] w-4 h-4 rounded-full flex items-center justify-center font-black border-2 border-white">{cart.length}</span>}
                                 </button>
-                                {currentUser && (
-                                    <button onClick={onGoToProfile} className="w-8 h-8 rounded-full overflow-hidden border border-gray-200">
-                                        <img src={currentUser.profile_image_url || `https://ui-avatars.com/api/?name=${currentUser.name}`} className="w-full h-full object-cover"/>
-                                    </button>
-                                )}
                             </div>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto bg-gray-50 pb-20">
-                            <div className="relative bg-white aspect-square w-full">
+                        <div className="flex-1 overflow-y-auto bg-white pb-24">
+                            <div className="relative aspect-square w-full bg-gray-50">
                                 <img src={sliderImages[currentImageIndex]} className="w-full h-full object-contain"/>
                                 {sliderImages.length > 1 && (
                                     <>
-                                        <button onClick={prevImage} className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-black/20 text-white rounded-full"><ChevronLeft/></button>
-                                        <button onClick={nextImage} className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-black/20 text-white rounded-full"><ChevronRight/></button>
-                                        <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-1">
+                                        <button onClick={prevImage} className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-white/50 rounded-full shadow-md"><ChevronLeft/></button>
+                                        <button onClick={nextImage} className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-white/50 rounded-full shadow-md"><ChevronRight/></button>
+                                        <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-1.5">
                                             {sliderImages.map((_, idx) => (
-                                                <div key={idx} className={`w-2 h-2 rounded-full shadow-sm ${idx === currentImageIndex ? 'bg-orange-500' : 'bg-gray-300'}`}></div>
+                                                <div key={idx} className={`h-1.5 rounded-full transition-all ${idx === currentImageIndex ? 'w-6 bg-orange-600' : 'w-1.5 bg-gray-300'}`}></div>
                                             ))}
                                         </div>
                                     </>
                                 )}
                             </div>
 
-                            <div className="p-4 bg-white mb-2 shadow-sm">
-                                <div className="flex justify-between items-start mb-2">
-                                    <div>
-                                        <div className="text-3xl font-black text-orange-600">
-                                            {appliedDiscount 
-                                                ? (selectedProduct.discount_price && selectedProduct.discount_price > 0 ? selectedProduct.discount_price : Math.round(selectedProduct.price * (1 - appliedDiscount.rate)))
-                                                : selectedProduct.price} 
-                                            <span className="text-sm text-gray-500 font-normal">DH</span>
+                            <div className="p-5">
+                                <div className="flex justify-between items-start mb-4">
+                                    <div className="space-y-1">
+                                        <div className="text-4xl font-black text-orange-600">
+                                            {displayPriceForSelectedProduct} 
+                                            <span className="text-sm text-gray-400 font-bold ml-1">DH</span>
                                         </div>
                                         {appliedDiscount && (
-                                            <div className="text-sm text-gray-400 line-through decoration-red-500">
+                                            <div className="text-sm text-gray-400 line-through">
                                                 {selectedProduct.price} DH
                                             </div>
                                         )}
-                                        {/* Show Commission to Affiliates */}
-                                        {currentUser && (
-                                            <div className="mt-1 bg-green-50 text-green-700 text-xs px-2 py-1 rounded inline-block font-bold border border-green-200">
+                                        {isApprovedAffiliate && (
+                                            <div className="mt-2 bg-green-50 text-green-700 text-[10px] px-3 py-1 rounded-full inline-block font-black border border-green-100">
                                                 ربح المسوق: {selectedProduct.affiliate_commission ? `${selectedProduct.affiliate_commission} DH` : `${Math.round(selectedProduct.price * 0.05)} DH`}
                                             </div>
                                         )}
                                     </div>
-                                    <button className="p-2 bg-gray-50 rounded-full text-gray-400 hover:text-red-500"><Heart/></button>
+                                    <button className="p-3 bg-gray-50 rounded-full text-gray-400"><Heart size={24}/></button>
                                 </div>
-                                <h1 className="text-lg font-bold text-gray-900 leading-tight mb-4">{selectedProduct.name}</h1>
+
+                                <h1 className="text-xl font-black text-gray-900 leading-tight mb-6">{selectedProduct.name}</h1>
                                 
                                 {selectedProduct.sizes && selectedProduct.sizes.length > 0 && (
-                                    <div className="mb-4">
-                                        <h4 className="font-bold text-sm mb-2">{t('selectSize')}</h4>
+                                    <div className="mb-6">
+                                        <h4 className="font-bold text-xs uppercase text-gray-400 mb-3">{t('selectSize')}</h4>
                                         <div className="flex flex-wrap gap-2">
                                             {selectedProduct.sizes.map(size => (
                                                 <button
                                                     key={size}
                                                     onClick={() => setSelectedSize(size)}
-                                                    className={`px-4 py-2 border rounded-lg text-sm font-bold transition-all ${selectedSize === size ? 'bg-black text-white border-black' : 'bg-white text-gray-600 border-gray-300 hover:border-black'}`}
+                                                    className={`px-5 py-2.5 border-2 rounded-xl text-sm font-black transition-all ${selectedSize === size ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-900 border-gray-100'}`}
                                                 >
                                                     {size}
                                                 </button>
@@ -678,72 +678,80 @@ const Store: React.FC<StoreProps> = ({ isOpen, onClose, currentUser, onOpenAuth,
                                     </div>
                                 )}
 
-                                <div className="p-3 bg-orange-50 rounded-xl mb-4 border border-orange-100 flex items-center gap-3">
-                                    <div className="bg-orange-100 p-2 rounded-full text-orange-600"><Truck size={18}/></div>
-                                    <div>
-                                        <p className="text-xs font-bold text-orange-800">{t('freeDelivery')}</p>
-                                        <p className="text-[10px] text-orange-600">{t('storeWelcomeMsg')}</p>
+                                <div className="grid grid-cols-2 gap-3 mb-6">
+                                    <div className="p-4 bg-orange-50/50 rounded-2xl border border-orange-50 flex flex-col gap-1">
+                                        <Truck size={20} className="text-orange-600 mb-1"/>
+                                        <p className="text-xs font-black">{t('freeDelivery')}</p>
+                                        <p className="text-[9px] text-gray-500">Tanja City Only</p>
+                                    </div>
+                                    <div className="p-4 bg-green-50/50 rounded-2xl border border-green-50 flex flex-col gap-1">
+                                        <CheckCircle size={20} className="text-green-600 mb-1"/>
+                                        <p className="text-xs font-black">Cash On Delivery</p>
+                                        <p className="text-[9px] text-gray-500">الدفع عند الاستلام</p>
                                     </div>
                                 </div>
 
-                                <div className="mb-4">
-                                    <h4 className="font-bold text-sm mb-2 text-gray-900">{t('description')}</h4>
+                                <div className="mb-8">
+                                    <h4 className="font-bold text-xs uppercase text-gray-400 mb-3">{t('description')}</h4>
                                     <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-line">{selectedProduct.description}</p>
                                 </div>
-                            </div>
 
-                            <div className="p-4 bg-white shadow-sm">
-                                <h4 className="font-bold text-sm mb-4 flex items-center gap-2"><MessageSquare size={16} className="text-blue-500"/> {t('reviews')} ({reviews.length})</h4>
-                                <div className="flex gap-2 mb-6 items-end bg-gray-50 p-2 rounded-xl border">
-                                    <textarea 
-                                        value={newReview} 
-                                        onChange={e => setNewReview(e.target.value)} 
-                                        placeholder={currentUser ? t('writeComment') : t('loginRequired')}
-                                        className="flex-1 bg-transparent text-sm outline-none resize-none h-10 py-2"
-                                        disabled={!currentUser}
-                                    />
-                                    <button onClick={handleSubmitReview} disabled={reviewLoading || !currentUser} className="bg-blue-600 text-white p-2 rounded-lg shadow-sm disabled:opacity-50">
-                                        {reviewLoading ? <Loader2 className="animate-spin" size={16}/> : <Send size={16}/>}
-                                    </button>
-                                </div>
-
-                                <div className="space-y-4">
-                                    {reviews.map((rev, index) => (
-                                        <div key={rev.id} className="flex gap-3 items-start border-b pb-3 last:border-0">
-                                            <div className="bg-gray-200 text-gray-600 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0">
-                                                #{index + 1}
-                                            </div>
-                                            <div className="flex-1">
-                                                <div className="flex justify-between items-center mb-1">
-                                                    <span className="font-bold text-xs text-gray-900">{rev.user_name}</span>
-                                                    <span className="text-[10px] text-gray-400">{new Date(rev.created_at).toLocaleDateString()}</p>
+                                {/* REVIEWS */}
+                                <div className="border-t pt-8">
+                                    <h4 className="font-black text-lg mb-6 flex items-center gap-2">
+                                        {t('reviews')} <span className="bg-gray-100 text-gray-500 px-2 py-0.5 rounded-md text-xs">{reviews.length}</span>
+                                    </h4>
+                                    <div className="flex gap-2 mb-8 items-start bg-gray-50 p-3 rounded-2xl border border-gray-100">
+                                        <textarea 
+                                            value={newReview} 
+                                            onChange={e => setNewReview(e.target.value)} 
+                                            placeholder={currentUser ? t('writeComment') : t('loginRequired')}
+                                            className="flex-1 bg-transparent text-sm outline-none resize-none h-12 py-1"
+                                            disabled={!currentUser}
+                                        />
+                                        <button onClick={handleSubmitReview} disabled={reviewLoading || !currentUser} className="bg-orange-600 text-white p-3 rounded-xl shadow-lg disabled:opacity-50">
+                                            {reviewLoading ? <Loader2 className="animate-spin" size={20}/> : <Send size={20}/>}
+                                        </button>
+                                    </div>
+                                    <div className="space-y-6">
+                                        {reviews.map((rev) => (
+                                            <div key={rev.id} className="space-y-2">
+                                                <div className="flex justify-between items-center">
+                                                    <span className="font-black text-sm">{rev.user_name}</span>
+                                                    <span className="text-[10px] text-gray-400 font-mono">{new Date(rev.created_at).toLocaleDateString()}</span>
                                                 </div>
-                                                <p className="text-sm text-gray-700 bg-gray-50 p-2 rounded-lg rounded-tl-none">{rev.comment}</p>
+                                                <div className="flex mb-1">
+                                                    {[1,2,3,4,5].map(s => <Star key={s} size={10} className="fill-orange-500 text-orange-500"/>)}
+                                                </div>
+                                                <p className="text-sm text-gray-700 bg-gray-50/50 p-3 rounded-2xl rounded-tl-none">{rev.comment}</p>
                                             </div>
-                                        </div>
-                                    ))}
-                                    {reviews.length === 0 && <p className="text-center text-gray-400 text-xs italic py-4">No reviews yet.</p>}
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="p-4 bg-white border-t safe-area-bottom shadow-[0_-5px_20px_-5px_rgba(0,0,0,0.1)]">
-                             <button onClick={() => addToCart(selectedProduct)} className="w-full py-4 bg-green-600 text-white rounded-full font-bold shadow-lg flex justify-center items-center gap-2 active:scale-95 transition-transform text-lg">
-                                 <ShoppingBag size={20}/> {t('addToCart')}
+                        {/* STICKY FOOTER */}
+                        <div className="p-4 bg-white border-t safe-area-bottom shadow-[0_-10px_30px_rgba(0,0,0,0.05)] flex gap-3">
+                             <button onClick={() => addToCart(selectedProduct)} className="flex-1 py-4 bg-orange-600 text-white rounded-full font-black shadow-xl uppercase tracking-widest active:scale-95 transition-transform text-sm">
+                                 {t('addToCart')}
                              </button>
                         </div>
                     </div>
                 )}
 
                 {showWelcome && view === 'catalog' && (
-                    <div className="absolute inset-0 z-30 bg-black/80 flex items-center justify-center p-6 backdrop-blur-sm">
-                        <div className="bg-white p-6 rounded-3xl max-w-xs text-center relative animate-fade-in">
-                            <button onClick={() => setShowWelcome(false)} className="absolute top-2 right-2"><X/></button>
-                            <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-3"><Truck className="text-orange-500"/></div>
-                            <h3 className="font-bold text-xl mb-2">{t('storeWelcomeTitle')}</h3>
-                            <p className="text-gray-600 mb-6 text-sm">{currentUser ? t('welcomeBackMessage').replace('{name}', currentUser.name) : ''} {t('storeWelcomeMsg')}</p>
-                            <button onClick={() => setShowWelcome(false)} className="w-full bg-orange-600 text-white py-3 rounded-full font-bold shadow-lg">{t('shopNow')}</button>
+                    <div className="absolute inset-0 z-[60] bg-white flex flex-col items-center justify-center p-8 animate-fade-in">
+                        <div className="w-24 h-24 bg-orange-50 rounded-full flex items-center justify-center mb-6 ring-4 ring-orange-50">
+                            <ShoppingBag className="text-orange-600" size={48}/>
                         </div>
+                        <h3 className="font-black text-3xl mb-3 text-center uppercase tracking-tighter">{t('storeWelcomeTitle')}</h3>
+                        <p className="text-gray-500 mb-12 text-center text-sm leading-relaxed max-w-[240px]">
+                            {t('storeWelcomeMsg')}
+                        </p>
+                        <button onClick={() => setShowWelcome(false)} className="w-full max-w-xs bg-orange-600 text-white py-5 rounded-full font-black shadow-2xl uppercase tracking-widest text-sm active:scale-95 transition-transform">
+                            {t('shopNow')}
+                        </button>
                     </div>
                 )}
             </div>
